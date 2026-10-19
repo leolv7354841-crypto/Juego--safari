@@ -1,0 +1,10 @@
+{
+  "name": "dead-zone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dead Zone: supervivencia zombi 2D para navegador (Chrome y Safari, computadora y celular).",
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes http-server -c-1 -p 8080 ."
+  }
+}

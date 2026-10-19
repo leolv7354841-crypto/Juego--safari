@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Dead Zone</title>
+  <meta name="description" content="Supervivencia zombi 2D en vista cenital. Juega en el navegador, en computadora o celular.">
+  <meta name="theme-color" content="#0c0e0b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dead Zone">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game" class="state-menu">
+    <canvas id="view" aria-label="Zona de juego"></canvas>
+
+    <div id="hud">
+      <div class="xp-track"><div class="xp-fill" id="xp-fill"></div></div>
+      <div class="hud-left">
+        <div class="lvl-badge"><small>NV</small><b id="lvl">1</b></div>
+        <div class="vitals">
+          <div class="bar hp" id="hp-bar">
+            <div class="fill" id="hp-fill"></div>
+            <span class="lbl">Vida</span><span class="val" id="hp-val">100</span>
+          </div>
+          <div class="bar st" id="st-bar">
+            <div class="fill" id="st-fill"></div>
+            <span class="lbl">Estamina</span>
+          </div>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="stat"><small>Tiempo</small><b id="time">00:00</b></div>
+        <div class="stat"><small>Bajas</small><b id="kills">0</b></div>
+        <div class="stat"><small>Oleada</small><b id="wave">1</b></div>
+        <button class="icon-btn" id="btn-pause" aria-label="Pausa">
+          <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        </button>
+      </div>
+      <div class="ammo" id="ammo">
+        <div class="slots" id="slots"></div>
+        <div class="ammo-main">
+          <span class="wname" id="wname">Pistola</span>
+          <span class="count"><b id="mag">12</b><i>/</i><span id="reserve">∞</span></span>
+        </div>
+        <div class="reload-track"><div class="reload-fill" id="reload-fill"></div></div>
+      </div>
+      <div id="toast"></div>
+      <div id="banner"><b id="banner-title"></b><span id="banner-sub"></span></div>
+    </div>
+
+    <div id="touch">
+      <div id="joy-zone">
+        <div id="joy-base"><div id="joy-knob"></div></div>
+      </div>
+      <div class="tbtns">
+        <button class="tbtn small" id="btn-swap" aria-label="Cambiar arma">
+          <svg viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>
+        </button>
+        <button class="tbtn small" id="btn-reload" aria-label="Recargar">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>
+        </button>
+        <button class="tbtn mid" id="btn-run" aria-label="Correr">
+          <span>Correr</span>
+        </button>
+        <button class="tbtn big" id="btn-fire" aria-label="Disparar">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <section class="screen" id="screen-start">
+      <div class="panel title-panel">
+        <p class="kicker">Día 47 · Zona de cuarentena 9</p>
+        <h1 class="logo">Dead<span>Zone</span></h1>
+        <p class="lead">La ciudad cayó. Los caminantes son lentos, pero nunca dejan de llegar. Aguanta todas las oleadas que puedas.</p>
+        <button class="btn primary" id="btn-start">Jugar</button>
+        <div class="controls-help">
+          <div class="help-desktop">
+            <span><kbd>WASD</kbd> moverse</span>
+            <span><kbd>Shift</kbd> correr</span>
+            <span><kbd>Clic</kbd> disparar</span>
+            <span><kbd>R</kbd> recargar</span>
+            <span><kbd>1-4</kbd>/<kbd>Q</kbd> armas</span>
+            <span><kbd>Esc</kbd> pausa</span>
+          </div>
+          <div class="help-touch">
+            <span>Joystick izquierdo para moverte</span>
+            <span>Mantén el botón de disparo: apunta solo</span>
+            <span>Correr gasta estamina</span>
+          </div>
+        </div>
+        <p class="best" id="best"></p>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-pause" hidden>
+      <div class="panel">
+        <h2>Pausa</h2>
+        <div class="stack">
+          <button class="btn primary" id="btn-resume">Continuar</button>
+          <button class="btn" id="btn-sound">Sonido: activado</button>
+          <button class="btn" id="btn-restart">Reiniciar partida</button>
+          <button class="btn ghost" id="btn-menu">Salir al menú</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-level" hidden>
+      <div class="panel wide">
+        <p class="kicker" id="level-kicker">Nivel 2</p>
+        <h2>Elige una mejora</h2>
+        <div class="cards" id="cards"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-over" hidden>
+      <div class="panel">
+        <p class="kicker">Fin de la partida</p>
+        <h2 class="dead-title">Has caído</h2>
+        <dl class="results" id="results"></dl>
+        <p class="best" id="over-best"></p>
+        <div class="stack">
+          <button class="btn primary" id="btn-again">Reintentar</button>
+          <button class="btn ghost" id="btn-over-menu">Menú principal</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

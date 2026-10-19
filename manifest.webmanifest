@@ -1,0 +1,15 @@
+{
+  "name": "Dead Zone",
+  "short_name": "Dead Zone",
+  "description": "Supervivencia zombi 2D en vista cenital.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0c0e0b",
+  "theme_color": "#0c0e0b",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

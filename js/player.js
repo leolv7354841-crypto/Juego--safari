@@ -1,0 +1,277 @@
+import { PLAYER_BASE, WEAPONS, WORLD_SIZE } from './config.js';
+import { clamp, rand, angleTo } from './util.js';
+
+// Distancia (local) desde el centro del personaje hasta la boca del cañón.
+const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1 };
+
+export class Player {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.kx = 0;
+    this.ky = 0;
+    this.r = PLAYER_BASE.radius;
+    this.mass = PLAYER_BASE.mass;
+    this.angle = -Math.PI / 2;
+    this.legAngle = -Math.PI / 2;
+    this.walkPhase = 0;
+    this.speedNow = 0;
+    this.stats = {
+      maxHp: PLAYER_BASE.maxHp,
+      armor: 0,
+      dmgMult: 1,
+      rateMult: 1,
+      maxStamina: PLAYER_BASE.maxStamina,
+      staminaRegenMult: 1,
+      speedMult: 1,
+      ammoMult: 1,
+      pierce: 0,
+      reloadMult: 1,
+    };
+    this.hp = this.stats.maxHp;
+    this.stamina = this.stats.maxStamina;
+    this.exhausted = false;
+    this.running = false;
+    this.sinceRun = 10;
+    this.weapons = [this.makeWeapon('pistol')];
+    this.wi = 0;
+    this.fireCd = 0;
+    this.reloadT = 0;
+    this.reloadDur = 1;
+    this.bloom = 0;
+    this.recoil = 0;
+    this.flashT = 0;
+    this.hurtT = 0;
+    this.alive = true;
+    this.target = null;
+    this.shotsFired = 0;
+    this.shotsHit = 0;
+    this.damageTaken = 0;
+  }
+
+  get weapon() {
+    return this.weapons[this.wi];
+  }
+  get gunTip() {
+    return GUN_TIP[this.weapon.id];
+  }
+
+  makeWeapon(id) {
+    const def = WEAPONS[id];
+    return { id, def, mag: this.magSize(def), reserve: def.reserve };
+  }
+  magSize(def) {
+    return Math.round(def.mag * this.stats.ammoMult);
+  }
+  reserveMax(def) {
+    return def.reserveMax === Infinity ? Infinity : Math.round(def.reserveMax * this.stats.ammoMult);
+  }
+  has(id) {
+    return this.weapons.some((w) => w.id === id);
+  }
+
+  unlock(id) {
+    if (this.has(id)) return false;
+    this.weapons.push(this.makeWeapon(id));
+    this.weapons.sort((a, b) => ['pistol', 'smg', 'shotgun', 'rifle'].indexOf(a.id) - ['pistol', 'smg', 'shotgun', 'rifle'].indexOf(b.id));
+    this.select(this.weapons.findIndex((w) => w.id === id));
+    return true;
+  }
+
+  select(i) {
+    if (i < 0 || i >= this.weapons.length || i === this.wi) return;
+    this.wi = i;
+    this.reloadT = 0;
+    this.fireCd = Math.max(this.fireCd, 0.18);
+  }
+
+  addAmmo(mult = 1) {
+    let any = false;
+    for (const w of this.weapons) {
+      if (w.def.reserve === Infinity) continue;
+      w.reserve = Math.min(this.reserveMax(w.def), w.reserve + Math.round(w.def.pickup * this.stats.ammoMult * mult));
+      any = true;
+    }
+    return any;
+  }
+
+  startReload(game) {
+    const w = this.weapon;
+    if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
+    this.reloadDur = w.def.reload / this.stats.reloadMult;
+    this.reloadT = this.reloadDur;
+    game.sfx.reload();
+  }
+
+  hurt(dmg, game) {
+    if (!this.alive) return;
+    const real = dmg * (1 - this.stats.armor);
+    this.hp -= real;
+    this.damageTaken += real;
+    this.hurtT = 0.3;
+    game.camera.shake(0.28);
+    game.hurtFlash = Math.min(1, game.hurtFlash + 0.5);
+    game.sfx.hurt();
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.alive = false;
+      game.onPlayerDeath();
+    }
+  }
+
+  update(dt, game) {
+    const input = game.input;
+    const st = this.stats;
+    const mv = input.move();
+    const mag = Math.hypot(mv.x, mv.y);
+    const moving = mag > 0.12;
+
+    // --- estamina ---
+    this.sinceRun += dt;
+    const wantRun = input.run && moving;
+    if (wantRun && !this.exhausted && this.stamina > 0) {
+      this.running = true;
+      this.sinceRun = 0;
+      this.stamina -= PLAYER_BASE.staminaDrain * dt;
+      if (this.stamina <= 0) {
+        this.stamina = 0;
+        this.exhausted = true;
+        game.sfx.exhausted();
+      }
+    } else {
+      this.running = false;
+    }
+    if (!this.running && this.sinceRun > PLAYER_BASE.regenDelay) {
+      this.stamina = Math.min(st.maxStamina, this.stamina + PLAYER_BASE.staminaRegen * st.staminaRegenMult * dt);
+    }
+    if (this.exhausted && this.stamina > st.maxStamina * 0.3) this.exhausted = false;
+
+    // --- movimiento ---
+    let speed = PLAYER_BASE.walkSpeed * st.speedMult;
+    if (this.running) speed *= PLAYER_BASE.runMult;
+    if (this.exhausted) speed *= 0.85;
+    const k = Math.min(mag, 1);
+    const tvx = moving ? (mv.x / mag) * speed * k : 0;
+    const tvy = moving ? (mv.y / mag) * speed * k : 0;
+    const a = 1 - Math.exp(-dt * 14);
+    this.vx += (tvx - this.vx) * a;
+    this.vy += (tvy - this.vy) * a;
+    const kd = Math.exp(-dt * 9);
+    this.kx *= kd;
+    this.ky *= kd;
+    const ox = this.x;
+    const oy = this.y;
+    this.x += (this.vx + this.kx) * dt;
+    this.y += (this.vy + this.ky) * dt;
+    game.world.collide(this, this.r);
+    this.x = clamp(this.x, 30, WORLD_SIZE - 30);
+    this.y = clamp(this.y, 30, WORLD_SIZE - 30);
+    const moved = Math.hypot(this.x - ox, this.y - oy);
+    this.speedNow = moved / Math.max(dt, 1e-4);
+    this.walkPhase += moved * 0.11;
+    if (moving) this.legAngle = angleTo(this.legAngle, Math.atan2(mv.y, mv.x), dt * 12);
+
+    // --- apuntado ---
+    const range = this.weapon.def.range;
+    if (input.mode === 'mouse') {
+      const m = game.mouseWorld();
+      this.angle = Math.atan2(m.y - this.y, m.x - this.x);
+      this.target = null;
+    } else {
+      this.target = game.horde.findTarget(this.x, this.y, range * 0.92, this.target);
+      if (this.target) {
+        const ta = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        this.angle = angleTo(this.angle, ta, dt * 16);
+      } else if (moving) {
+        this.angle = angleTo(this.angle, Math.atan2(mv.y, mv.x), dt * 8);
+      }
+    }
+
+    // --- armas ---
+    this.fireCd -= dt;
+    this.flashT -= dt;
+    this.hurtT -= dt;
+    this.recoil = Math.max(0, this.recoil - dt * 8);
+    this.bloom = Math.max(0, this.bloom - dt * 0.5);
+    if (this.reloadT > 0) {
+      this.reloadT -= dt;
+      if (this.reloadT <= 0) {
+        this.reloadT = 0;
+        const w = this.weapon;
+        const need = this.magSize(w.def) - w.mag;
+        const take = Math.min(need, w.reserve);
+        w.mag += take;
+        if (w.reserve !== Infinity) w.reserve -= take;
+        game.sfx.reloadDone();
+      }
+    }
+    if (input.consume('reload')) this.startReload(game);
+    if (input.consume('swap')) this.select((this.wi + 1) % this.weapons.length);
+    const slot = input.consume('slot');
+    if (slot) this.select(slot - 1);
+    if (input.firing) this.tryFire(game);
+  }
+
+  tryFire(game) {
+    if (this.reloadT > 0 || this.fireCd > 0) return;
+    const w = this.weapon;
+    const d = w.def;
+    if (w.mag <= 0) {
+      if (w.reserve > 0) this.startReload(game);
+      else {
+        game.sfx.empty();
+        this.fireCd = 0.35;
+        game.toast('Sin munición: cambia de arma');
+        if (this.wi !== 0) this.select(0);
+      }
+      return;
+    }
+    w.mag--;
+    this.fireCd = 1 / (d.rate * this.stats.rateMult);
+    const spread = d.spread + this.bloom + (this.running ? 0.05 : 0);
+    const ca = Math.cos(this.angle);
+    const sa = Math.sin(this.angle);
+    const tip = this.gunTip;
+    const sx = this.x + ca * tip;
+    const sy = this.y + sa * tip;
+    // si el cañón atraviesa una pared, el disparo sale desde el cuerpo
+    const blocked = game.world.pointBlocked(sx, sy, 0, true);
+    const ox = blocked ? this.x : sx;
+    const oy = blocked ? this.y : sy;
+    const shot = { hit: false };
+    for (let i = 0; i < d.pellets; i++) {
+      const off = d.pellets > 1 ? ((i / (d.pellets - 1)) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
+      const a = this.angle + off;
+      game.bullets.spawn({
+        x: ox,
+        y: oy,
+        dx: Math.cos(a),
+        dy: Math.sin(a),
+        speed: d.speed * rand(0.95, 1.05),
+        life: d.range * (d.pellets > 1 ? rand(0.8, 1) : 1),
+        dmg: d.damage * this.stats.dmgMult,
+        pierce: d.pierce + this.stats.pierce,
+        knock: d.knock,
+        shot,
+        hits: null,
+      });
+    }
+    this.shotsFired++;
+    this.bloom = Math.min(0.22, this.bloom + d.bloom);
+    this.recoil = 1;
+    this.flashT = 0.05;
+    this.kx -= ca * d.knock * 0.5;
+    this.ky -= sa * d.knock * 0.5;
+    game.camera.shake(d.shake);
+    game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    game.muzzle = 1;
+    game.muzzleX = sx;
+    game.muzzleY = sy;
+    game.particles.casing(this.x + ca * 8, this.y + sa * 8, this.angle + Math.PI / 2);
+    game.particles.muzzleSmoke(sx, sy, this.angle);
+    game.sfx.shot(d.id);
+    if (w.mag === 0 && w.reserve > 0) this.startReload(game);
+  }
+}
