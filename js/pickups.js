@@ -23,17 +23,25 @@ export class Pickups {
       const dx = p.x - it.x;
       const dy = p.y - it.y;
       const d = Math.hypot(dx, dy);
-      if (d < 80 && p.alive) {
-        const pull = (1 - d / 80) * 380 * dt;
+      // sólo se atrae lo que se puede recoger: un botiquín con la vida llena se queda en el suelo
+      const usable = p.alive && this.canCollect(it, p);
+      if (d < 80 && usable) {
+        const pull = Math.min(d, (1 - d / 80) * 380 * dt);
         it.x += (dx / (d || 1)) * pull;
         it.y += (dy / (d || 1)) * pull;
       }
-      if (d < p.r + 14 && p.alive && this.collect(it, game)) {
+      if (d < p.r + 14 && usable && this.collect(it, game)) {
         this.list.splice(i, 1);
         continue;
       }
       if (it.t > LIFE) this.list.splice(i, 1);
     }
+  }
+
+  canCollect(it, p) {
+    if (it.k === 'med') return p.hp < p.stats.maxHp;
+    if (it.k === 'ammo') return p.weapons.some((w) => w.reserve !== Infinity && w.reserve < p.reserveMax(w.def));
+    return true;
   }
 
   collect(it, game) {
