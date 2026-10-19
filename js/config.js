@@ -6,7 +6,7 @@ export const ROAD_CENTERS = [300, 1100, 1900, 2700, 3500];
 export const ROAD_HALF = 110;
 export const SIDEWALK = 44;
 export const NAV_CELL = 40;
-export const MAX_ALIVE = 460;
+export const MAX_ALIVE = 600;
 
 export const PLAYER_BASE = {
   radius: 14,
@@ -68,8 +68,8 @@ export const ZOMBIES = {
   },
 };
 
-// Con hordas más grandes la experiencia necesaria sube para no saturar de mejoras.
-export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 1.6);
+// Con hordas 5 veces mayores la experiencia necesaria sube igual para no saturar de mejoras.
+export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 7);
 
 // Dinero por cada zombi eliminado.
 export const BOUNTY = { normal: 1, sprinter: 3, fat: 5, giant: 10 };

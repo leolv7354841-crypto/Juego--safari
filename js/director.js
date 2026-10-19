@@ -22,8 +22,9 @@ export class Director {
   startWave(game) {
     this.wave++;
     const w = this.wave;
-    const normals = 32 + w * 18 + Math.floor(Math.pow(w, 1.8));
-    const sprinters = w >= 2 ? 3 + Math.floor((w - 1) * 3.5) : 0;
+    // hordas masivas: 5 veces más normales y velocistas que antes
+    const normals = 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
+    const sprinters = 5 * (3 + Math.floor((w - 1) * 3.5));
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
     const giants = w >= 4 ? 1 + Math.floor((w - 4) / 3) : 0;
     const q = [];
@@ -34,11 +35,11 @@ export class Director {
     for (let i = 0; i < giants; i++) q.splice(randInt(Math.floor(q.length * 0.45), q.length), 0, 'giant');
     this.queue = q;
     this.waveSize = q.length;
-    this.interval = Math.max(0.35, 1.8 - w * 0.1);
+    this.interval = Math.max(0.3, 1.5 - w * 0.08);
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : w === 2 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : w === 1 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
@@ -95,7 +96,7 @@ export class Director {
   }
 
   spawnGroup(game) {
-    const size = Math.min(this.queue.length, randInt(5, 8 + Math.floor(this.wave * 1.5)));
+    const size = Math.min(this.queue.length, randInt(14, 22 + this.wave * 3));
     const cam = game.camera;
     const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 70;
     const p = game.player;
@@ -112,8 +113,8 @@ export class Director {
         const type = this.queue[0];
         const r = type === 'giant' ? 44 : type === 'fat' ? 22 : type === 'sprinter' ? 12 : 14;
         for (let t = 0; t < 6; t++) {
-          const x = cx + rand(-90, 90);
-          const y = cy + rand(-90, 90);
+          const x = cx + rand(-150, 150);
+          const y = cy + rand(-150, 150);
           if (world.pointBlocked(x, y, r + 2) || !world.reachable(x, y)) continue;
           game.horde.spawn(type, x, y, this.hpMult, this.speedMult);
           this.queue.shift();

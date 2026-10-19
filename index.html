@@ -104,7 +104,10 @@
         <p class="kicker">Día 47 · Zona de cuarentena 9</p>
         <h1 class="logo">Dead<span>Zone</span></h1>
         <p class="lead">La ciudad cayó. Los caminantes son lentos, pero nunca dejan de llegar. Aguanta todas las oleadas que puedas.</p>
-        <button class="btn primary" id="btn-start">Jugar</button>
+        <div class="start-actions">
+          <button class="btn primary" id="btn-continue" hidden>Continuar</button>
+          <button class="btn primary" id="btn-start">Jugar</button>
+        </div>
         <div class="controls-help">
           <div class="help-desktop">
             <span><kbd>WASD</kbd> moverse</span>
@@ -167,6 +170,7 @@
         <dl class="results" id="results"></dl>
         <p class="best" id="over-best"></p>
         <div class="stack">
+          <button class="btn primary" id="btn-over-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-again">Reintentar</button>
           <button class="btn ghost" id="btn-over-menu">Menú principal</button>
         </div>

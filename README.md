@@ -12,10 +12,17 @@ de un cerco, no para pasear.
 
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
-| Normal  | 42   | lenta         | Llega en grandes cantidades                                   |
-| Velocista | 26 | rápida        | Desde la oleada 2. Te alcanza si no corres                    |
+| Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
+| Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 | Gigante | 1500 | muy lenta     | Su cuerpo **bloquea las balas** y protege a los que van detrás |
+
+### Progreso guardado
+
+La partida se guarda sola al terminar cada ronda y mientras te preparas (bloques puestos, compras,
+mejoras, armas y munición). Al volver a abrir el juego aparece **Continuar**, y si caes puedes
+**continuar desde la última ronda superada**. *Nueva partida* borra el progreso guardado. El guardado
+vive en el navegador de cada dispositivo.
 
 ### Dinero y tienda
 

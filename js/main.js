@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS } from './config.js';
 import { Structures } from './build.js';
 import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
@@ -15,6 +15,7 @@ import { Sfx } from './audio.js';
 import { drawSurvivor } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
+const SAVE_KEY = 'dz-save-v1';
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif' };
 const ITEM_ICONS = {
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
@@ -90,7 +91,9 @@ class Game {
     this.setupMenu();
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
+    window.addEventListener('pagehide', () => this.player && this.saveProgress());
     document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.player) this.saveProgress();
       if (document.hidden && this.state === 'play') this.pause();
     });
     this.last = performance.now();
@@ -100,8 +103,8 @@ class Game {
 
   /* ---------- partidas ---------- */
 
-  newWorld() {
-    this.world = new World();
+  newWorld(seed) {
+    this.world = new World(seed);
     this.world.setChunkScale(this.chunkScale);
     this.world.maxChunks = this.maxChunks;
   }
@@ -155,12 +158,19 @@ class Game {
       }
     }
     this.setState('menu');
+    const save = storage.get(SAVE_KEY, null);
+    this.$('btn-continue').hidden = !save;
+    if (save) this.$('btn-continue').textContent = `Continuar · ronda ${save.wave + 1}`;
+    this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
+    this.$('btn-start').classList.toggle('primary', !save);
     const best = storage.get('dz-best', null);
     this.$('best').textContent = best ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}` : '';
   }
 
   start(freshWorld) {
     this.sfx.unlock();
+    // una partida nueva sustituye al progreso guardado
+    storage.remove(SAVE_KEY);
     if (freshWorld) this.newWorld();
     this.resetRun();
     this.input.reset();
@@ -190,6 +200,91 @@ class Game {
     this.input.reset();
     this.last = performance.now();
     this.setState('play');
+  }
+
+  /* ---------- progreso guardado ---------- */
+
+  // Se guarda al terminar cada ronda y durante la preparación (bloques, compras, mejoras).
+  saveProgress() {
+    const p = this.player;
+    if (!p.alive || this.director.state !== 'waiting') return;
+    const s = this.structures;
+    storage.set(SAVE_KEY, {
+      v: 1,
+      seed: this.world.seedBase,
+      wave: this.director.wave,
+      time: this.time,
+      kills: this.kills,
+      level: this.level,
+      xp: this.xp,
+      taken: this.taken,
+      money: this.money,
+      moneyEarned: this.moneyEarned,
+      inv: this.inv,
+      buildSel: this.buildSel,
+      player: {
+        x: p.x,
+        y: p.y,
+        hp: p.hp,
+        stamina: p.stamina,
+        stats: p.stats,
+        weapons: p.weapons.map((w) => ({ id: w.id, mag: w.mag, reserve: w.reserve === Infinity ? -1 : w.reserve })),
+        wi: p.wi,
+        shotsFired: p.shotsFired,
+        shotsHit: p.shotsHit,
+        damageTaken: p.damageTaken,
+      },
+      blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
+      wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
+    });
+    this.saveT = 0;
+  }
+
+  loadProgress() {
+    const d = storage.get(SAVE_KEY, null);
+    if (!d || d.v !== 1) return false;
+    this.sfx.unlock();
+    if (this.world.seedBase !== d.seed) this.newWorld(d.seed);
+    this.resetRun();
+    Object.assign(this.kills, d.kills);
+    this.time = d.time;
+    this.level = d.level;
+    this.xp = d.xp;
+    this.xpNeed = xpForLevel(d.level);
+    this.taken = d.taken || {};
+    this.money = d.money;
+    this.moneyEarned = d.moneyEarned;
+    Object.assign(this.inv, d.inv);
+    this.buildSel = d.buildSel || 'wood';
+    const p = this.player;
+    const sp = d.player;
+    Object.assign(p.stats, sp.stats);
+    p.x = sp.x;
+    p.y = sp.y;
+    p.hp = Math.min(sp.hp, p.stats.maxHp);
+    p.stamina = sp.stamina;
+    p.weapons = sp.weapons.filter((w) => WEAPONS[w.id]).map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
+    p.wi = Math.min(sp.wi, p.weapons.length - 1);
+    p.shotsFired = sp.shotsFired;
+    p.shotsHit = sp.shotsHit;
+    p.damageTaken = sp.damageTaken;
+    for (const b of d.blocks) {
+      const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0 };
+      this.structures.blocks.push(o);
+      this.world.addDynamic(o);
+    }
+    for (const b of d.wires) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
+    this.director.wave = d.wave;
+    this.director.state = 'waiting';
+    this.camera.x = p.x;
+    this.camera.y = p.y;
+    this.world.updateFlow(p.x, p.y);
+    this.input.reset();
+    this.input.setRun(false);
+    this.setState('play');
+    this.updateHud(true);
+    this.toast(`Progreso cargado · ronda ${d.wave} superada`);
+    return true;
   }
 
   /* ---------- eventos de combate ---------- */
@@ -235,8 +330,8 @@ class Game {
       if (z.type === 'fat') {
         if (r < 0.22 && hasGuns) this.pickups.drop('ammo', z.x, z.y);
         else if (r < 0.3) this.pickups.drop('med', z.x, z.y);
-      } else if (r < 0.045 && hasGuns) this.pickups.drop('ammo', z.x, z.y);
-      else if (r > 0.986) this.pickups.drop('med', z.x, z.y);
+      } else if (r < 0.02 && hasGuns) this.pickups.drop('ammo', z.x, z.y);
+      else if (r > 0.995) this.pickups.drop('med', z.x, z.y);
       this.sfx.kill(false);
     }
   }
@@ -327,6 +422,7 @@ class Game {
   onWaveCleared() {
     this.shopPending = true;
     this.sfx.level();
+    this.saveProgress();
   }
 
   startNextRound() {
@@ -345,6 +441,7 @@ class Game {
 
   closeShop() {
     if (this.state !== 'shop') return;
+    this.saveProgress();
     this.input.reset();
     this.last = performance.now();
     this.setState('play');
@@ -483,6 +580,11 @@ class Game {
       dd.textContent = v;
       dl.append(dt, dd);
     }
+    const save = storage.get(SAVE_KEY, null);
+    this.$('btn-over-continue').hidden = !save;
+    if (save) this.$('btn-over-continue').textContent = `Continuar desde la ronda ${save.wave + 1}`;
+    this.$('btn-again').textContent = save ? 'Nueva partida' : 'Reintentar';
+    this.$('btn-again').classList.toggle('primary', !save);
     const best = storage.get('dz-best', null);
     const record = !best || this.time > best.time;
     if (record) storage.set('dz-best', { time: this.time, kills: total, wave: this.director.wave });
@@ -501,6 +603,13 @@ class Game {
     on('btn-resume', () => this.resume());
     on('btn-restart', () => this.start(true));
     on('btn-again', () => this.start(true));
+    on('btn-continue', () => {
+      this.tryFullscreen();
+      if (!this.loadProgress()) this.start(false);
+    });
+    on('btn-over-continue', () => {
+      if (!this.loadProgress()) this.start(true);
+    });
     on('btn-menu', () => {
       this.newWorld();
       this.setupMenu();
@@ -759,6 +868,10 @@ class Game {
     }
     if (this.pendingLevels > 0) this.openLevelUp();
     else if (this.shopPending) this.openShop();
+    else if (this.director.state === 'waiting') {
+      this.saveT = (this.saveT || 0) + dt;
+      if (this.saveT > 2) this.saveProgress();
+    }
   }
 
   render() {
