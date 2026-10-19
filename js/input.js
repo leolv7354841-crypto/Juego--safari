@@ -39,6 +39,9 @@ export class Input {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
       if (e.code === 'KeyR') this.pressed.reload = true;
       if (e.code === 'KeyQ' || e.code === 'Tab') this.pressed.swap = true;
+      if (e.code === 'KeyF') this.pressed.build = true;
+      if (e.code === 'KeyV') this.pressed.cycleBuild = true;
+      if (e.code === 'KeyG') this.pressed.grenade = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
       const m = /^Digit([1-4])$/.exec(e.code);
       if (m) this.pressed.slot = Number(m[1]);
@@ -162,6 +165,8 @@ export class Input {
     tap('#btn-run', () => this.setRun(!this.runToggle));
     tap('#btn-reload', () => (this.pressed.reload = true));
     tap('#btn-swap', () => (this.pressed.swap = true));
+    tap('#btn-build', () => (this.pressed.build = true));
+    tap('#btn-grenade', () => (this.pressed.grenade = true));
 
     // evita zoom por gestos y menú contextual en iOS
     this.on(document, 'gesturestart', prevent);

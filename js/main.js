@@ -1,5 +1,6 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER } from './config.js';
+import { Structures } from './build.js';
 import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -15,6 +16,7 @@ import { drawSurvivor } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif' };
+const SHORT_BUILD = { wood: 'Madera', metal: 'Metal', fence: 'Valla', wire: 'Púas' };
 
 class Camera {
   constructor() {
@@ -65,6 +67,7 @@ class Game {
     this.decals = new Decals();
     this.pickups = new Pickups();
     this.bullets = new Bullets();
+    this.structures = new Structures();
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
     this.ash = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), v: rand(0.004, 0.012), p: rand(0, TAU) }));
@@ -113,6 +116,12 @@ class Game {
     this.xpNeed = xpForLevel(1);
     this.pendingLevels = 0;
     this.taken = {};
+    this.money = 0;
+    this.moneyEarned = 0;
+    this.inv = { wood: 0, metal: 0, fence: 0, wire: 0, grenade: 0 };
+    this.buildSel = 'wood';
+    this.shopPending = false;
+    this.structures.clear();
     this.deathT = 0;
     this.muzzle = 0;
     this.hurtFlash = 0;
@@ -160,6 +169,7 @@ class Game {
     this.$('screen-pause').hidden = s !== 'pause';
     this.$('screen-level').hidden = s !== 'levelup';
     this.$('screen-over').hidden = s !== 'over';
+    this.$('screen-shop').hidden = s !== 'shop';
   }
 
   pause() {
@@ -201,6 +211,10 @@ class Game {
     this.decals.corpse(z);
     this.particles.death(z.x, z.y, z.r);
     this.addXp(z.def.xp);
+    if (this.state !== 'menu') {
+      this.money += BOUNTY[z.type];
+      this.moneyEarned += BOUNTY[z.type];
+    }
     const p = this.player;
     const hasGuns = p.weapons.length > 1;
     const r = Math.random();
@@ -297,6 +311,123 @@ class Game {
     }
   }
 
+  /* ---------- tienda y construcción ---------- */
+
+  onWaveCleared() {
+    this.shopPending = true;
+  }
+
+  openShop() {
+    this.shopPending = false;
+    this.input.reset();
+    this.setState('shop');
+    this.$('shop-kicker').textContent = `Oleada ${this.director.wave} superada`;
+    this.renderShop();
+  }
+
+  closeShop() {
+    if (this.state !== 'shop') return;
+    this.input.reset();
+    this.last = performance.now();
+    this.setState('play');
+    if (BUILD_ORDER.some((k) => this.inv[k] > 0)) {
+      this.toast(this.input.mode === 'touch' ? 'Toca Construir para colocar' : 'Pulsa F para colocar · V para cambiar');
+    }
+  }
+
+  renderShop() {
+    this.$('shop-money').textContent = `$${this.money}`;
+    this.$('shop-items').innerHTML = SHOP_ORDER.map((k) => {
+      const it = SHOP[k];
+      const poor = this.money < it.price;
+      return `<div class="shop-item${k === 'grenade' ? ' hot' : ''}">
+        <canvas class="shop-ic" data-ic="${k}" width="96" height="96"></canvas>
+        <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp ? ` · Resistencia ${it.hp}` : ''}</small></div>
+        <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
+      </div>`;
+    }).join('');
+    this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
+  }
+
+  drawShopIcon(c, k) {
+    const g = c.getContext('2d');
+    g.setTransform(1.6, 0, 0, 1.6, 0, 0);
+    if (k === 'grenade') {
+      g.setTransform(4.5, 0, 0, 4.5, 0, 0);
+      this.structures.drawGrenades.call({ grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] }, g);
+      return;
+    }
+    const def = SHOP[k];
+    const w = def.w;
+    const h = def.h;
+    const s = Math.min(44 / w, 44 / h, 1);
+    g.setTransform(1.6 * s, 0, 0, 1.6 * s, 1.6 * (30 - (w * s) / 2), 1.6 * (30 - (h * s) / 2));
+    if (def.ground) this.structures.drawGround.call({ scorches: [], wires: [{ x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
+    else this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
+  }
+
+  buy(k) {
+    const it = SHOP[k];
+    if (!it || this.money < it.price) return;
+    this.money -= it.price;
+    this.inv[k]++;
+    if (k !== 'grenade' && this.inv[this.buildSel] <= 0) this.buildSel = k;
+    this.sfx.buy();
+    this.renderShop();
+  }
+
+  tryBuild() {
+    if (this.inv[this.buildSel] <= 0) {
+      const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
+      if (!next) {
+        this.toast('Compra barricadas en la tienda');
+        return;
+      }
+      this.buildSel = next;
+    }
+    if (this.structures.place(this, this.buildSel)) {
+      this.inv[this.buildSel]--;
+      this.sfx.build();
+      if (this.inv[this.buildSel] <= 0) {
+        const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
+        if (next) this.buildSel = next;
+      }
+    } else {
+      this.toast('No cabe ahí');
+    }
+  }
+
+  cycleBuild() {
+    const owned = BUILD_ORDER.filter((k) => this.inv[k] > 0);
+    if (!owned.length) return;
+    const i = owned.indexOf(this.buildSel);
+    this.buildSel = owned[(i + 1) % owned.length];
+    this.toast(SHOP[this.buildSel].name);
+  }
+
+  tryGrenade() {
+    if (this.inv.grenade <= 0) {
+      this.toast('Sin granadas: cómpralas en la tienda');
+      return;
+    }
+    const p = this.player;
+    let tx;
+    let ty;
+    if (this.input.mode === 'mouse') {
+      const m = this.mouseWorld();
+      tx = m.x;
+      ty = m.y;
+    } else if (p.target && !p.target.dead) {
+      tx = p.target.x;
+      ty = p.target.y;
+    } else {
+      tx = p.x + Math.cos(p.angle) * 220;
+      ty = p.y + Math.sin(p.angle) * 220;
+    }
+    this.inv.grenade--;
+    this.structures.throwGrenade(this, tx, ty);
+  }
+
   /* ---------- fin de partida ---------- */
 
   gameOver() {
@@ -316,6 +447,7 @@ class Game {
       ['sep'],
       ['Precisión', `${acc}%`],
       ['Daño recibido', Math.round(p.damageTaken)],
+      ['Dinero ganado', `$${this.moneyEarned}`],
     ];
     const dl = this.$('results');
     dl.innerHTML = '';
@@ -363,6 +495,17 @@ class Game {
       this.syncSoundLabel();
     });
     this.syncSoundLabel();
+    on('btn-shop-done', () => this.closeShop());
+    this.$('shop-items').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-buy]');
+      if (b) this.buy(b.dataset.buy);
+    });
+    this.$('inv').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('[data-k]');
+      if (!b) return;
+      e.preventDefault();
+      this.buildSel = b.dataset.k;
+    });
     this.$('slots').addEventListener('pointerdown', (e) => {
       const b = e.target.closest('.slot');
       if (!b) return;
@@ -443,6 +586,22 @@ class Game {
     }
     const rl = p.reloadT > 0 ? 1 - p.reloadT / p.reloadDur : 0;
     this.set('rl', $('reload-fill'), 'width', `${(rl * 100).toFixed(0)}%`);
+    this.set('money', $('money'), 'text', String(this.money));
+    const inv = this.inv;
+    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + this.buildSel;
+    if (this.cache.inv !== isig) {
+      this.cache.inv = isig;
+      const chips = BUILD_ORDER.filter((k) => inv[k] > 0).map(
+        (k) => `<button class="chip${k === this.buildSel ? ' on' : ''}" data-k="${k}">${SHORT_BUILD[k]} ${inv[k]}</button>`,
+      );
+      if (inv.grenade > 0) chips.push(`<span class="chip gren">Granadas ${inv.grenade}</span>`);
+      $('inv').innerHTML = chips.join('');
+      $('inv').hidden = !chips.length;
+      $('build-count').textContent = inv[this.buildSel] > 0 ? inv[this.buildSel] : '0';
+      $('btn-build').classList.toggle('off', !BUILD_ORDER.some((k) => inv[k] > 0));
+      $('gren-count').textContent = inv.grenade;
+      $('btn-grenade').classList.toggle('off', inv.grenade <= 0);
+    }
     const sig = p.weapons.map((x) => x.id).join() + '|' + p.wi;
     if (this.cache.slots !== sig) {
       this.cache.slots = sig;
@@ -536,7 +695,13 @@ class Game {
       this.pause();
       return;
     }
-    if (p.alive) p.update(dt, this);
+    if (p.alive) {
+      p.update(dt, this);
+      if (this.input.consume('build')) this.tryBuild();
+      if (this.input.consume('cycleBuild')) this.cycleBuild();
+      if (this.input.consume('grenade')) this.tryGrenade();
+    }
+    this.structures.update(dt, this);
     this.flowT -= dt;
     if (this.flowT <= 0) {
       this.world.updateFlow(p.x, p.y);
@@ -562,6 +727,7 @@ class Game {
       return;
     }
     if (this.pendingLevels > 0) this.openLevelUp();
+    else if (this.shopPending) this.openShop();
   }
 
   render() {
@@ -591,8 +757,11 @@ class Game {
     ctx.fillRect(0, 0, W, H);
     ctx.setTransform(z, 0, 0, z, tx, ty);
     this.world.drawGround(ctx, v.x0, v.y0, v.x1, v.y1);
+    this.structures.drawGround(ctx, v);
     this.decals.draw(ctx, v);
+    this.structures.drawBlocks(ctx, v);
     this.pickups.draw(ctx, v, this.time);
+    if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0) this.structures.drawGhost(ctx, this, this.buildSel, this.time);
     this.horde.draw(ctx, v, base, 'small');
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
@@ -601,6 +770,7 @@ class Game {
     }
     this.horde.draw(ctx, v, base, 'giant');
     this.bullets.draw(ctx);
+    this.structures.drawGrenades(ctx);
     this.world.drawOverhead(ctx, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
     this.particles.draw(ctx, v);
 
@@ -629,6 +799,7 @@ class Game {
 
   drawWorldUi(ctx) {
     const v = this.view;
+    this.structures.drawBars(ctx, v);
     for (const zb of this.horde.list) {
       if (zb.type === 'normal' || zb.hp >= zb.maxHp) continue;
       if (zb.x < v.x0 || zb.x > v.x1 || zb.y < v.y0 || zb.y > v.y1) continue;

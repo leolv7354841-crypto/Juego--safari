@@ -22,8 +22,8 @@ export class Director {
   startWave(game) {
     this.wave++;
     const w = this.wave;
-    const normals = 8 + w * 6 + Math.floor(Math.pow(w, 1.5));
-    const fats = w >= 2 ? Math.floor((w - 1) * 1.6) : 0;
+    const normals = 20 + w * 12 + Math.floor(Math.pow(w, 1.7));
+    const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
     const giants = w >= 4 ? 1 + Math.floor((w - 4) / 3) : 0;
     const q = [];
     for (let i = 0; i < normals; i++) q.push('normal');
@@ -32,7 +32,7 @@ export class Director {
     for (let i = 0; i < giants; i++) q.splice(randInt(Math.floor(q.length * 0.45), q.length), 0, 'giant');
     this.queue = q;
     this.waveSize = q.length;
-    this.interval = Math.max(0.55, 2.4 - w * 0.12);
+    this.interval = Math.max(0.35, 1.8 - w * 0.1);
     this.spawnT = 0.5;
     this.state = 'active';
     game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
@@ -51,15 +51,16 @@ export class Director {
       this.spawnGroup(game);
       this.spawnT = this.interval * rand(0.7, 1.3);
     }
-    if (!this.queue.length && alive <= Math.max(2, Math.floor(this.waveSize * 0.06))) {
+    if (!this.queue.length && alive <= Math.max(3, Math.floor(this.waveSize * 0.04))) {
       this.state = 'break';
-      this.timer = 6;
-      game.banner(`Oleada ${this.wave} superada`, 'Recupera el aliento');
+      this.timer = 8;
+      game.banner(`Oleada ${this.wave} superada`, 'Prepara tus defensas');
+      game.onWaveCleared();
     }
   }
 
   spawnGroup(game) {
-    const size = Math.min(this.queue.length, randInt(3, 4 + Math.floor(this.wave * 0.8)));
+    const size = Math.min(this.queue.length, randInt(5, 8 + Math.floor(this.wave * 1.5)));
     const cam = game.camera;
     const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 70;
     const p = game.player;
@@ -87,6 +88,19 @@ export class Director {
         if (!this.queue.length) break;
       }
       if (placed) return;
+    }
+    // si el jugador está encerrado por barricadas no hay ruta: aparecer igualmente
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const a = rand(0, TAU);
+      const d = radius + rand(30, 200);
+      const x = p.x + Math.cos(a) * d;
+      const y = p.y + Math.sin(a) * d;
+      if (x < 80 || y < 80 || x > WORLD_SIZE - 80 || y > WORLD_SIZE - 80) continue;
+      const type = this.queue[0];
+      if (world.pointBlocked(x, y, type === 'giant' ? 46 : 24)) continue;
+      game.horde.spawn(type, x, y, this.hpMult, this.speedMult);
+      this.queue.shift();
+      return;
     }
   }
 }

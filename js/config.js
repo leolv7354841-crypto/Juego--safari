@@ -6,7 +6,7 @@ export const ROAD_CENTERS = [300, 1100, 1900, 2700, 3500];
 export const ROAD_HALF = 110;
 export const SIDEWALK = 44;
 export const NAV_CELL = 40;
-export const MAX_ALIVE = 280;
+export const MAX_ALIVE = 380;
 
 export const PLAYER_BASE = {
   radius: 14,
@@ -64,4 +64,34 @@ export const ZOMBIES = {
   },
 };
 
-export const xpForLevel = (lvl) => Math.floor(6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5);
+// Con hordas más grandes la experiencia necesaria sube para no saturar de mejoras.
+export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 1.6);
+
+// Dinero por cada zombi eliminado.
+export const BOUNTY = { normal: 1, fat: 5, giant: 10 };
+
+// Tienda entre oleadas. w/h en px del mundo; rotates = se coloca perpendicular a la mira.
+export const SHOP = {
+  wood: {
+    name: 'Bloque de madera', desc: 'Barricada básica. Disparas por encima de ella.',
+    price: 10, hp: 160, w: 40, h: 40,
+  },
+  metal: {
+    name: 'Bloque de metal', desc: 'Placa de acero: aguanta 3 veces más que la madera.',
+    price: 30, hp: 520, w: 40, h: 40,
+  },
+  fence: {
+    name: 'Valla de metal reforzado', desc: 'Muro ancho casi indestructible. Frena hasta a los gigantes un buen rato.',
+    price: 70, hp: 1400, w: 80, h: 24, rotates: true,
+  },
+  wire: {
+    name: 'Alambre de púas', desc: 'No bloquea el paso: frena mucho y hiere a los zombis que lo cruzan.',
+    price: 20, hp: 70, w: 80, h: 40, rotates: true, ground: true,
+  },
+  grenade: {
+    name: 'Granada', desc: 'Explosión en área que arrasa grupos enteros. Cara, úsala bien.',
+    price: 90, consumable: true,
+  },
+};
+export const SHOP_ORDER = ['wood', 'metal', 'fence', 'wire', 'grenade'];
+export const BUILD_ORDER = ['wood', 'metal', 'fence', 'wire'];

@@ -15,6 +15,22 @@ de un cerco, no para pasear.
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 | Gigante | 1500 | muy lenta     | Su cuerpo **bloquea las balas** y protege a los que van detrás |
 
+### Dinero y tienda
+
+Cada zombi eliminado da dinero: **normal $1 · gordo $5 · gigante $10**. Al terminar cada oleada (después
+de elegir tu mejora de nivel) se abre la tienda:
+
+| Objeto | Precio | Efecto |
+|--------|--------|--------|
+| Bloque de madera | $10 | Barricada básica (160 de resistencia) |
+| Bloque de metal | $30 | Aguanta 3× más que la madera (520) |
+| Valla de metal reforzado | $70 | Muro ancho casi indestructible (1400) |
+| Alambre de púas | $20 | No bloquea, pero frena y hiere a los zombis |
+| Granada | $90 | Explosión en área que arrasa grupos |
+
+Las barricadas se colocan delante de ti y las balas pasan por encima. Los zombis las golpean hasta
+romperlas o buscan otro camino para rodearlas.
+
 Armas: pistola (munición infinita), subfusil, escopeta y rifle. Se desbloquean con mejoras de nivel o en
 las cajas que suelta cada gigante.
 
@@ -27,6 +43,8 @@ las cajas que suelta cada gigante.
 | Ratón: apuntar · clic: disparar | Botón de disparo con **apuntado automático** |
 | `R`: recargar | Botón de recarga |
 | `1`–`4` o `Q`: cambiar arma | Botón de cambio de arma |
+| `F`: construir · `V`: cambiar bloque | Botón **Construir** |
+| `G`: lanzar granada | Botón **Granada** (apunta solo) |
 | `Esc` / `P`: pausa | Botón de pausa |
 
 ## Ejecutar en local
@@ -64,6 +82,7 @@ js/zombies.js       Horda, rejilla espacial, separación y ataques
 js/bullets.js       Balas con colisión segmento-círculo y perforación
 js/director.js      Oleadas y aparición de zombis
 js/upgrades.js      Mejoras al subir de nivel
+js/build.js         Barricadas, alambre de púas y granadas
 js/lighting.js      Oscuridad, linterna, farolas y fuegos
 js/particles.js     Partículas y restos en el suelo
 js/pickups.js       Munición, botiquines y cajas de armas

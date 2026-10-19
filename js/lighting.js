@@ -55,6 +55,10 @@ export class Lighting {
       g.globalAlpha = l.cur;
       g.drawImage(this.soft, l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
     }
+    for (const b of game.structures.blasts) {
+      g.globalAlpha = Math.min(1, b.t * 3);
+      g.drawImage(this.soft, b.x - 320, b.y - 320, 640, 640);
+    }
     if (game.muzzle > 0) {
       g.globalAlpha = game.muzzle;
       g.drawImage(this.soft, game.muzzleX - 200, game.muzzleY - 200, 400, 400);
@@ -86,6 +90,10 @@ export class Lighting {
       const r = l.r * 0.75;
       ctx.globalAlpha = (l.cur ?? l.i) * (l.flicker > 0.1 ? 0.32 : 0.16);
       ctx.drawImage(l.flicker > 0.1 ? this.warm : this.cool, l.x - r, l.y - r, r * 2, r * 2);
+    }
+    for (const b of game.structures.blasts) {
+      ctx.globalAlpha = Math.min(1, b.t * 2.5) * 0.7;
+      ctx.drawImage(this.warm, b.x - 200, b.y - 200, 400, 400);
     }
     if (game.muzzle > 0) {
       ctx.globalAlpha = game.muzzle * 0.35;

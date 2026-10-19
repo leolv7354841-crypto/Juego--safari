@@ -81,6 +81,7 @@ export class Horde {
       dead: false,
       spawnT: 0.6,
       lastStep: 0,
+      chew: 0.4,
     };
     this.list.push(z);
     return z;
@@ -149,6 +150,12 @@ export class Horde {
       z.angle = angleTo(z.angle, Math.atan2(inRange ? dy : my, inRange ? dx : mx), def.turn * dt);
       let sp = z.speed * (z.slow > 0 ? 0.35 : 1);
       if (inRange) sp *= 0.15;
+      // alambre de púas: frena y hiere
+      if (game.structures.wires.length && game.structures.wireAt(z, dt)) {
+        sp *= 0.35;
+        z.hp -= 14 * dt;
+        if (z.hp <= 0 && !z.dead) game.killZombie(z);
+      }
       z.x += mx * sp * dt + z.kx * dt;
       z.y += my * sp * dt + z.ky * dt;
       const kd = Math.exp(-dt * 7);
@@ -224,7 +231,17 @@ export class Horde {
           p.y += ny * ov * (z.mass / tm);
         }
       }
+      world.lastBlock = null;
       world.collide(z, z.r);
+      // golpea la barricada que le cierra el paso
+      if (world.lastBlock && !z.inRange && !z.dead) {
+        z.chew -= dt;
+        if (z.chew <= 0) {
+          z.chew = 1 / z.def.attackRate;
+          z.lunge = 1;
+          game.structures.damageBlock(game, world.lastBlock, z.def.damage * 1.6);
+        }
+      }
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
       z.y = clamp(z.y, 30, WORLD_SIZE - 30);
     }

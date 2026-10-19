@@ -183,6 +183,35 @@ export class Sfx {
     this.tone({ freq: 55, dur: 1.4, gain: 0.3 });
   }
 
+  explosion() {
+    if (!this.ok('explosion', 0.08)) return;
+    this.burst({ dur: 1.1, freq: 1800, sweep: 60, gain: 1 });
+    this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
+  }
+
+  blockHit(kind) {
+    if (!this.ok('blockHit', 0.12)) return;
+    if (kind === 'wood') this.burst({ dur: 0.08, freq: 700, gain: 0.3, type: 'bandpass', q: 3 });
+    else this.burst({ dur: 0.1, freq: 2600, gain: 0.25, type: 'bandpass', q: 9 });
+  }
+
+  blockBreak() {
+    if (!this.ok('blockBreak', 0.1)) return;
+    this.burst({ dur: 0.45, freq: 900, sweep: 150, gain: 0.6 });
+  }
+
+  build() {
+    if (!this.ok('build', 0.05)) return;
+    this.burst({ dur: 0.07, freq: 600, gain: 0.4, type: 'bandpass', q: 2 });
+    this.burst({ dur: 0.06, freq: 1400, gain: 0.25, type: 'bandpass', q: 4 });
+  }
+
+  buy() {
+    if (!this.ok('buy', 0.05)) return;
+    this.tone({ freq: 880, dur: 0.08, gain: 0.18, type: 'triangle' });
+    this.tone({ freq: 1320, dur: 0.12, gain: 0.15, type: 'triangle', delay: 0.06 });
+  }
+
   exhausted() {
     if (!this.ok('exhausted', 1)) return;
     this.burst({ dur: 0.5, freq: 1200, gain: 0.15, type: 'bandpass', q: 1, attack: 0.15 });

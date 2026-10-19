@@ -276,6 +276,59 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   text-shadow: 0 2px 6px #000;
 }
 
+.money {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--display);
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.money i { font-style: normal; font-size: 18px; color: var(--st); }
+.money b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--st); }
+
+.inv { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.chip {
+  pointer-events: auto;
+  padding: 2px 7px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+}
+.chip.on { border-color: var(--xp); color: var(--xp); }
+.chip.gren { color: var(--accent); border-color: rgba(217, 120, 58, 0.5); }
+
+/* ---------- Tienda ---------- */
+
+.panel.shop { text-align: left; }
+.shop .kicker { text-align: left; }
+.shop-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.shop-head h2 { margin-bottom: 4px; }
+.shop-money { font-family: var(--display); font-size: 44px; font-weight: 600; color: var(--st); font-variant-numeric: tabular-nums; }
+.shop-note { margin: 0 0 14px; font-size: 15px; color: var(--dim); }
+.shop-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 8px; margin-bottom: 14px; }
+.shop-item {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(230, 224, 210, 0.05);
+  border: 1px solid var(--line);
+}
+.shop-item.hot { border-color: rgba(217, 120, 58, 0.45); }
+.shop-ic { width: 60px; height: 60px; }
+.shop-txt { display: grid; gap: 2px; min-width: 0; }
+.shop-txt b { font-family: var(--display); font-size: 24px; font-weight: 500; line-height: 0.9; letter-spacing: 0.03em; text-transform: uppercase; }
+.shop-txt span { font-size: 15px; line-height: 1.2; color: #cfc8b8; }
+.shop-txt small { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.btn.buy { width: auto; min-width: 84px; padding: 11px 14px 8px; font-size: 24px; background: var(--st); color: #1d1607; border-color: var(--st); }
+.btn.buy.poor { background: rgba(230, 224, 210, 0.06); color: var(--dim); border-color: var(--line); cursor: not-allowed; }
+
 /* ---------- Controles táctiles ---------- */
 
 #touch { display: none; position: absolute; inset: 0; pointer-events: none; }
@@ -328,7 +381,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   right: max(16px, var(--sar));
   bottom: calc(var(--sab) + 18px);
   width: 210px;
-  height: 200px;
+  height: 240px;
   pointer-events: none;
 }
 .tbtn {
@@ -352,13 +405,31 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .tbtn.mid span { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .tbtn.mid.on { background: var(--st); color: #1d1607; border-color: var(--st); }
 .tbtn.small { width: 52px; height: 52px; }
+.tbtn.off { opacity: 0.4; }
+.tbtn .badge {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 2px 5px 0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+#btn-grenade { right: 144px; bottom: 88px; }
+#btn-build { right: 34px; bottom: 176px; }
 #btn-reload { right: 4px; bottom: 112px; }
 #btn-swap { right: 74px; bottom: 96px; }
 
 .touch .ammo {
   left: auto;
   right: max(16px, var(--sar));
-  bottom: calc(var(--sab) + 228px);
+  bottom: calc(var(--sab) + 256px);
   min-width: 0;
   padding: 6px 10px 8px;
 }
@@ -544,6 +615,17 @@ kbd {
   .icon-btn { width: 38px; }
   .hud-left { left: max(10px, var(--sal)); gap: 6px; }
   .hud-right { right: max(10px, var(--sar)); }
+}
+
+@media (max-width: 560px) {
+  .shop-item { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; padding: 8px 10px; }
+  .shop-ic { width: 44px; height: 44px; }
+  .shop-txt b { font-size: 20px; }
+  .shop-txt span { font-size: 13px; }
+  .shop-txt small { font-size: 10px; }
+  .btn.buy { min-width: 64px; padding: 9px 10px 6px; font-size: 20px; }
+  .shop-money { font-size: 36px; }
+  .shop-note { font-size: 13px; }
 }
 
 @media (max-height: 460px) {

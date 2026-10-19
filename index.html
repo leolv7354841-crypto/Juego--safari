@@ -35,6 +35,7 @@
             <div class="fill" id="st-fill"></div>
             <span class="lbl">Estamina</span>
           </div>
+          <div class="money"><i>$</i><b id="money">0</b></div>
         </div>
       </div>
       <div class="hud-right">
@@ -47,6 +48,7 @@
       </div>
       <div class="ammo" id="ammo">
         <div class="slots" id="slots"></div>
+        <div class="inv" id="inv" hidden></div>
         <div class="ammo-main">
           <span class="wname" id="wname">Pistola</span>
           <span class="count"><b id="mag">12</b><i>/</i><span id="reserve">∞</span></span>
@@ -67,6 +69,14 @@
         </button>
         <button class="tbtn small" id="btn-reload" aria-label="Recargar">
           <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>
+        </button>
+        <button class="tbtn small off" id="btn-grenade" aria-label="Lanzar granada">
+          <svg viewBox="0 0 24 24"><ellipse cx="11" cy="14" rx="6" ry="6"/><path d="M11 8V5h4M15 5l3-2"/></svg>
+          <span class="badge" id="gren-count">0</span>
+        </button>
+        <button class="tbtn small off" id="btn-build" aria-label="Construir">
+          <svg viewBox="0 0 24 24"><rect x="3" y="12" width="8" height="8"/><rect x="13" y="12" width="8" height="8"/><rect x="8" y="4" width="8" height="8"/></svg>
+          <span class="badge" id="build-count">0</span>
         </button>
         <button class="tbtn mid" id="btn-run" aria-label="Correr">
           <span>Correr</span>
@@ -90,12 +100,15 @@
             <span><kbd>Clic</kbd> disparar</span>
             <span><kbd>R</kbd> recargar</span>
             <span><kbd>1-4</kbd>/<kbd>Q</kbd> armas</span>
+            <span><kbd>F</kbd> construir · <kbd>V</kbd> cambiar bloque</span>
+            <span><kbd>G</kbd> granada</span>
             <span><kbd>Esc</kbd> pausa</span>
           </div>
           <div class="help-touch">
             <span>Joystick izquierdo para moverte</span>
             <span>Mantén el botón de disparo: apunta solo</span>
             <span>Correr gasta estamina</span>
+            <span>Tras cada oleada: tienda de barricadas y granadas</span>
           </div>
         </div>
         <p class="best" id="best"></p>
@@ -119,6 +132,19 @@
         <p class="kicker" id="level-kicker">Nivel 2</p>
         <h2>Elige una mejora</h2>
         <div class="cards" id="cards"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-shop" hidden>
+      <div class="panel wide shop">
+        <p class="kicker" id="shop-kicker">Oleada 1 superada</p>
+        <div class="shop-head">
+          <h2>Tienda</h2>
+          <div class="shop-money" id="shop-money">$0</div>
+        </div>
+        <p class="shop-note">Zombi normal $1 · gordo $5 · gigante $10. Las barricadas se colocan delante de ti y las balas pasan por encima.</p>
+        <div class="shop-items" id="shop-items"></div>
+        <button class="btn primary" id="btn-shop-done">Continuar</button>
       </div>
     </section>
 

@@ -105,6 +105,25 @@ export class Particles {
     }
   }
 
+  explosion(x, y, R) {
+    this.ring(x, y, R * 0.55, '255,190,120');
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      const s = rand(150, 520);
+      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.12, 0.3), 1, pick(['#ffd890', '#ffb060', '#fff2d0']), 5);
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU);
+      const s = rand(30, 140);
+      this.add(SMOKE, x + Math.cos(a) * 10, y + Math.sin(a) * 10, Math.cos(a) * s, Math.sin(a) * s, rand(0.8, 1.6), rand(10, 20), i < 5 ? '230,140,60' : '70,66,60', 2.5, 40);
+    }
+    for (let i = 0; i < 18; i++) {
+      const a = rand(0, TAU);
+      const s = rand(80, 260);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.4, 0.9), rand(2, 4), pick(['#3a352d', '#55503e', '#2a2722']), 4);
+    }
+  }
+
   pickupFx(x, y, color) {
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * TAU;

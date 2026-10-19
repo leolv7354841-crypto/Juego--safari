@@ -1109,6 +1109,7 @@ export class World {
             const d2 = dx * dx + dy * dy;
             if (d2 >= r * r) continue;
             hit = true;
+            if (o.block) this.lastBlock = o;
             if (d2 > 1e-6) {
               const d = Math.sqrt(d2);
               e.x += (dx / d) * (r - d);
@@ -1139,6 +1140,75 @@ export class World {
       }
     }
     return hit;
+  }
+
+  /* ---------- barricadas del jugador ---------- */
+
+  addDynamic(o) {
+    const n = this.obsN;
+    o.stamp = 0;
+    o.cells = [];
+    const x0 = clamp(Math.floor(o.x / OBS_CELL), 0, n - 1);
+    const y0 = clamp(Math.floor(o.y / OBS_CELL), 0, n - 1);
+    const x1 = clamp(Math.floor((o.x + o.w) / OBS_CELL), 0, n - 1);
+    const y1 = clamp(Math.floor((o.y + o.h) / OBS_CELL), 0, n - 1);
+    for (let j = y0; j <= y1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        this.obsGrid[j * n + i].push(o);
+        o.cells.push(j * n + i);
+      }
+    }
+    this.refreshNav(o.x, o.y, o.w, o.h);
+  }
+
+  removeDynamic(o) {
+    for (const idx of o.cells) {
+      const arr = this.obsGrid[idx];
+      const i = arr.indexOf(o);
+      if (i >= 0) arr.splice(i, 1);
+    }
+    o.cells = [];
+    this.refreshNav(o.x, o.y, o.w, o.h);
+  }
+
+  refreshNav(x, y, w, h) {
+    const n = this.navN;
+    const pad = 24;
+    const i0 = clamp(Math.floor((x - pad) / NAV_CELL), 0, n - 1);
+    const j0 = clamp(Math.floor((y - pad) / NAV_CELL), 0, n - 1);
+    const i1 = clamp(Math.floor((x + w + pad) / NAV_CELL), 0, n - 1);
+    const j1 = clamp(Math.floor((y + h + pad) / NAV_CELL), 0, n - 1);
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const blocked = this.pointBlocked(i * NAV_CELL + NAV_CELL / 2, j * NAV_CELL + NAV_CELL / 2, 12);
+        this.blocked[j * n + i] = blocked ? 1 : 0;
+      }
+    }
+    this.flowCell = -1;
+  }
+
+  // ¿Cabe un rectángulo sin tocar ningún obstáculo?
+  rectFree(x, y, w, h) {
+    if (x < 30 || y < 30 || x + w > this.size - 30 || y + h > this.size - 30) return false;
+    const n = this.obsN;
+    const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
+    const y0 = clamp(Math.floor(y / OBS_CELL), 0, n - 1);
+    const x1 = clamp(Math.floor((x + w) / OBS_CELL), 0, n - 1);
+    const y1 = clamp(Math.floor((y + h) / OBS_CELL), 0, n - 1);
+    for (let j = y0; j <= y1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        for (const o of this.obsGrid[j * n + i]) {
+          if (o.k === 0) {
+            if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return false;
+          } else {
+            const px = clamp(o.x, x, x + w);
+            const py = clamp(o.y, y, y + h);
+            if ((px - o.x) ** 2 + (py - o.y) ** 2 < o.r * o.r) return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   pointBlocked(x, y, pad = 0, bulletsOnly = false) {
