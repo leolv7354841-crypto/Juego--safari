@@ -304,29 +304,26 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 #round-panel {
   display: none;
   position: absolute;
-  left: 50%;
-  top: 30%;
-  transform: translate(-50%, -50%);
-  width: min(380px, calc(100% - 32px));
-  padding: 18px 20px 14px;
-  text-align: center;
-  background: rgba(13, 15, 11, 0.86);
+  top: calc(var(--sat) + 72px);
+  right: max(14px, var(--sar));
+  width: 214px;
+  padding: 8px 9px 9px;
+  text-align: left;
+  background: rgba(13, 15, 11, 0.8);
   border: 1px solid var(--line);
-  border-top: 2px solid var(--xp);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  animation: rise 0.35s ease-out;
+  border-left: 2px solid var(--xp);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: rise 0.3s ease-out;
 }
 .state-play #round-panel.show { display: block; }
-@keyframes rise { from { opacity: 0; transform: translate(-50%, -42%); } }
-#round-panel .kicker { margin-bottom: 2px; color: var(--xp); }
-#round-panel h2 { margin: 0 0 6px; font-size: 40px; }
-.round-sub { margin: 0 auto 14px; max-width: 34ch; font-size: 15px; line-height: 1.3; color: #cfc8b8; }
-.round-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.round-actions .btn { font-size: 22px; padding: 12px 14px 9px; }
-#btn-round-shop { width: auto; }
-.round-key { margin: 8px 0 0; font-size: 12px; color: var(--dim); }
+@keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
+#round-panel .kicker, .round-sub { display: none; }
+#round-panel h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: 0.06em; color: var(--xp); }
+.round-actions { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.round-actions .btn { font-size: 15px; padding: 8px 8px 5px; letter-spacing: 0.08em; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+#btn-round-shop { font-size: 13px; padding: 5px 8px 3px; color: var(--dim); }
+.round-key { margin: 5px 0 0; font-size: 11px; color: var(--dim); }
 .touch .round-key { display: none; }
 
 /* ---------- Tienda ---------- */
@@ -627,10 +624,9 @@ kbd {
 @media (max-width: 560px) {
   .hud-left { width: 184px; }
   .slot { padding: 1px 4px 0; font-size: 9px; line-height: 14px; }
-  #round-panel { top: 50%; padding: 14px 14px 12px; }
-  #round-panel h2 { font-size: 32px; }
-  .round-sub { font-size: 13px; margin-bottom: 10px; }
-  .round-actions .btn { font-size: 18px; padding: 10px 10px 7px; }
+  #round-panel { top: calc(var(--sat) + 62px); width: 184px; right: max(10px, var(--sar)); }
+  #round-panel h2 { font-size: 17px; }
+  .round-actions .btn { font-size: 13px; }
   .lvl-badge { width: 38px; }
   .loadout { padding: 4px 6px 5px; gap: 3px; }
   .count b { font-size: 20px; }
@@ -659,10 +655,10 @@ kbd {
 }
 
 @media (max-height: 460px) {
-  #round-panel { top: auto; bottom: calc(var(--sab) + 12px); transform: translateX(-50%); width: min(340px, calc(100% - 520px)); min-width: 260px; padding: 10px 12px; animation: none; }
-  #round-panel h2 { font-size: 26px; margin-bottom: 8px; }
-  #round-panel .kicker, .round-sub { display: none; }
-  .round-actions .btn { font-size: 17px; padding: 9px 8px 6px; }
+  #round-panel { top: calc(var(--sat) + 8px); right: auto; left: 50%; transform: translateX(-50%); width: 272px; padding: 6px 8px 7px; animation: none; }
+  #round-panel h2 { font-size: 15px; margin-bottom: 4px; }
+  .round-actions { grid-template-columns: 1fr auto; }
+  .round-actions .btn, #btn-round-shop { font-size: 13px; padding: 6px 8px 4px; }
   .hud-left, .hud-right { top: calc(var(--sat) + 10px); }
   .bar { height: 17px; }
   .bar.st { height: 10px; }
