@@ -5,7 +5,8 @@ Juego de supervivencia zombi en vista cenital (top-down) que se juega directamen
 
 ## Cómo se juega
 
-Sobrevive a oleadas de caminantes cada vez más grandes. Cada zombi eliminado da experiencia; al subir de
+Sobrevive a rondas de caminantes cada vez más grandes. Una ronda termina al eliminar al último zombi; la
+siguiente no empieza hasta que pulses **Iniciar siguiente ronda**, así que puedes prepararte sin prisa. Cada zombi eliminado da experiencia; al subir de
 nivel el juego se pausa y eliges una de tres mejoras aleatorias. Correr gasta estamina: úsala para salir
 de un cerco, no para pasear.
 
@@ -28,7 +29,7 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Alambre de púas | $20 | No bloquea, pero frena y hiere a los zombis |
 | Granada | $90 | Explosión en área que arrasa grupos |
 
-Las barricadas se colocan delante de ti y las balas pasan por encima. Los zombis las golpean hasta
+Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches). Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
 Armas: pistola (munición infinita), subfusil, escopeta y rifle. Se desbloquean con mejoras de nivel o en
@@ -45,6 +46,7 @@ las cajas que suelta cada gigante.
 | `1`–`4` o `Q`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
 | `G`: lanzar granada | Botón **Granada** (apunta solo) |
+| `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
 | `Esc` / `P`: pausa | Botón de pausa |
 
 ## Ejecutar en local

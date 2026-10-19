@@ -16,7 +16,13 @@ import { drawSurvivor } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif' };
-const SHORT_BUILD = { wood: 'Madera', metal: 'Metal', fence: 'Valla', wire: 'Púas' };
+const ITEM_ICONS = {
+  grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
+  wood: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#7a5634" stroke="#141612"/><path d="M2 2l8 8" stroke="#4a3220" stroke-width="1.5"/></svg>',
+  metal: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#8a8f93" stroke="#141612"/><path d="M2 10l8-8" stroke="#c9cdd0"/></svg>',
+  fence: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3.5" width="11" height="5" fill="#3c4146" stroke="#141612"/><path d="M2 4l3 4M5 4l3 4M8 4l3 4" stroke="#9aa1a8" stroke-width=".8"/><rect x="0.5" y="3.5" width="2" height="5" fill="#c7a24a"/></svg>',
+  wire: '<svg viewBox="0 0 12 12"><path d="M0 6l2-3 2 6 2-6 2 6 2-6 2 3" fill="none" stroke="#c9c4b6" stroke-width="1.2"/></svg>',
+};
 
 class Camera {
   constructor() {
@@ -315,6 +321,13 @@ class Game {
 
   onWaveCleared() {
     this.shopPending = true;
+    this.sfx.level();
+  }
+
+  startNextRound() {
+    if (this.state !== 'play' || !this.player.alive) return;
+    this.sfx.unlock();
+    if (this.director.nextRound(this)) this.updateHud(false);
   }
 
   openShop() {
@@ -496,6 +509,10 @@ class Game {
     });
     this.syncSoundLabel();
     on('btn-shop-done', () => this.closeShop());
+    on('btn-next-round', () => this.startNextRound());
+    on('btn-round-shop', () => {
+      if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
+    });
     this.$('shop-items').addEventListener('click', (e) => {
       const b = e.target.closest('[data-buy]');
       if (b) this.buy(b.dataset.buy);
@@ -586,17 +603,18 @@ class Game {
     }
     const rl = p.reloadT > 0 ? 1 - p.reloadT / p.reloadDur : 0;
     this.set('rl', $('reload-fill'), 'width', `${(rl * 100).toFixed(0)}%`);
-    this.set('money', $('money'), 'text', String(this.money));
     const inv = this.inv;
-    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + this.buildSel;
+    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + this.buildSel + '|' + this.money;
     if (this.cache.inv !== isig) {
       this.cache.inv = isig;
-      const chips = BUILD_ORDER.filter((k) => inv[k] > 0).map(
-        (k) => `<button class="chip${k === this.buildSel ? ' on' : ''}" data-k="${k}">${SHORT_BUILD[k]} ${inv[k]}</button>`,
-      );
-      if (inv.grenade > 0) chips.push(`<span class="chip gren">Granadas ${inv.grenade}</span>`);
-      $('inv').innerHTML = chips.join('');
-      $('inv').hidden = !chips.length;
+      // granadas y bloques siempre visibles; atenuados cuando no hay
+      const items = [`<span class="it gren${inv.grenade ? '' : ' zero'}" title="Granadas">${ITEM_ICONS.grenade}<b>${inv.grenade}</b></span>`];
+      for (const k of BUILD_ORDER) {
+        const cls = `it${inv[k] ? '' : ' zero'}${k === this.buildSel && inv[k] ? ' on' : ''}`;
+        items.push(`<button class="${cls}" data-k="${k}" title="${SHOP[k].name}">${ITEM_ICONS[k]}<b>${inv[k]}</b></button>`);
+      }
+      items.push(`<span class="it money" title="Dinero">$<b id="money">${this.money}</b></span>`);
+      $('inv').innerHTML = items.join('');
       $('build-count').textContent = inv[this.buildSel] > 0 ? inv[this.buildSel] : '0';
       $('btn-build').classList.toggle('off', !BUILD_ORDER.some((k) => inv[k] > 0));
       $('gren-count').textContent = inv.grenade;
@@ -606,8 +624,14 @@ class Game {
     if (this.cache.slots !== sig) {
       this.cache.slots = sig;
       $('slots').innerHTML = p.weapons
-        .map((x, i) => `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${SHORT[x.id]}</button>`)
+        .map((x, i) => `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`)
         .join('');
+    }
+    const prep = this.director.state === 'waiting' && p.alive;
+    if (this.cache.prep !== prep) {
+      this.cache.prep = prep;
+      $('round-panel').classList.toggle('show', prep);
+      if (prep) $('round-kicker').textContent = `Ronda ${this.director.wave} superada`;
     }
   }
 
@@ -700,6 +724,7 @@ class Game {
       if (this.input.consume('build')) this.tryBuild();
       if (this.input.consume('cycleBuild')) this.cycleBuild();
       if (this.input.consume('grenade')) this.tryGrenade();
+      if (this.input.consume('nextRound')) this.startNextRound();
     }
     this.structures.update(dt, this);
     this.flowT -= dt;
@@ -859,8 +884,9 @@ class Game {
   drawGiantMarkers(ctx, W, H) {
     const b = this.base;
     const m = 34 * this.dpr;
+    const few = !this.director.queue.length && this.horde.list.length <= 5;
     for (const zb of this.horde.list) {
-      if (zb.type !== 'giant') continue;
+      if (zb.type !== 'giant' && !few) continue;
       const sx = zb.x * b.z + b.tx;
       const sy = zb.y * b.z + b.ty;
       if (sx > 0 && sx < W && sy > 0 && sy < H) continue;
@@ -874,7 +900,7 @@ class Game {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(a);
-      ctx.fillStyle = 'rgba(217,120,58,0.9)';
+      ctx.fillStyle = zb.type === 'giant' ? 'rgba(217,120,58,0.9)' : 'rgba(230,224,210,0.75)';
       ctx.beginPath();
       ctx.moveTo(s, 0);
       ctx.lineTo(-s * 0.6, -s * 0.8);

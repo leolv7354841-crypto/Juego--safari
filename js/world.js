@@ -133,7 +133,8 @@ export class World {
     const rx = x - w / 2;
     const ry = y - h / 2;
     if (!this.free(rx, ry, w, h, opts.pad ?? 10)) return false;
-    this.addRect(rx + 2, ry + 2, w - 4, h - 4);
+    // low: frena a jugador y zombis, pero las balas pasan por encima
+    this.addRect(rx + 2, ry + 2, w - 4, h - 4, true);
     const ang = (horizontal ? 0 : Math.PI / 2) + (rng() < 0.5 ? Math.PI : 0);
     const burnt = opts.burnt ?? rng() < 0.14;
     const color = rpick(rng, CAR_COLORS);

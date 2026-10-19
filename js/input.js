@@ -42,6 +42,7 @@ export class Input {
       if (e.code === 'KeyF') this.pressed.build = true;
       if (e.code === 'KeyV') this.pressed.cycleBuild = true;
       if (e.code === 'KeyG') this.pressed.grenade = true;
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
       const m = /^Digit([1-4])$/.exec(e.code);
       if (m) this.pressed.slot = Number(m[1]);

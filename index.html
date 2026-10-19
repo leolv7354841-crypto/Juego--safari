@@ -25,17 +25,27 @@
     <div id="hud">
       <div class="xp-track"><div class="xp-fill" id="xp-fill"></div></div>
       <div class="hud-left">
-        <div class="lvl-badge"><small>NV</small><b id="lvl">1</b></div>
-        <div class="vitals">
-          <div class="bar hp" id="hp-bar">
-            <div class="fill" id="hp-fill"></div>
-            <span class="lbl">Vida</span><span class="val" id="hp-val">100</span>
+        <div class="hud-row">
+          <div class="lvl-badge"><small>NV</small><b id="lvl">1</b></div>
+          <div class="vitals">
+            <div class="bar hp" id="hp-bar">
+              <div class="fill" id="hp-fill"></div>
+              <span class="lbl">Vida</span><span class="val" id="hp-val">100</span>
+            </div>
+            <div class="bar st" id="st-bar">
+              <div class="fill" id="st-fill"></div>
+              <span class="lbl">Estamina</span>
+            </div>
           </div>
-          <div class="bar st" id="st-bar">
-            <div class="fill" id="st-fill"></div>
-            <span class="lbl">Estamina</span>
+        </div>
+        <div class="loadout" id="ammo">
+          <div class="lo-weapon">
+            <span class="wname" id="wname" hidden>Pistola</span>
+            <div class="slots" id="slots"></div>
+            <span class="count"><b id="mag">12</b><i>/</i><span id="reserve">∞</span></span>
           </div>
-          <div class="money"><i>$</i><b id="money">0</b></div>
+          <div class="reload-track"><div class="reload-fill" id="reload-fill"></div></div>
+          <div class="inv" id="inv"></div>
         </div>
       </div>
       <div class="hud-right">
@@ -45,15 +55,6 @@
         <button class="icon-btn" id="btn-pause" aria-label="Pausa">
           <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
         </button>
-      </div>
-      <div class="ammo" id="ammo">
-        <div class="slots" id="slots"></div>
-        <div class="inv" id="inv" hidden></div>
-        <div class="ammo-main">
-          <span class="wname" id="wname">Pistola</span>
-          <span class="count"><b id="mag">12</b><i>/</i><span id="reserve">∞</span></span>
-        </div>
-        <div class="reload-track"><div class="reload-fill" id="reload-fill"></div></div>
       </div>
       <div id="toast"></div>
       <div id="banner"><b id="banner-title"></b><span id="banner-sub"></span></div>
@@ -85,6 +86,17 @@
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
         </button>
       </div>
+    </div>
+
+    <div id="round-panel" role="dialog" aria-labelledby="round-title">
+      <p class="kicker" id="round-kicker">Ronda 1</p>
+      <h2 id="round-title">Ronda completada</h2>
+      <p class="round-sub">Sin límite de tiempo. Muévete, construye y revisa tus armas: los zombis no llegarán hasta que inicies.</p>
+      <div class="round-actions">
+        <button class="btn primary" id="btn-next-round">Iniciar siguiente ronda</button>
+        <button class="btn" id="btn-round-shop">Tienda</button>
+      </div>
+      <p class="round-key">Tecla <kbd>Enter</kbd></p>
     </div>
 
     <section class="screen" id="screen-start">

@@ -35,11 +35,20 @@ export class Director {
     this.interval = Math.max(0.35, 1.8 - w * 0.1);
     this.spawnT = 0.5;
     this.state = 'active';
+    this.straggleT = 0;
     game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
+  // Lo llama el botón INICIAR SIGUIENTE RONDA.
+  nextRound(game) {
+    if (this.state !== 'waiting') return false;
+    this.startWave(game);
+    return true;
+  }
+
   update(dt, game) {
+    if (this.state === 'waiting') return;
     if (this.state === 'break') {
       this.timer -= dt;
       if (this.timer <= 0) this.startWave(game);
@@ -51,11 +60,35 @@ export class Director {
       this.spawnGroup(game);
       this.spawnT = this.interval * rand(0.7, 1.3);
     }
-    if (!this.queue.length && alive <= Math.max(3, Math.floor(this.waveSize * 0.04))) {
-      this.state = 'break';
-      this.timer = 8;
-      game.banner(`Oleada ${this.wave} superada`, 'Prepara tus defensas');
+    // la ronda termina al eliminar al último zombi; la siguiente espera al jugador
+    if (!this.queue.length && alive === 0) {
+      this.state = 'waiting';
       game.onWaveCleared();
+      return;
+    }
+    if (!this.queue.length && alive <= 5) this.herdStragglers(dt, game);
+  }
+
+  // Si quedan pocos zombis atascados lejos, los acerca para que la ronda no se trabe.
+  herdStragglers(dt, game) {
+    this.straggleT = (this.straggleT || 0) + dt;
+    if (this.straggleT < 6) return;
+    this.straggleT = 0;
+    const p = game.player;
+    const cam = game.camera;
+    const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 60;
+    for (const z of game.horde.list) {
+      if (Math.hypot(z.x - p.x, z.y - p.y) < 1100) continue;
+      for (let t = 0; t < 12; t++) {
+        const a = rand(0, TAU);
+        const x = p.x + Math.cos(a) * radius;
+        const y = p.y + Math.sin(a) * radius;
+        if (x < 80 || y < 80 || x > WORLD_SIZE - 80 || y > WORLD_SIZE - 80) continue;
+        if (game.world.pointBlocked(x, y, z.r + 2)) continue;
+        z.x = x;
+        z.y = y;
+        break;
+      }
     }
   }
 
