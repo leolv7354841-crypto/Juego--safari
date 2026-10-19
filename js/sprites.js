@@ -160,6 +160,11 @@ const NORMAL_PALETTES = [
   { skin: '#a2ad88', shirt: '#9a8a5c', pants: '#343b46', hair: '#3a2c20' },
   { skin: '#95a37f', shirt: '#55605c', pants: '#46392b', hair: '#262019' },
 ];
+const SPRINTER_PALETTES = [
+  { skin: '#a9b29c', shirt: '#8a3a2e', pants: '#2a2c30', hair: '#1a1714' },
+  { skin: '#9fa894', shirt: '#9a5a2a', pants: '#33302a', hair: '#3a2a1c' },
+  { skin: '#b1b8a4', shirt: '#6e2f3a', pants: '#25282d', hair: '#151311' },
+];
 const FAT_PALETTES = [
   { skin: '#a8ad7e', shirt: '#cfc8b4', pants: '#38404c', hair: '#2b241d' },
   { skin: '#9fa676', shirt: '#6c4b3c', pants: '#2c2c2a', hair: '#1d1a17' },
@@ -209,6 +214,30 @@ function drawNormal(g, r, p, ph) {
   g.fillStyle = '#2a1c14';
   g.fillRect(r * 0.48, -r * 0.18, r * 0.1, r * 0.08);
   g.fillRect(r * 0.48, r * 0.1, r * 0.1, r * 0.08);
+}
+
+// Velocista: flaco, inclinado hacia delante, zancada larga y brazos hacia atrás.
+function drawSprinter(g, r, p, ph) {
+  softShadow(g, r * 1.3);
+  const s = Math.sin(ph);
+  const stride = r * 0.85;
+  ell(g, s * stride, -r * 0.28, r * 0.42, r * 0.18, 0, p.pants);
+  ell(g, -s * stride, r * 0.28, r * 0.42, r * 0.18, 0, p.pants);
+  limb(g, -r * 0.05, -r * 0.55, -r * 0.75 + s * r * 0.35, -r * 0.6, r * 0.24, p.skin);
+  limb(g, -r * 0.05, r * 0.55, -r * 0.75 - s * r * 0.35, r * 0.6, r * 0.24, p.skin);
+  g.save();
+  g.rotate(s * 0.12);
+  ell(g, r * 0.05, 0, r * 0.42, r * 0.7, 0, p.shirt);
+  rips(g, mulberry32(p.seed), r * 0.05, 0, r * 0.42, r * 0.7, shade(p.shirt, 0.6), 4);
+  g.restore();
+  circ(g, r * 0.62, s * r * 0.05, r * 0.36, p.skin);
+  g.fillStyle = p.hair;
+  g.beginPath();
+  g.arc(r * 0.55, s * r * 0.05, r * 0.32, Math.PI * 0.6, Math.PI * 1.4);
+  g.fill();
+  g.fillStyle = '#c84a32';
+  g.fillRect(r * 0.86, -r * 0.16, r * 0.1, r * 0.08);
+  g.fillRect(r * 0.86, r * 0.08, r * 0.1, r * 0.08);
 }
 
 function drawFat(g, r, p, ph) {
@@ -302,8 +331,8 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, fat: drawFat, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = { normal: drawNormal, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
+const PALETTES = { normal: NORMAL_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -337,11 +366,12 @@ function buildSet(type, r, frames, pal, scale, pad) {
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], fat: [], giant: [] };
+  ZSPRITES = { normal: [], sprinter: [], fat: [], giant: [] };
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
     giant: { r: 42, frames: 8, scale: 2, pad: 1.45 },
+    sprinter: { r: 11, frames: 6, scale: 2.6, pad: 1.8 },
   };
   for (const type of Object.keys(conf)) {
     const k = conf[type];

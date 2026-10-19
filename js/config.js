@@ -6,7 +6,7 @@ export const ROAD_CENTERS = [300, 1100, 1900, 2700, 3500];
 export const ROAD_HALF = 110;
 export const SIDEWALK = 44;
 export const NAV_CELL = 40;
-export const MAX_ALIVE = 380;
+export const MAX_ALIVE = 460;
 
 export const PLAYER_BASE = {
   radius: 14,
@@ -54,6 +54,10 @@ export const ZOMBIES = {
     hp: 42, speed: [30, 44], radius: 13, damage: 8, attackRate: 0.9,
     xp: 1, mass: 1, reach: 7, frames: 6, turn: 4,
   },
+  sprinter: {
+    hp: 26, speed: [88, 104], radius: 11, damage: 6, attackRate: 1.3,
+    xp: 2, mass: 0.8, reach: 6, frames: 6, turn: 7,
+  },
   fat: {
     hp: 130, speed: [21, 27], radius: 21, damage: 14, attackRate: 0.75,
     xp: 4, mass: 4, reach: 8, frames: 6, turn: 3,
@@ -68,7 +72,7 @@ export const ZOMBIES = {
 export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 1.6);
 
 // Dinero por cada zombi eliminado.
-export const BOUNTY = { normal: 1, fat: 5, giant: 10 };
+export const BOUNTY = { normal: 1, sprinter: 3, fat: 5, giant: 10 };
 
 // Tienda entre oleadas. w/h en px del mundo; rotates = se coloca perpendicular a la mira.
 export const SHOP = {

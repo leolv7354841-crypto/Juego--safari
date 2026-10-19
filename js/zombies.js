@@ -43,6 +43,25 @@ export class Grid {
 }
 
 let nextId = 1;
+
+// a avanza hacia b (n = dirección de a hacia b). Si a es más rápido y b le tapa el
+// camino, a se desliza de lado para adelantarlo en lugar de quedarse atascado detrás.
+function overtake(a, b, nx, ny, dt) {
+  if (a.dead || a.inRange || a.speed < b.speed * 1.12) return;
+  const ahead = (a.mx || 0) * nx + (a.my || 0) * ny;
+  if (ahead < 0.25) return;
+  let tx = -ny;
+  let ty = nx;
+  let side = (a.mx || 0) * tx + (a.my || 0) * ty;
+  if (Math.abs(side) < 0.05) side = a.id & 1 ? 1 : -1;
+  if (side < 0) {
+    tx = -tx;
+    ty = -ty;
+  }
+  const k = a.speed * dt * 1.6 * ahead * (b.mass > a.mass * 3 ? 1.8 : 1);
+  a.x += tx * k;
+  a.y += ty * k;
+}
 const tmpDir = { x: 0, y: 0 };
 const near = [];
 
@@ -144,6 +163,8 @@ export class Horde {
       const wl = Math.hypot(wx, wy) || 1;
       mx = wx / wl;
       my = wy / wl;
+      z.mx = mx;
+      z.my = my;
 
       const reach = z.r + p.r + def.reach;
       const inRange = d < reach && p.alive;
@@ -194,7 +215,7 @@ export class Horde {
     grid.clear();
     for (const z of list) grid.insert(z);
     for (const z of list) {
-      const q = z.r + 44;
+      const q = z.r + 70;
       grid.query(z.x - q, z.y - q, z.x + q, z.y + q, near);
       for (let k = 0; k < near.length; k++) {
         const o = near[k];
@@ -202,9 +223,15 @@ export class Horde {
         const dx = o.x - z.x;
         const dy = o.y - z.y;
         const rr = z.r + o.r;
+        const look = rr + 34;
         const d2 = dx * dx + dy * dy;
+        if (d2 >= look * look) continue;
+        const d0 = Math.sqrt(d2) || 0.01;
+        // el más rápido rodea al más lento que tiene delante (todos pueden pasar a un gigante)
+        overtake(z, o, dx / d0, dy / d0, dt);
+        overtake(o, z, -dx / d0, -dy / d0, dt);
         if (d2 >= rr * rr) continue;
-        const d = Math.sqrt(d2) || 0.01;
+        const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
         const ov = (rr - d) * 0.8;
         const nx = dx / d;
         const ny = dy / d;

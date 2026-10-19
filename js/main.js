@@ -116,7 +116,7 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
-    this.kills = { normal: 0, fat: 0, giant: 0 };
+    this.kills = { normal: 0, sprinter: 0, fat: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
     this.xpNeed = xpForLevel(1);
@@ -202,7 +202,7 @@ class Game {
     const kn = (b.knock * 3) / z.mass;
     z.kx += b.dx * kn;
     z.ky += b.dy * kn;
-    this.particles.hit(hx, hy, b.dx, b.dy, z.type !== 'normal');
+    this.particles.hit(hx, hy, b.dx, b.dy, z.type === 'fat' || z.type === 'giant');
     if (b.shot && !b.shot.hit) {
       b.shot.hit = true;
       this.player.shotsHit++;
@@ -318,6 +318,11 @@ class Game {
   }
 
   /* ---------- tienda y construcción ---------- */
+
+  totalKills() {
+    const k = this.kills;
+    return k.normal + k.sprinter + k.fat + k.giant;
+  }
 
   onWaveCleared() {
     this.shopPending = true;
@@ -446,7 +451,7 @@ class Game {
   gameOver() {
     this.setState('over');
     const p = this.player;
-    const total = this.kills.normal + this.kills.fat + this.kills.giant;
+    const total = this.totalKills();
     const acc = p.shotsFired ? Math.round((p.shotsHit / p.shotsFired) * 100) : 0;
     const rows = [
       ['Tiempo sobrevivido', fmtTime(this.time)],
@@ -455,6 +460,7 @@ class Game {
       ['sep'],
       ['Zombis eliminados', total],
       ['Normales', this.kills.normal],
+      ['Velocistas', this.kills.sprinter],
       ['Gordos', this.kills.fat],
       ['Gigantes', this.kills.giant],
       ['sep'],
@@ -590,7 +596,7 @@ class Game {
     this.set('xpw', $('xp-fill'), 'width', `${((this.xp / this.xpNeed) * 100).toFixed(1)}%`);
     this.set('lvl', $('lvl'), 'text', String(this.level));
     this.set('time', $('time'), 'text', fmtTime(this.time));
-    this.set('kills', $('kills'), 'text', String(this.kills.normal + this.kills.fat + this.kills.giant));
+    this.set('kills', $('kills'), 'text', String(this.totalKills()));
     this.set('wave', $('wave'), 'text', String(Math.max(1, this.director.wave)));
     const w = p.weapon;
     this.set('wname', $('wname'), 'text', w.def.name);
@@ -826,7 +832,7 @@ class Game {
     const v = this.view;
     this.structures.drawBars(ctx, v);
     for (const zb of this.horde.list) {
-      if (zb.type === 'normal' || zb.hp >= zb.maxHp) continue;
+      if (zb.type === 'normal' || zb.type === 'sprinter' || zb.hp >= zb.maxHp) continue;
       if (zb.x < v.x0 || zb.x > v.x1 || zb.y < v.y0 || zb.y > v.y1) continue;
       const w = zb.r * 1.6;
       const y = zb.y - zb.r - 12;

@@ -13,12 +13,13 @@ de un cerco, no para pasear.
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
 | Normal  | 42   | lenta         | Llega en grandes cantidades                                   |
+| Velocista | 26 | rápida        | Desde la oleada 2. Te alcanza si no corres                    |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 | Gigante | 1500 | muy lenta     | Su cuerpo **bloquea las balas** y protege a los que van detrás |
 
 ### Dinero y tienda
 
-Cada zombi eliminado da dinero: **normal $1 · gordo $5 · gigante $10**. Al terminar cada oleada (después
+Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · gigante $10**. Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
 | Objeto | Precio | Efecto |
@@ -31,6 +32,8 @@ de elegir tu mejora de nivel) se abre la tienda:
 
 Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches). Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
+
+Los zombis más rápidos rodean a los más lentos para adelantarlos: nadie se queda atascado detrás de un gigante.
 
 Armas: pistola (munición infinita), subfusil, escopeta y rifle. Se desbloquean con mejoras de nivel o en
 las cajas que suelta cada gigante.

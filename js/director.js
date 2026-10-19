@@ -22,11 +22,13 @@ export class Director {
   startWave(game) {
     this.wave++;
     const w = this.wave;
-    const normals = 20 + w * 12 + Math.floor(Math.pow(w, 1.7));
+    const normals = 32 + w * 18 + Math.floor(Math.pow(w, 1.8));
+    const sprinters = w >= 2 ? 3 + Math.floor((w - 1) * 3.5) : 0;
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
     const giants = w >= 4 ? 1 + Math.floor((w - 4) / 3) : 0;
     const q = [];
     for (let i = 0; i < normals; i++) q.push('normal');
+    for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
     // los gigantes llegan en la segunda mitad de la oleada
     for (let i = 0; i < giants; i++) q.splice(randInt(Math.floor(q.length * 0.45), q.length), 0, 'giant');
@@ -36,7 +38,7 @@ export class Director {
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : w === 2 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
@@ -108,7 +110,7 @@ export class Director {
       let placed = 0;
       for (let i = 0; i < size; i++) {
         const type = this.queue[0];
-        const r = type === 'giant' ? 44 : type === 'fat' ? 22 : 14;
+        const r = type === 'giant' ? 44 : type === 'fat' ? 22 : type === 'sprinter' ? 12 : 14;
         for (let t = 0; t < 6; t++) {
           const x = cx + rand(-90, 90);
           const y = cy + rand(-90, 90);
