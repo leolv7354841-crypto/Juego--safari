@@ -13,7 +13,7 @@ de un cerco, no para pasear.
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
 | Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
-| Policía SWAT | 840 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 20× más      |
+| Policía SWAT | 336 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 8× más       |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 
@@ -47,8 +47,9 @@ Las barricadas se colocan delante de ti y las balas pasan por encima (también p
 Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
-Los zombis más rápidos rodean a los más lentos para adelantarlos, y cada grupo se abre en abanico
-para rodearte y encerrarte desde todos los lados, anticipando hacia dónde te mueves.
+Los zombis se mueven de forma irregular: se desvían, tropiezan y cambian de dirección. Al rodearte,
+unos llegan de frente, otros se abren por los costados y algunos se quedan rezagados. Se esquivan
+entre ellos para no amontonarse ni formar filas, y los más rápidos adelantan a los más lentos.
 
 ### Armas y munición
 

@@ -43,6 +43,16 @@ export class Grid {
 }
 
 let nextId = 1;
+const near2 = [];
+
+// Papel de cada zombi en el cerco: unos llegan de frente, otros por los costados
+// (en abanico) y algunos se quedan rezagados, más lentos y torpes.
+function pickRole() {
+  const r = Math.random();
+  if (r < 0.4) return { role: 'front', fan: rand(-0.35, 0.35), pace: rand(0.92, 1.08) };
+  if (r < 0.8) return { role: 'flank', fan: (Math.random() < 0.5 ? -1 : 1) * rand(0.7, 1.9), pace: rand(0.95, 1.1) };
+  return { role: 'lag', fan: rand(-0.9, 0.9), pace: rand(0.6, 0.78) };
+}
 
 // a avanza hacia b (n = dirección de a hacia b). Si a es más rápido y b le tapa el
 // camino, a se desliza de lado para adelantarlo en lugar de quedarse atascado detrás.
@@ -103,7 +113,12 @@ export class Horde {
       chew: 0.4,
       // lado del cerco: se fija al primer movimiento (ver update)
       slot: null,
-      fan: ((nextId * 0.618034) % 1) * 2 - 1,
+      ...pickRole(),
+      // deriva del rumbo, tropiezos y ritmo propio: nadie camina en línea perfecta
+      wander: 0,
+      wanderV: 0,
+      stumbleT: 0,
+      nextStumble: rand(1, 6),
     };
     this.list.push(z);
     return z;
@@ -163,7 +178,7 @@ export class Horde {
       // ese lado camina en círculo (tangente) y sólo entra de frente al llegar; además apuntan a
       // donde vas a estar, así los de delante te cortan el paso y la horda te encierra.
       // cada grupo se abre en abanico (±110°) desde el lado por el que llega
-      if (z.slot === null) z.slot = Math.atan2(-dy, -dx) + z.fan * 1.9;
+      if (z.slot === null) z.slot = Math.atan2(-dy, -dx) + z.fan;
       if (p.alive && d > 60 && d < 1000) {
         const ex = p.x + p.vx * 0.9 - z.x;
         const ey = p.y + p.vy * 0.9 - z.y;
@@ -186,20 +201,63 @@ export class Horde {
           my /= l;
         }
       }
-      // andar tambaleante, típico de un caminante
-      const wob = Math.sin(time * 1.6 + z.wob) * (z.type === 'giant' ? 0.12 : 0.38);
-      const wx = mx - my * wob;
-      const wy = my + mx * wob;
-      const wl = Math.hypot(wx, wy) || 1;
-      mx = wx / wl;
-      my = wy / wl;
+      // evitar amontonarse: se apartan de los que tienen al lado y rodean al que tienen delante
+      if (d > 50) {
+        this.grid.query(z.x - z.r - 26, z.y - z.r - 26, z.x + z.r + 26, z.y + z.r + 26, near2);
+        let ax = 0;
+        let ay = 0;
+        for (let k = 0; k < near2.length; k++) {
+          const o = near2[k];
+          if (o === z || o.dead) continue;
+          const ox = z.x - o.x;
+          const oy = z.y - o.y;
+          const R = z.r + o.r + 22;
+          const od = Math.hypot(ox, oy);
+          if (od >= R || od < 0.01) continue;
+          const push = 1 - od / R;
+          ax += (ox / od) * push;
+          ay += (oy / od) * push;
+          // el de delante: paso al costado en vez de hacer fila detrás
+          if (-(ox * mx + oy * my) / od > 0.75) {
+            const side = z.id & 1 ? 1 : -1;
+            ax += -my * side * push * 0.8;
+            ay += mx * side * push * 0.8;
+          }
+        }
+        mx += ax * 0.9;
+        my += ay * 0.9;
+        const l = Math.hypot(mx, my) || 1;
+        mx /= l;
+        my /= l;
+      }
+      // movimiento irregular: el rumbo deriva al azar, a ratos tropiezan y dan un tirón
+      z.wanderV = (z.wanderV + rand(-1, 1) * dt * 5) * Math.exp(-dt * 1.2);
+      z.wander = (z.wander + z.wanderV * dt) * Math.exp(-dt * 0.35);
+      if (z.wander > 0.65) z.wander = 0.65;
+      else if (z.wander < -0.65) z.wander = -0.65;
+      z.nextStumble -= dt;
+      if (z.nextStumble <= 0 && d > 40) {
+        z.stumbleT = rand(0.25, 0.65);
+        z.wander += rand(-0.7, 0.7);
+        z.nextStumble = z.role === 'lag' ? rand(1.5, 4) : rand(3, 9);
+      }
+      z.stumbleT -= dt;
+      const wob = z.wander + Math.sin(time * 1.6 + z.wob) * (z.type === 'giant' ? 0.08 : 0.22);
+      const cw = Math.cos(wob);
+      const sw = Math.sin(wob);
+      const wx = mx * cw - my * sw;
+      const wy = mx * sw + my * cw;
+      mx = wx;
+      my = wy;
       z.mx = mx;
       z.my = my;
 
       const reach = z.r + p.r + def.reach;
       const inRange = d < reach && p.alive;
       z.angle = angleTo(z.angle, Math.atan2(inRange ? dy : my, inRange ? dx : mx), def.turn * dt);
-      let sp = z.speed * (z.slow > 0 ? 0.35 : 1);
+      // ritmo propio que sube y baja; al tropezar casi se frenan
+      let sp = z.speed * z.pace * (0.85 + 0.15 * Math.sin(time * 0.7 + z.wob)) * (z.slow > 0 ? 0.35 : 1);
+      if (z.stumbleT > 0) sp *= 0.25;
       if (inRange) sp *= 0.15;
       // alambre de púas: frena y hiere
       const trap = game.structures.wires.length ? game.structures.trapAt(z, dt, game) : null;

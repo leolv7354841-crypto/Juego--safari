@@ -87,9 +87,9 @@ export const ZOMBIES = {
     hp: 42, speed: [30, 44], radius: 13, damage: 8, attackRate: 0.9,
     xp: 1, mass: 1, reach: 7, frames: 6, turn: 4,
   },
-  // Policía SWAT: como un normal, con escudo antidisturbios; aguanta 20 veces más.
+  // Policía SWAT: como un normal, con escudo antidisturbios; aguanta 8 veces más.
   swat: {
-    hp: 42 * 20, speed: [28, 38], radius: 14, damage: 10, attackRate: 0.9,
+    hp: 42 * 8, speed: [28, 38], radius: 14, damage: 10, attackRate: 0.9,
     xp: 10, mass: 2.5, reach: 8, frames: 6, turn: 3.5,
   },
   sprinter: {
