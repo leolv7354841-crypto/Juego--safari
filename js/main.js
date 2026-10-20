@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER, SELL_RATE } from './config.js';
 import { Structures } from './build.js';
 import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
@@ -15,13 +15,21 @@ import { Sfx } from './audio.js';
 import { drawSurvivor, drawGunIcon } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
+// SAVE_KEY: guardado automático (también a mitad de ronda).
+// CHECK_KEY: punto de control al terminar cada ronda, para continuar tras morir.
 const SAVE_KEY = 'dz-save-v1';
+const CHECK_KEY = 'dz-check-v1';
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet' };
 const ITEM_ICONS = {
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
   wood: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#7a5634" stroke="#141612"/><path d="M2 2l8 8" stroke="#4a3220" stroke-width="1.5"/></svg>',
   metal: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#8a8f93" stroke="#141612"/><path d="M2 10l8-8" stroke="#c9cdd0"/></svg>',
   fence: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3.5" width="11" height="5" fill="#3c4146" stroke="#141612"/><path d="M2 4l3 4M5 4l3 4M8 4l3 4" stroke="#9aa1a8" stroke-width=".8"/><rect x="0.5" y="3.5" width="2" height="5" fill="#c7a24a"/></svg>',
+  sandbag: '<svg viewBox="0 0 12 12"><ellipse cx="3.5" cy="6" rx="3" ry="2.5" fill="#8a7d5c" stroke="#141612" stroke-width=".8"/><ellipse cx="8.5" cy="6" rx="3" ry="2.5" fill="#7f7354" stroke="#141612" stroke-width=".8"/></svg>',
+  concrete: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3" width="11" height="6" fill="#8c8a84" stroke="#141612"/><rect x="0.5" y="3" width="11" height="2" fill="#a3a19a"/></svg>',
+  turret: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#3d4246" stroke="#141612"/><circle cx="6" cy="6" r="3" fill="#5c6268"/><rect x="6" y="5" width="5.5" height="2" fill="#1e2124"/></svg>',
+  spikes: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#4a4740" stroke="#141612"/><path d="M3 5l1-2 1 2M7 5l1-2 1 2M3 10l1-2 1 2M7 10l1-2 1 2" fill="#b8b2a4"/></svg>',
+  mine: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#4a5236" stroke="#141612"/><circle cx="6" cy="6" r="1.4" fill="#ff5a3a"/></svg>',
   wire: '<svg viewBox="0 0 12 12"><path d="M0 6l2-3 2 6 2-6 2 6 2-6 2 3" fill="none" stroke="#c9c4b6" stroke-width="1.2"/></svg>',
 };
 
@@ -127,7 +135,7 @@ class Game {
     this.taken = {};
     this.money = 0;
     this.moneyEarned = 0;
-    this.inv = { wood: 0, metal: 0, fence: 0, wire: 0, grenade: 0 };
+    this.inv = Object.fromEntries([...BUILD_ORDER, 'grenade'].map((k) => [k, 0]));
     this.buildSel = 'wood';
     this.shopPending = false;
     this.structures.clear();
@@ -158,9 +166,11 @@ class Game {
       }
     }
     this.setState('menu');
-    const save = storage.get(SAVE_KEY, null);
+    const save = storage.get(SAVE_KEY, null) || storage.get(CHECK_KEY, null);
     this.$('btn-continue').hidden = !save;
-    if (save) this.$('btn-continue').textContent = `Continuar · ronda ${save.wave + 1}`;
+    if (save) {
+      this.$('btn-continue').textContent = save.dstate === 'active' ? `Continuar · ronda ${save.wave}` : `Continuar · ronda ${save.wave + 1}`;
+    }
     this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
     this.$('btn-start').classList.toggle('primary', !save);
     const best = storage.get('dz-best', null);
@@ -171,6 +181,7 @@ class Game {
     this.sfx.unlock();
     // una partida nueva sustituye al progreso guardado
     storage.remove(SAVE_KEY);
+    storage.remove(CHECK_KEY);
     if (freshWorld) this.newWorld();
     this.resetRun();
     this.input.reset();
@@ -204,13 +215,21 @@ class Game {
 
   /* ---------- progreso guardado ---------- */
 
-  // Se guarda al terminar cada ronda y durante la preparación (bloques, compras, mejoras).
+  // Se guarda cada pocos segundos, también a mitad de ronda (con los zombis vivos),
+  // y al cerrar o minimizar la página. Al terminar una ronda se crea además un punto de control.
   saveProgress() {
     const p = this.player;
-    if (!p.alive || this.director.state !== 'waiting') return;
+    const ds = this.director.state;
+    if (!p || !p.alive || (ds !== 'waiting' && ds !== 'active')) return;
     const s = this.structures;
-    storage.set(SAVE_KEY, {
+    const queue = {};
+    for (const t of this.director.queue) queue[t] = (queue[t] || 0) + 1;
+    const data = {
       v: 1,
+      dstate: ds,
+      queue,
+      waveSize: this.director.waveSize,
+      zombies: ds === 'active' ? this.horde.list.filter((z) => !z.dead).map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)]) : [],
       seed: this.world.seedBase,
       wave: this.director.wave,
       time: this.time,
@@ -236,12 +255,15 @@ class Game {
       },
       blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
       wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
-    });
+    };
+    storage.set(SAVE_KEY, data);
+    if (ds === 'waiting') storage.set(CHECK_KEY, data);
     this.saveT = 0;
   }
 
-  loadProgress() {
-    const d = storage.get(SAVE_KEY, null);
+  loadProgress(key = SAVE_KEY) {
+    let d = storage.get(key, null);
+    if (!d && key === SAVE_KEY) d = storage.get(CHECK_KEY, null);
     if (!d || d.v !== 1) return false;
     this.sfx.unlock();
     if (this.world.seedBase !== d.seed) this.newWorld(d.seed);
@@ -269,13 +291,34 @@ class Game {
     p.shotsHit = sp.shotsHit;
     p.damageTaken = sp.damageTaken;
     for (const b of d.blocks) {
-      const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0 };
+      if (!SHOP[b.kind]) continue;
+      const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0, cd: 0, ang: 0 };
       this.structures.blocks.push(o);
       this.world.addDynamic(o);
     }
-    for (const b of d.wires) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
-    this.director.wave = d.wave;
-    this.director.state = 'waiting';
+    for (const b of d.wires) if (SHOP[b.kind]) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
+    const dir = this.director;
+    dir.wave = d.wave;
+    dir.state = 'waiting';
+    if (d.dstate === 'active') {
+      // reanudar la ronda a medias: los zombis vuelven donde estaban y el resto sigue en cola
+      dir.state = 'active';
+      const q = [];
+      for (const [t, n] of Object.entries(d.queue || {})) for (let i = 0; i < n; i++) q.push(t);
+      for (let i = q.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [q[i], q[j]] = [q[j], q[i]];
+      }
+      dir.queue = q;
+      dir.waveSize = d.waveSize || q.length;
+      dir.interval = Math.max(0.3, 1.5 - d.wave * 0.08);
+      dir.spawnT = 1;
+      for (const [t, x, y, hp] of d.zombies || []) {
+        if (!this.horde.sprites[t]) continue;
+        const z = this.horde.spawn(t, x, y, dir.hpMult, dir.speedMult);
+        z.hp = Math.min(hp, z.maxHp);
+      }
+    }
     this.camera.x = p.x;
     this.camera.y = p.y;
     this.world.updateFlow(p.x, p.y);
@@ -283,7 +326,8 @@ class Game {
     this.input.setRun(false);
     this.setState('play');
     this.updateHud(true);
-    this.toast(`Progreso cargado · ronda ${d.wave} superada`);
+    this.toast(d.dstate === 'active' ? `Progreso cargado · ronda ${d.wave} en curso` : `Progreso cargado · ronda ${d.wave} superada`);
+    this.saveT = 0;
     return true;
   }
 
@@ -358,6 +402,8 @@ class Game {
   }
 
   onPlayerDeath() {
+    // el guardado de mitad de ronda ya no sirve: se continuará desde el último punto de control
+    storage.remove(SAVE_KEY);
     this.deathT = 1.6;
     this.input.reset();
     this.camera.shake(0.6);
@@ -464,7 +510,7 @@ class Game {
       return `<div class="shop-item${owned ? ' owned' : ''}">
         <canvas class="shop-ic" data-gun="${id}" width="96" height="96"></canvas>
         <div class="shop-txt"><b>${d.name}</b><span>${d.desc}</span><small>Daño ${d.damage}${d.pellets > 1 ? `×${d.pellets}` : ''} · ${d.rate} disp/s · cargador ${d.mag}</small></div>
-        ${owned ? '<span class="tag-owned">Tuya</span>' : buyBtn(`data-gun-buy="${id}"`, d.price, `$${d.price}`)}
+        ${owned ? `<button class="btn buy sell" data-sell="${id}">Vender $${Math.round(d.price * SELL_RATE)}</button>` : buyBtn(`data-gun-buy="${id}"`, d.price, `$${d.price}`)}
       </div>`;
     });
     // munición sin límite para cada arma que tengas
@@ -485,7 +531,7 @@ class Game {
       const poor = this.money < it.price;
       return `<div class="shop-item${k === 'grenade' ? ' hot' : ''}">
         <canvas class="shop-ic" data-ic="${k}" width="96" height="96"></canvas>
-        <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp ? ` · Resistencia ${it.hp}` : ''}</small></div>
+        <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp > 1 ? ` · Resistencia ${it.hp}` : ''}</small></div>
         <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
       </div>`;
     });
@@ -514,6 +560,17 @@ class Game {
     this.renderShop();
   }
 
+  sellWeapon(id) {
+    const p = this.player;
+    const d = WEAPONS[id];
+    if (!d || id === 'pistol' || !p.removeWeapon(id)) return;
+    const gain = Math.round(d.price * SELL_RATE);
+    this.money += gain;
+    this.sfx.buy();
+    this.toast(`${d.name} vendida: +$${gain}`);
+    this.renderShop();
+  }
+
   buyAmmo(id, n) {
     const p = this.player;
     const w = p.weapons.find((x) => x.id === id);
@@ -539,7 +596,7 @@ class Game {
     const h = def.h;
     const s = Math.min(44 / w, 44 / h, 1);
     g.setTransform(1.6 * s, 0, 0, 1.6 * s, 1.6 * (30 - (w * s) / 2), 1.6 * (30 - (h * s) / 2));
-    if (def.ground) this.structures.drawGround.call({ scorches: [], wires: [{ x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
+    if (def.ground) this.structures.drawGround.call({ scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
     else this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
   }
 
@@ -621,7 +678,6 @@ class Game {
       ['Normales', this.kills.normal],
       ['Velocistas', this.kills.sprinter],
       ['Gordos', this.kills.fat],
-      ['Gigantes', this.kills.giant],
       ['sep'],
       ['Precisión', `${acc}%`],
       ['Daño recibido', Math.round(p.damageTaken)],
@@ -642,7 +698,7 @@ class Game {
       dd.textContent = v;
       dl.append(dt, dd);
     }
-    const save = storage.get(SAVE_KEY, null);
+    const save = storage.get(CHECK_KEY, null);
     this.$('btn-over-continue').hidden = !save;
     if (save) this.$('btn-over-continue').textContent = `Continuar desde la ronda ${save.wave + 1}`;
     this.$('btn-again').textContent = save ? 'Nueva partida' : 'Reintentar';
@@ -670,7 +726,7 @@ class Game {
       if (!this.loadProgress()) this.start(false);
     });
     on('btn-over-continue', () => {
-      if (!this.loadProgress()) this.start(true);
+      if (!this.loadProgress(CHECK_KEY)) this.start(true);
     });
     on('btn-menu', () => {
       this.newWorld();
@@ -691,6 +747,8 @@ class Game {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
     });
     this.$('shop-items').addEventListener('click', (e) => {
+      const sell = e.target.closest('[data-sell]');
+      if (sell) return this.sellWeapon(sell.dataset.sell);
       const g = e.target.closest('[data-gun-buy]');
       if (g) return this.buyWeapon(g.dataset.gunBuy);
       const a = e.target.closest('[data-ammo]');
@@ -788,10 +846,11 @@ class Game {
     const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + this.buildSel + '|' + this.money;
     if (this.cache.inv !== isig) {
       this.cache.inv = isig;
-      // granadas y bloques siempre visibles; atenuados cuando no hay
+      // granadas siempre visibles; de las estructuras sólo las que tienes (son muchas)
       const items = [`<span class="it gren${inv.grenade ? '' : ' zero'}" title="Granadas">${ITEM_ICONS.grenade}<b>${inv.grenade}</b></span>`];
       for (const k of BUILD_ORDER) {
-        const cls = `it${inv[k] ? '' : ' zero'}${k === this.buildSel && inv[k] ? ' on' : ''}`;
+        if (!inv[k]) continue;
+        const cls = `it${k === this.buildSel ? ' on' : ''}`;
         items.push(`<button class="${cls}" data-k="${k}" title="${SHOP[k].name}">${ITEM_ICONS[k]}<b>${inv[k]}</b></button>`);
       }
       items.push(`<span class="it money" title="Dinero">$<b id="money">${this.money}</b></span>`);
@@ -934,9 +993,9 @@ class Game {
     }
     if (this.pendingLevels > 0) this.openLevelUp();
     else if (this.shopPending) this.openShop();
-    else if (this.director.state === 'waiting') {
+    else {
       this.saveT = (this.saveT || 0) + dt;
-      if (this.saveT > 2) this.saveProgress();
+      if (this.saveT > (this.director.state === 'active' ? 4 : 2)) this.saveProgress();
     }
   }
 

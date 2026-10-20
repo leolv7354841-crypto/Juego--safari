@@ -4,6 +4,9 @@ import { TAU, rand, clamp } from './util.js';
 import { OUT } from './sprites.js';
 
 const SNAP = 20;
+const TRAP_WIRE = { slow: 0.35, dps: 14 };
+const TRAP_SPIKES = { slow: 0.5, dps: 45 };
+const TURRET_RANGE = 340;
 const BLAST_R = 140;
 const near = [];
 
@@ -88,7 +91,7 @@ export class Structures {
     if (def.ground) {
       this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0 });
     } else {
-      const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0 };
+      const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0, cd: 0, ang: game.player.angle };
       this.blocks.push(o);
       game.world.addDynamic(o);
     }
@@ -111,17 +114,23 @@ export class Structures {
     }
   }
 
-  // Llamado por cada zombi: ralentiza y hiere si está sobre alambre.
-  wireAt(z, dt) {
+  // Llamado por cada zombi: devuelve el efecto de la trampa que pisa (o null).
+  trapAt(z, dt, game) {
     for (let i = 0; i < this.wires.length; i++) {
       const w = this.wires[i];
       if (z.x + z.r * 0.5 < w.x || z.x - z.r * 0.5 > w.x + w.w || z.y + z.r * 0.5 < w.y || z.y - z.r * 0.5 > w.y + w.h) continue;
-      w.hp -= dt * 2.5 * Math.sqrt(z.mass);
+      if (w.kind === 'mine') {
+        this.wires.splice(i, 1);
+        this.explode(game, { x: w.x + w.w / 2, y: w.y + w.h / 2 }, 115, 280);
+        return null;
+      }
+      const spikes = w.kind === 'spikes';
+      w.hp -= dt * (spikes ? 1.5 : 2.5) * Math.sqrt(z.mass);
       w.hitT = 0.1;
       if (w.hp <= 0) this.wires.splice(i, 1);
-      return true;
+      return spikes ? TRAP_SPIKES : TRAP_WIRE;
     }
-    return false;
+    return null;
   }
 
   /* ---------- granadas ---------- */
@@ -138,23 +147,23 @@ export class Structures {
     this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0 });
   }
 
-  explode(game, g) {
+  explode(game, g, R = BLAST_R, power = 330) {
     const { x, y } = g;
-    game.horde.grid.query(x - BLAST_R - 44, y - BLAST_R - 44, x + BLAST_R + 44, y + BLAST_R + 44, near);
+    game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
       if (z.dead) continue;
       const dx = z.x - x;
       const dy = z.y - y;
       const d = Math.hypot(dx, dy);
-      if (d > BLAST_R + z.r) continue;
-      const f = clamp(1 - d / BLAST_R, 0, 1);
+      if (d > R + z.r) continue;
+      const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      game.hitZombie(z, { dmg: 330 * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: 120 + 260 * f, shot: null }, z.x, z.y);
+      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: 120 + 260 * f, shot: null }, z.x, z.y);
     }
     const p = game.player;
     const pd = Math.hypot(p.x - x, p.y - y);
     game.camera.shake(0.45 + 0.5 * clamp(1 - pd / 600, 0, 1));
-    game.particles.explosion(x, y, BLAST_R);
+    game.particles.explosion(x, y, R);
     game.sfx.explosion();
     this.blasts.push({ x, y, t: 0.4 });
     this.scorches.push({ x, y, t: 0, life: 25, a: rand(0, TAU) });
@@ -162,6 +171,7 @@ export class Structures {
   }
 
   update(dt, game) {
+    this.time = (this.time || 0) + dt;
     for (let i = this.grenades.length - 1; i >= 0; i--) {
       const g = this.grenades[i];
       g.t += dt;
@@ -181,8 +191,44 @@ export class Structures {
     }
     for (const s of this.scorches) s.t += dt;
     while (this.scorches.length && this.scorches[0].t > this.scorches[0].life) this.scorches.shift();
-    for (const b of this.blocks) b.hitT -= dt;
+    for (const b of this.blocks) {
+      b.hitT -= dt;
+      if (b.kind === 'turret') this.updateTurret(b, dt, game);
+    }
     for (const w of this.wires) w.hitT -= dt;
+  }
+
+  // Torreta: apunta al zombi más cercano dentro de su alcance y dispara sola.
+  updateTurret(b, dt, game) {
+    b.cd -= dt;
+    b.flash = Math.max(0, (b.flash || 0) - dt);
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    game.horde.grid.query(cx - TURRET_RANGE, cy - TURRET_RANGE, cx + TURRET_RANGE, cy + TURRET_RANGE, near);
+    let best = null;
+    let bd = TURRET_RANGE * TURRET_RANGE;
+    for (const z of near) {
+      if (z.dead) continue;
+      const d = (z.x - cx) ** 2 + (z.y - cy) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = z;
+      }
+    }
+    if (!best) return;
+    const target = Math.atan2(best.y - cy, best.x - cx);
+    let diff = target - b.ang;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    b.ang += Math.max(-dt * 9, Math.min(dt * 9, diff));
+    if (b.cd > 0 || Math.abs(diff) > 0.25) return;
+    b.cd = 0.16;
+    b.flash = 0.05;
+    const a = b.ang + rand(-0.04, 0.04);
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    game.bullets.spawn({ x: cx + ca * 20, y: cy + sa * 20, dx: ca, dy: sa, speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null });
+    game.particles.muzzleSmoke(cx + ca * 22, cy + sa * 22, a);
+    game.sfx.turret();
   }
 
   /* ---------- dibujo ---------- */
@@ -204,7 +250,9 @@ export class Structures {
     ctx.globalAlpha = 1;
     for (const w of this.wires) {
       if (w.x > v.x1 || w.x + w.w < v.x0 || w.y > v.y1 || w.y + w.h < v.y0) continue;
-      drawWire(ctx, w);
+      if (w.kind === 'spikes') drawSpikes(ctx, w);
+      else if (w.kind === 'mine') drawMine(ctx, w, this.time || 0);
+      else drawWire(ctx, w);
     }
   }
 
@@ -318,6 +366,70 @@ function drawBlock(ctx, b) {
       ctx.arc(x + nx, y + ny, 2, 0, TAU);
       ctx.fill();
     }
+  } else if (b.kind === 'sandbag') {
+    const horiz = w > h;
+    const n = Math.round((horiz ? w : h) / 20);
+    for (let row = 0; row < 2; row++) {
+      for (let i = 0; i < n; i++) {
+        const off = row ? 10 : 0;
+        const along = Math.min((horiz ? w : h) - 10, 10 + i * 20 + off);
+        const across = (horiz ? h : w) * (row ? 0.68 : 0.32);
+        const cx = horiz ? x + along : x + across;
+        const cy = horiz ? y + across : y + along;
+        ctx.fillStyle = (i + row) % 2 ? '#8a7d5c' : '#7f7354';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, horiz ? 10.5 : (w * 0.3), horiz ? (h * 0.3) : 10.5, 0, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = OUT;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+    }
+  } else if (b.kind === 'concrete') {
+    ctx.fillStyle = '#8c8a84';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#a3a19a';
+    if (w > h) ctx.fillRect(x, y + 3, w, h * 0.35);
+    else ctx.fillRect(x + 3, y, w * 0.35, h);
+    ctx.fillStyle = 'rgba(40,38,34,0.35)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(x + ((i * 37) % w), y + ((i * 13) % h), 3, 3);
+    ctx.fillStyle = 'rgba(199,162,74,0.8)';
+    if (w > h) {
+      ctx.fillRect(x + 6, y + h - 6, 10, 3);
+      ctx.fillRect(x + w - 16, y + h - 6, 10, 3);
+    } else {
+      ctx.fillRect(x + w - 6, y + 6, 3, 10);
+      ctx.fillRect(x + w - 6, y + h - 16, 3, 10);
+    }
+  } else if (b.kind === 'turret') {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.fillStyle = '#3d4246';
+    ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+    ctx.fillStyle = '#c7a24a';
+    ctx.fillRect(x + 2, y + 2, 6, 6);
+    ctx.fillRect(x + w - 8, y + h - 8, 6, 6);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(b.ang || 0);
+    ctx.fillStyle = '#1e2124';
+    ctx.fillRect(4, -2.5, 20, 5);
+    ctx.fillStyle = '#5c6268';
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, TAU);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = OUT;
+    ctx.stroke();
+    ctx.fillStyle = '#b5463a';
+    ctx.fillRect(2, -2, 4, 4);
+    if (b.flash > 0) {
+      ctx.fillStyle = 'rgba(255,214,140,0.95)';
+      ctx.beginPath();
+      ctx.arc(26, 0, 5, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
   } else {
     ctx.fillStyle = '#3c4146';
     ctx.fillRect(x, y, w, h);
@@ -379,6 +491,54 @@ function drawBlock(ctx, b) {
     ctx.fillStyle = 'rgba(255,240,220,0.35)';
     ctx.fillRect(x, y, w, h);
   }
+}
+
+function drawSpikes(ctx, w) {
+  const { x, y } = w;
+  ctx.globalAlpha = 0.55 + 0.45 * (w.hp / w.max);
+  ctx.fillStyle = '#4a4740';
+  ctx.fillRect(x, y, w.w, w.h);
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w.w, w.h);
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const px = x + 6 + i * ((w.w - 12) / 3);
+      const py = y + 6 + j * ((w.h - 12) / 3);
+      ctx.fillStyle = w.hitT > 0 ? '#e6e0d2' : '#b8b2a4';
+      ctx.beginPath();
+      ctx.moveTo(px, py - 4);
+      ctx.lineTo(px + 3, py + 3);
+      ctx.lineTo(px - 3, py + 3);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMine(ctx, w, time) {
+  const cx = w.x + w.w / 2;
+  const cy = w.y + w.h / 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.arc(cx + 2, cy + 3, 10, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#4a5236';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10, 0, TAU);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = OUT;
+  ctx.stroke();
+  ctx.fillStyle = '#6a7050';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = Math.sin(time * 6 + cx) > 0 ? '#ff5a3a' : '#5a2a20';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 2, 0, TAU);
+  ctx.fill();
 }
 
 function drawWire(ctx, w) {

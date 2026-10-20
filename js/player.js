@@ -80,6 +80,17 @@ export class Player {
     return true;
   }
 
+  // Quita un arma (vender). La pistola no se puede quitar.
+  removeWeapon(id) {
+    const i = this.weapons.findIndex((w) => w.id === id);
+    if (i <= 0 || id === 'pistol') return false;
+    this.weapons.splice(i, 1);
+    if (this.wi === i) this.wi = 0;
+    else if (this.wi > i) this.wi--;
+    this.reloadT = 0;
+    return true;
+  }
+
   select(i) {
     if (i < 0 || i >= this.weapons.length || i === this.wi) return;
     this.wi = i;

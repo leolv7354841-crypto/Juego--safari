@@ -185,6 +185,11 @@ export class Sfx {
     this.tone({ freq: 55, dur: 1.4, gain: 0.3 });
   }
 
+  turret() {
+    if (!this.ok('turret', 0.12)) return;
+    this.burst({ dur: 0.07, freq: 2600, sweep: 800, gain: 0.22 });
+  }
+
   explosion() {
     if (!this.ok('explosion', 0.08)) return;
     this.burst({ dur: 1.1, freq: 1800, sweep: 60, gain: 1 });

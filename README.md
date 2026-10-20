@@ -15,37 +15,42 @@ de un cerco, no para pasear.
 | Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
-| Gigante | 1500 | muy lenta     | Su cuerpo **bloquea las balas** y protege a los que van detrás |
 
 ### Progreso guardado
 
-La partida se guarda sola al terminar cada ronda y mientras te preparas (bloques puestos, compras,
-mejoras, armas y munición). Al volver a abrir el juego aparece **Continuar**, y si caes puedes
-**continuar desde la última ronda superada**. *Nueva partida* borra el progreso guardado. El guardado
-vive en el navegador de cada dispositivo.
+El juego se guarda solo en el navegador cada pocos segundos, **también a mitad de ronda** (con los
+zombis que siguen vivos), y al cerrar o minimizar la página. Al volver a abrir el sitio aparece
+**Continuar** y sigues donde estabas. Al terminar cada ronda se crea además un punto de control: si
+caes, puedes **continuar desde la última ronda superada**. *Nueva partida* borra el progreso.
+El guardado vive en el navegador de cada dispositivo (y en cada sitio web por separado).
 
 ### Dinero y tienda
 
-Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · gigante $10**. Al terminar cada oleada (después
+Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5**. Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
-| Objeto | Precio | Efecto |
+| Estructura | Precio | Efecto |
 |--------|--------|--------|
-| Bloque de madera | $10 | Barricada básica (160 de resistencia) |
-| Bloque de metal | $30 | Aguanta 3× más que la madera (520) |
-| Valla de metal reforzado | $70 | Muro ancho casi indestructible (1400) |
-| Alambre de púas | $20 | No bloquea, pero frena y hiere a los zombis |
-| Granada | $90 | Explosión en área que arrasa grupos |
+| Bloque de madera | $10 | Barricada básica (160) |
+| Sacos terreros | $25 | Muro ancho y barato (450) |
+| Bloque de metal | $30 | 3× más que la madera (520) |
+| Valla de metal reforzado | $70 | Muro ancho muy resistente (1400) |
+| Muro de concreto | $150 | La defensa más dura (3200) |
+| Torreta automática | $350 | Dispara sola al zombi más cercano |
+| Alambre de púas | $20 | No bloquea: frena y hiere |
+| Trampa de pinchos | $60 | Frena y hiere mucho más |
+| Mina terrestre | $45 | Explota al pisarla |
+| Granada | $90 | Explosión en área que lanzas tú |
 
 Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches). Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
-Los zombis más rápidos rodean a los más lentos para adelantarlos: nadie se queda atascado detrás de un gigante.
+Los zombis más rápidos rodean a los más lentos para adelantarlos.
 
 ### Armas y munición
 
 La pistola tiene balas infinitas. Todas las demás se compran en la tienda (las básicas también salen en
-mejoras de nivel y en las cajas de los gigantes):
+mejoras de nivel). Puedes **vender** cualquier arma que tengas por la mitad de su precio:
 
 | Arma | Precio | Cargador |
 |------|--------|----------|

@@ -26,20 +26,17 @@ export class Director {
     const normals = 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
     const sprinters = 5 * (3 + Math.floor((w - 1) * 3.5));
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
-    const giants = w >= 4 ? 1 + Math.floor((w - 4) / 3) : 0;
     const q = [];
     for (let i = 0; i < normals; i++) q.push('normal');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
-    // los gigantes llegan en la segunda mitad de la oleada
-    for (let i = 0; i < giants; i++) q.splice(randInt(Math.floor(q.length * 0.45), q.length), 0, 'giant');
     this.queue = q;
     this.waveSize = q.length;
     this.interval = Math.max(0.3, 1.5 - w * 0.08);
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, giants ? 'Se acerca un gigante' : w === 1 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, w === 1 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 

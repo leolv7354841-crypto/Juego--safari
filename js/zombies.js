@@ -172,11 +172,12 @@ export class Horde {
       let sp = z.speed * (z.slow > 0 ? 0.35 : 1);
       if (inRange) sp *= 0.15;
       // alambre de púas: frena y hiere
-      if (game.structures.wires.length && game.structures.wireAt(z, dt)) {
-        sp *= 0.35;
-        z.hp -= 14 * dt;
-        if (z.hp <= 0 && !z.dead) game.killZombie(z);
+      const trap = game.structures.wires.length ? game.structures.trapAt(z, dt, game) : null;
+      if (trap) {
+        sp *= trap.slow;
+        z.hp -= trap.dps * dt;
       }
+      if (z.hp <= 0 && !z.dead) game.killZombie(z);
       z.x += mx * sp * dt + z.kx * dt;
       z.y += my * sp * dt + z.ky * dt;
       const kd = Math.exp(-dt * 7);

@@ -364,7 +364,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 }
 .shop-sec:first-child { margin-top: 0; }
 .shop-empty { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--dim); }
-.shop-item.owned { opacity: 0.6; }
+.shop-item.owned { border-color: rgba(134, 168, 146, 0.35); }
+.btn.buy.sell { min-width: 0; font-size: 16px; padding: 8px 10px 5px; background: none; color: var(--accent); border-color: rgba(217, 120, 58, 0.6); }
+.btn.buy.sell:hover { background: rgba(217, 120, 58, 0.15); }
 .tag-owned { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--xp); padding: 0 8px; }
 .buy-col { display: grid; gap: 4px; }
 .btn.buy.sm { min-width: 0; font-size: 17px; padding: 7px 10px 4px; }

@@ -79,7 +79,7 @@ export const WEAPONS = {
   },
 };
 export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autoshotgun', 'sniper', 'lmg'];
-// las cajas de los gigantes sólo regalan las armas básicas; las mejores se compran
+// cajas de armas (las básicas); las mejores se compran
 export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
 
 export const ZOMBIES = {
@@ -117,18 +117,40 @@ export const SHOP = {
     name: 'Bloque de metal', desc: 'Placa de acero: aguanta 3 veces más que la madera.',
     price: 30, hp: 520, w: 40, h: 40,
   },
+  sandbag: {
+    name: 'Sacos terreros', desc: 'Muro ancho y barato. Ideal para cerrar calles rápido.',
+    price: 25, hp: 450, w: 80, h: 24, rotates: true,
+  },
   fence: {
-    name: 'Valla de metal reforzado', desc: 'Muro ancho casi indestructible. Frena hasta a los gigantes un buen rato.',
+    name: 'Valla de metal reforzado', desc: 'Muro ancho muy resistente. Frena a los gordos un buen rato.',
     price: 70, hp: 1400, w: 80, h: 24, rotates: true,
+  },
+  concrete: {
+    name: 'Muro de concreto', desc: 'La defensa más dura: aguanta más del doble que la valla.',
+    price: 150, hp: 3200, w: 80, h: 28, rotates: true,
+  },
+  turret: {
+    name: 'Torreta automática', desc: 'Dispara sola al zombi más cercano. Ponla detrás de tus muros.',
+    price: 350, hp: 700, w: 40, h: 40, turret: true,
   },
   wire: {
     name: 'Alambre de púas', desc: 'No bloquea el paso: frena mucho y hiere a los zombis que lo cruzan.',
     price: 20, hp: 70, w: 80, h: 40, rotates: true, ground: true,
+  },
+  spikes: {
+    name: 'Trampa de pinchos', desc: 'Placa de clavos: frena y hiere mucho más que el alambre.',
+    price: 60, hp: 300, w: 40, h: 40, ground: true,
+  },
+  mine: {
+    name: 'Mina terrestre', desc: 'Explota cuando un zombi la pisa y arrasa todo alrededor.',
+    price: 45, hp: 1, w: 24, h: 24, ground: true,
   },
   grenade: {
     name: 'Granada', desc: 'Explosión en área que arrasa grupos enteros. Cara, úsala bien.',
     price: 90, consumable: true,
   },
 };
-export const SHOP_ORDER = ['wood', 'metal', 'fence', 'wire', 'grenade'];
-export const BUILD_ORDER = ['wood', 'metal', 'fence', 'wire'];
+export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'turret', 'wire', 'spikes', 'mine'];
+export const SHOP_ORDER = [...BUILD_ORDER, 'grenade'];
+// Vender un arma devuelve esta fracción de su precio.
+export const SELL_RATE = 0.5;
