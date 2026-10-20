@@ -1,8 +1,8 @@
-import { PLAYER_BASE, WEAPONS, WORLD_SIZE } from './config.js';
+import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER } from './config.js';
 import { clamp, rand, angleTo } from './util.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
-const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1 };
+const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41 };
 
 export class Player {
   constructor(x, y) {
@@ -75,7 +75,7 @@ export class Player {
   unlock(id) {
     if (this.has(id)) return false;
     this.weapons.push(this.makeWeapon(id));
-    this.weapons.sort((a, b) => ['pistol', 'smg', 'shotgun', 'rifle'].indexOf(a.id) - ['pistol', 'smg', 'shotgun', 'rifle'].indexOf(b.id));
+    this.weapons.sort((a, b) => WEAPON_ORDER.indexOf(a.id) - WEAPON_ORDER.indexOf(b.id));
     this.select(this.weapons.findIndex((w) => w.id === id));
     return true;
   }

@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER } from './config.js';
 import { Structures } from './build.js';
 import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
@@ -12,11 +12,11 @@ import { Director } from './director.js';
 import { Lighting } from './lighting.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
-import { drawSurvivor } from './sprites.js';
+import { drawSurvivor, drawGunIcon } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
 const SAVE_KEY = 'dz-save-v1';
-const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif' };
+const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet' };
 const ITEM_ICONS = {
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
   wood: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#7a5634" stroke="#141612"/><path d="M2 2l8 8" stroke="#4a3220" stroke-width="1.5"/></svg>',
@@ -452,7 +452,35 @@ class Game {
 
   renderShop() {
     this.$('shop-money').textContent = `$${this.money}`;
-    this.$('shop-items').innerHTML = SHOP_ORDER.map((k) => {
+    const p = this.player;
+    const buyBtn = (attrs, price, label, extra = '') => {
+      const poor = this.money < price;
+      return `<button class="btn buy${extra}${poor ? ' poor' : ''}" ${attrs} ${poor ? 'disabled' : ''}>${label}</button>`;
+    };
+    // armas: de la más barata a la más potente
+    const guns = WEAPON_ORDER.filter((id) => id !== 'pistol').map((id) => {
+      const d = WEAPONS[id];
+      const owned = p.has(id);
+      return `<div class="shop-item${owned ? ' owned' : ''}">
+        <canvas class="shop-ic" data-gun="${id}" width="96" height="96"></canvas>
+        <div class="shop-txt"><b>${d.name}</b><span>${d.desc}</span><small>Daño ${d.damage}${d.pellets > 1 ? `×${d.pellets}` : ''} · ${d.rate} disp/s · cargador ${d.mag}</small></div>
+        ${owned ? '<span class="tag-owned">Tuya</span>' : buyBtn(`data-gun-buy="${id}"`, d.price, `$${d.price}`)}
+      </div>`;
+    });
+    // munición sin límite para cada arma que tengas
+    const ammo = p.weapons.filter((w) => w.reserve !== Infinity).map((w) => {
+      const d = w.def;
+      const mag = p.magSize(d);
+      return `<div class="shop-item">
+        <canvas class="shop-ic" data-gun="${w.id}" width="96" height="96"></canvas>
+        <div class="shop-txt"><b>Balas · ${d.name}</b><span>Cargador de ${mag} balas por $${d.ammoPrice}. Sin límite de reserva.</span><small>Reserva: ${w.reserve} balas</small></div>
+        <div class="buy-col">
+          ${buyBtn(`data-ammo="${w.id}" data-n="1"`, d.ammoPrice, `+1 · $${d.ammoPrice}`, ' sm')}
+          ${buyBtn(`data-ammo="${w.id}" data-n="10"`, d.ammoPrice * 10, `+10 · $${d.ammoPrice * 10}`, ' sm')}
+        </div>
+      </div>`;
+    });
+    const gear = SHOP_ORDER.map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
       return `<div class="shop-item${k === 'grenade' ? ' hot' : ''}">
@@ -460,8 +488,42 @@ class Game {
         <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp ? ` · Resistencia ${it.hp}` : ''}</small></div>
         <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
       </div>`;
-    }).join('');
+    });
+    this.$('shop-items').innerHTML = `
+      <h3 class="shop-sec">Armas</h3>${guns.join('')}
+      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
+      <h3 class="shop-sec">Defensas y granadas</h3>${gear.join('')}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
+    this.$('shop-items').querySelectorAll('canvas[data-gun]').forEach((c) => {
+      const g = c.getContext('2d');
+      g.setTransform(2.1, 0, 0, 2.1, 4, 48);
+      g.shadowColor = 'rgba(230,224,210,0.85)';
+      g.shadowBlur = 3;
+      drawGunIcon(g, c.dataset.gun);
+    });
+  }
+
+  buyWeapon(id) {
+    const d = WEAPONS[id];
+    const p = this.player;
+    if (!d || p.has(id) || this.money < d.price) return;
+    this.money -= d.price;
+    p.unlock(id);
+    this.sfx.buy();
+    this.toast(`${d.name} comprada`);
+    this.renderShop();
+  }
+
+  buyAmmo(id, n) {
+    const p = this.player;
+    const w = p.weapons.find((x) => x.id === id);
+    if (!w || w.reserve === Infinity) return;
+    const cost = w.def.ammoPrice * n;
+    if (this.money < cost) return;
+    this.money -= cost;
+    w.reserve += p.magSize(w.def) * n;
+    this.sfx.buy();
+    this.renderShop();
   }
 
   drawShopIcon(c, k) {
@@ -629,6 +691,10 @@ class Game {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
     });
     this.$('shop-items').addEventListener('click', (e) => {
+      const g = e.target.closest('[data-gun-buy]');
+      if (g) return this.buyWeapon(g.dataset.gunBuy);
+      const a = e.target.closest('[data-ammo]');
+      if (a) return this.buyAmmo(a.dataset.ammo, Number(a.dataset.n));
       const b = e.target.closest('[data-buy]');
       if (b) this.buy(b.dataset.buy);
     });

@@ -1,6 +1,6 @@
 import { drawPickup } from './sprites.js';
 import { rand, pick } from './util.js';
-import { WEAPON_ORDER, WEAPONS } from './config.js';
+import { CRATE_WEAPONS, WEAPONS } from './config.js';
 
 const LIFE = 22;
 
@@ -56,7 +56,7 @@ export class Pickups {
       game.toast('+30 Vida');
       game.particles.pickupFx(it.x, it.y, '#7fb38f');
     } else {
-      const locked = WEAPON_ORDER.filter((id) => !p.has(id));
+      const locked = CRATE_WEAPONS.filter((id) => !p.has(id));
       if (locked.length) {
         const id = pick(locked);
         p.unlock(id);

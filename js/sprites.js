@@ -651,6 +651,8 @@ export function coneSprite() {
 
 /* ---------- Superviviente ---------- */
 
+const GUN_LEN = { pistol: 23, smg: 30, shotgun: 33, rifle: 38, ar: 35, autoshotgun: 35, sniper: 47, lmg: 42 };
+
 const GUNS = {
   pistol: (g, r) => {
     g.fillStyle = '#26282b';
@@ -674,6 +676,46 @@ const GUNS = {
     g.fillStyle = '#6b4a30';
     g.fillRect(r * 0.2 + 14, -3.2, 8, 6.4);
   },
+  ar: (g, r) => {
+    g.fillStyle = '#2c2e30';
+    g.fillRect(r * 0.2, -3, 8, 6);
+    g.fillStyle = '#25272a';
+    g.fillRect(r * 0.2 + 8, -2.8, 22, 5.6);
+    g.fillStyle = '#1b1c1e';
+    g.fillRect(r * 0.2 + 14, 2, 5, 7);
+    g.fillStyle = '#4a4f42';
+    g.fillRect(r * 0.2 + 10, -4.2, 9, 2);
+  },
+  autoshotgun: (g, r) => {
+    g.fillStyle = '#2a2b2d';
+    g.fillRect(r * 0.2, -3.4, 30, 6.8);
+    g.fillStyle = '#1b1c1e';
+    g.beginPath();
+    g.arc(r * 0.2 + 14, 4, 5, 0, TAU);
+    g.fill();
+    g.fillStyle = '#5a5e52';
+    g.fillRect(r * 0.2 + 22, -2, 8, 4);
+  },
+  sniper: (g, r) => {
+    g.fillStyle = '#3d3226';
+    g.fillRect(r * 0.05, -3, 12, 6);
+    g.fillStyle = '#25272a';
+    g.fillRect(r * 0.05 + 12, -2, 34, 4);
+    g.fillStyle = '#121314';
+    g.fillRect(r * 0.05 + 14, -5.5, 16, 3.5);
+    g.fillStyle = '#5c7a8a';
+    g.fillRect(r * 0.05 + 28, -5, 2, 2.5);
+  },
+  lmg: (g, r) => {
+    g.fillStyle = '#2a2c2e';
+    g.fillRect(r * 0.15, -3.6, 32, 7.2);
+    g.fillStyle = '#4a4f42';
+    g.fillRect(r * 0.15 + 8, 3.2, 10, 8);
+    g.fillStyle = '#1b1c1e';
+    g.fillRect(r * 0.15 + 28, -1.5, 9, 3);
+    g.fillStyle = '#c9a54a';
+    g.fillRect(r * 0.15 + 9, 10, 8, 2);
+  },
   rifle: (g, r) => {
     g.fillStyle = '#4b3a2a';
     g.fillRect(r * 0.15, -3, 10, 6);
@@ -683,6 +725,17 @@ const GUNS = {
     g.fillRect(r * 0.15 + 12, -4.5, 11, 3);
   },
 };
+
+// Silueta del arma para la tienda (mira hacia la derecha).
+export function drawGunIcon(g, id) {
+  g.save();
+  // la culata de cada arma empieza en un punto distinto: la centramos según su largo
+  const r = 14;
+  g.translate(-r * 0.05, 0);
+  g.scale(42 / Math.max(30, GUN_LEN[id] || 30), 42 / Math.max(30, GUN_LEN[id] || 30));
+  GUNS[id](g, r);
+  g.restore();
+}
 
 export function drawSurvivor(g, p, time) {
   const r = p.r;

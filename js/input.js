@@ -44,7 +44,7 @@ export class Input {
       if (e.code === 'KeyG') this.pressed.grenade = true;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
-      const m = /^Digit([1-4])$/.exec(e.code);
+      const m = /^Digit([1-9])$/.exec(e.code);
       if (m) this.pressed.slot = Number(m[1]);
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) this.setMode('mouse');
     });

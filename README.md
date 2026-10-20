@@ -42,8 +42,23 @@ romperlas o buscan otro camino para rodearlas.
 
 Los zombis más rápidos rodean a los más lentos para adelantarlos: nadie se queda atascado detrás de un gigante.
 
-Armas: pistola (munición infinita), subfusil, escopeta y rifle. Se desbloquean con mejoras de nivel o en
-las cajas que suelta cada gigante.
+### Armas y munición
+
+La pistola tiene balas infinitas. Todas las demás se compran en la tienda (las básicas también salen en
+mejoras de nivel y en las cajas de los gigantes):
+
+| Arma | Precio | Cargador |
+|------|--------|----------|
+| Subfusil | $120 | 32 |
+| Escopeta | $160 | 6 (8 perdigones) |
+| Rifle | $220 | 10 (atraviesa 2) |
+| Fusil de asalto | $400 | 30 |
+| Escopeta automática | $600 | 12 (9 perdigones) |
+| Francotirador | $750 | 5 (atraviesa 6) |
+| Ametralladora | $900 | 100 |
+
+En la sección **Munición** de la tienda compras cargadores de cualquier arma que tengas, de 1 en 1 o de
+10 en 10. La reserva de balas no tiene límite.
 
 ### Controles
 
@@ -53,7 +68,7 @@ las cajas que suelta cada gigante.
 | `Shift`: correr | Botón **Correr** (activa/desactiva) |
 | Ratón: apuntar · clic: disparar | Botón de disparo con **apuntado automático** |
 | `R`: recargar | Botón de recarga |
-| `1`–`4` o `Q`: cambiar arma | Botón de cambio de arma |
+| `1`–`8` o `Q`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
 | `G`: lanzar granada | Botón **Granada** (apunta solo) |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |

@@ -30,24 +30,57 @@ export const WEAPONS = {
   },
   smg: {
     id: 'smg', name: 'Subfusil', damage: 14, rate: 11, mag: 32,
-    reserve: 128, reserveMax: 320, pickup: 64, reload: 1.5,
+    reserve: 128, reserveMax: Infinity, pickup: 64, reload: 1.5,
     spread: 0.09, bloom: 0.022, pellets: 1, speed: 1000, range: 520,
     knock: 30, shake: 0.07, pierce: 0, len: 15,
+    price: 120, ammoPrice: 6, desc: 'Ráfagas rápidas para contener a la horda.',
   },
   shotgun: {
     id: 'shotgun', name: 'Escopeta', damage: 17, rate: 1.25, mag: 6,
-    reserve: 24, reserveMax: 60, pickup: 12, reload: 1.9,
+    reserve: 24, reserveMax: Infinity, pickup: 12, reload: 1.9,
     spread: 0.3, bloom: 0.1, pellets: 8, speed: 820, range: 330,
     knock: 130, shake: 0.3, pierce: 0, len: 20,
+    price: 160, ammoPrice: 8, desc: '8 perdigones a corta distancia que derriban grupos.',
   },
   rifle: {
     id: 'rifle', name: 'Rifle', damage: 72, rate: 1.9, mag: 10,
-    reserve: 40, reserveMax: 100, pickup: 16, reload: 1.7,
+    reserve: 40, reserveMax: Infinity, pickup: 16, reload: 1.7,
     spread: 0.008, bloom: 0.06, pellets: 1, speed: 1500, range: 950,
     knock: 110, shake: 0.22, pierce: 2, len: 24,
+    price: 220, ammoPrice: 8, desc: 'Disparo potente y lejano que atraviesa 2 enemigos.',
+  },
+  ar: {
+    id: 'ar', name: 'Fusil de asalto', damage: 30, rate: 8, mag: 30,
+    reserve: 90, reserveMax: Infinity, pickup: 30, reload: 1.6,
+    spread: 0.05, bloom: 0.015, pellets: 1, speed: 1250, range: 700,
+    knock: 50, shake: 0.1, pierce: 1, len: 20,
+    price: 400, ammoPrice: 10, desc: 'Automático, preciso y perforante. El todoterreno.',
+  },
+  autoshotgun: {
+    id: 'autoshotgun', name: 'Escopeta automática', damage: 18, rate: 3.5, mag: 12,
+    reserve: 36, reserveMax: Infinity, pickup: 12, reload: 2.2,
+    spread: 0.32, bloom: 0.06, pellets: 9, speed: 850, range: 340,
+    knock: 120, shake: 0.28, pierce: 0, len: 22,
+    price: 600, ammoPrice: 15, desc: '9 perdigones en ráfaga continua. Barre hordas de cerca.',
+  },
+  sniper: {
+    id: 'sniper', name: 'Francotirador', damage: 240, rate: 1.1, mag: 5,
+    reserve: 20, reserveMax: Infinity, pickup: 5, reload: 2.4,
+    spread: 0.003, bloom: 0.08, pellets: 1, speed: 2000, range: 1400,
+    knock: 220, shake: 0.35, pierce: 6, len: 30,
+    price: 750, ammoPrice: 15, desc: 'Daño enorme: cada bala atraviesa hasta 6 zombis en fila.',
+  },
+  lmg: {
+    id: 'lmg', name: 'Ametralladora', damage: 26, rate: 13, mag: 100,
+    reserve: 200, reserveMax: Infinity, pickup: 100, reload: 3.2,
+    spread: 0.08, bloom: 0.012, pellets: 1, speed: 1200, range: 650,
+    knock: 45, shake: 0.09, pierce: 1, len: 26,
+    price: 900, ammoPrice: 35, desc: 'Cargador de 100 balas a ritmo infernal. La reina del caos.',
   },
 };
-export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle'];
+export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autoshotgun', 'sniper', 'lmg'];
+// las cajas de los gigantes sólo regalan las armas básicas; las mejores se compran
+export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
 
 export const ZOMBIES = {
   normal: {

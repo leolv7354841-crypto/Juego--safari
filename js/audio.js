@@ -81,6 +81,8 @@ export class Sfx {
 
   shot(kind) {
     if (!this.ok('shot', 0.03)) return;
+    // las armas nuevas reutilizan el sonido de su familia
+    kind = { ar: 'smg', lmg: 'smg', autoshotgun: 'shotgun', sniper: 'rifle' }[kind] || kind;
     if (kind === 'shotgun') {
       this.burst({ dur: 0.35, freq: 2400, sweep: 300, gain: 0.9 });
       this.tone({ freq: 120, to: 40, dur: 0.25, gain: 0.7 });
