@@ -47,7 +47,8 @@ Las barricadas se colocan delante de ti y las balas pasan por encima (también p
 Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
-Los zombis más rápidos rodean a los más lentos para adelantarlos.
+Los zombis más rápidos rodean a los más lentos para adelantarlos, y cada grupo se abre en abanico
+para rodearte y encerrarte desde todos los lados, anticipando hacia dónde te mueves.
 
 ### Armas y munición
 

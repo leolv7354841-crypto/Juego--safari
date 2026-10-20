@@ -101,6 +101,9 @@ export class Horde {
       spawnT: 0.6,
       lastStep: 0,
       chew: 0.4,
+      // lado del cerco: se fija al primer movimiento (ver update)
+      slot: null,
+      fan: ((nextId * 0.618034) % 1) * 2 - 1,
     };
     this.list.push(z);
     return z;
@@ -154,6 +157,33 @@ export class Horde {
         } else {
           mx = dx / d;
           my = dy / d;
+        }
+      }
+      // cerco: cada zombi tiene asignado un lado alrededor del jugador. Mientras está lejos de
+      // ese lado camina en círculo (tangente) y sólo entra de frente al llegar; además apuntan a
+      // donde vas a estar, así los de delante te cortan el paso y la horda te encierra.
+      // cada grupo se abre en abanico (±110°) desde el lado por el que llega
+      if (z.slot === null) z.slot = Math.atan2(-dy, -dx) + z.fan * 1.9;
+      if (p.alive && d > 60 && d < 1000) {
+        const ex = p.x + p.vx * 0.9 - z.x;
+        const ey = p.y + p.vy * 0.9 - z.y;
+        const ed = Math.hypot(ex, ey) || 1;
+        const bearing = Math.atan2(-ey, -ex);
+        let diff = z.slot - bearing;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        const fade = d > 120 ? 1 : (d - 60) / 60;
+        const turn = Math.min(Math.abs(diff), 1.3) * fade;
+        if (turn > 0.02) {
+          const sgn = diff > 0 ? 1 : -1;
+          const tx = (sgn * ey) / ed;
+          const ty = (-sgn * ex) / ed;
+          const c = Math.cos(turn);
+          const sn = Math.sin(turn);
+          mx = mx * c + tx * sn;
+          my = my * c + ty * sn;
+          const l = Math.hypot(mx, my) || 1;
+          mx /= l;
+          my /= l;
         }
       }
       // andar tambaleante, típico de un caminante
