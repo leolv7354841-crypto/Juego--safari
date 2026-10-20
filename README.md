@@ -13,6 +13,7 @@ de un cerco, no para pasear.
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
 | Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
+| Policía SWAT | 840 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 20× más      |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 
@@ -26,7 +27,7 @@ El guardado vive en el navegador de cada dispositivo (y en cada sitio web por se
 
 ### Dinero y tienda
 
-Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5**. Al terminar cada oleada (después
+Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · SWAT $10**. Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
 | Estructura | Precio | Efecto |

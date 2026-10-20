@@ -23,12 +23,16 @@ export class Director {
     this.wave++;
     const w = this.wave;
     // hordas masivas: 5 veces más normales y velocistas que antes
-    const normals = 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
+    // el 20% de los normales llega como policía SWAT
+    const normalTotal = 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
+    const swats = Math.round(normalTotal * 0.2);
+    const normals = normalTotal - swats;
     const sprinters = 5 * (3 + Math.floor((w - 1) * 3.5));
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
     const q = [];
     for (let i = 0; i < normals; i++) q.push('normal');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
+    for (let i = 0; i < swats; i++) q.splice(randInt(0, q.length), 0, 'swat');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
     this.queue = q;
     this.waveSize = q.length;
@@ -36,7 +40,7 @@ export class Director {
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, w === 1 ? 'Llegan los velocistas' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
@@ -108,7 +112,7 @@ export class Director {
       let placed = 0;
       for (let i = 0; i < size; i++) {
         const type = this.queue[0];
-        const r = type === 'giant' ? 44 : type === 'fat' ? 22 : type === 'sprinter' ? 12 : 14;
+        const r = type === 'giant' ? 44 : type === 'fat' ? 22 : type === 'sprinter' ? 12 : type === 'swat' ? 15 : 14;
         for (let t = 0; t < 6; t++) {
           const x = cx + rand(-150, 150);
           const y = cy + rand(-150, 150);

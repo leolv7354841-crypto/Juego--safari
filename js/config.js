@@ -87,6 +87,11 @@ export const ZOMBIES = {
     hp: 42, speed: [30, 44], radius: 13, damage: 8, attackRate: 0.9,
     xp: 1, mass: 1, reach: 7, frames: 6, turn: 4,
   },
+  // Policía SWAT: como un normal, con escudo antidisturbios; aguanta 20 veces más.
+  swat: {
+    hp: 42 * 20, speed: [28, 38], radius: 14, damage: 10, attackRate: 0.9,
+    xp: 10, mass: 2.5, reach: 8, frames: 6, turn: 3.5,
+  },
   sprinter: {
     hp: 26, speed: [88, 104], radius: 11, damage: 6, attackRate: 1.3,
     xp: 2, mass: 0.8, reach: 6, frames: 6, turn: 7,
@@ -105,7 +110,7 @@ export const ZOMBIES = {
 export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 7);
 
 // Dinero por cada zombi eliminado.
-export const BOUNTY = { normal: 1, sprinter: 3, fat: 5, giant: 10 };
+export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, giant: 10 };
 
 // Tienda entre oleadas. w/h en px del mundo; rotates = se coloca perpendicular a la mira.
 export const SHOP = {

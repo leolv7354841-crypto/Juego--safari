@@ -160,6 +160,10 @@ const NORMAL_PALETTES = [
   { skin: '#a2ad88', shirt: '#9a8a5c', pants: '#343b46', hair: '#3a2c20' },
   { skin: '#95a37f', shirt: '#55605c', pants: '#46392b', hair: '#262019' },
 ];
+const SWAT_PALETTES = [
+  { skin: '#97a682', shirt: '#22262b', pants: '#1c1f23', hair: '#15171a', vest: '#2f353b', shield: '#5d7484' },
+  { skin: '#8d9c78', shirt: '#262b22', pants: '#1f221c', hair: '#15171a', vest: '#363b31', shield: '#62788a' },
+];
 const SPRINTER_PALETTES = [
   { skin: '#a9b29c', shirt: '#8a3a2e', pants: '#2a2c30', hair: '#1a1714' },
   { skin: '#9fa894', shirt: '#9a5a2a', pants: '#33302a', hair: '#3a2a1c' },
@@ -214,6 +218,74 @@ function drawNormal(g, r, p, ph) {
   g.fillStyle = '#2a1c14';
   g.fillRect(r * 0.48, -r * 0.18, r * 0.1, r * 0.08);
   g.fillRect(r * 0.48, r * 0.1, r * 0.1, r * 0.08);
+}
+
+// Policía SWAT zombi: uniforme táctico, chaleco, casco con visor y un escudo
+// antidisturbios amarrado al antebrazo izquierdo.
+function drawSwat(g, r, p, ph) {
+  softShadow(g, r * 1.3);
+  const s = Math.sin(ph);
+  const c = Math.cos(ph);
+  const stride = r * 0.45;
+  ell(g, s * stride, -r * 0.32, r * 0.36, r * 0.22, 0, p.pants);
+  ell(g, -s * stride, r * 0.32, r * 0.36, r * 0.22, 0, p.pants);
+  g.fillStyle = '#0f1012';
+  g.fillRect(s * stride + r * 0.15, -r * 0.44, r * 0.22, r * 0.24);
+  g.fillRect(-s * stride + r * 0.15, r * 0.2, r * 0.22, r * 0.24);
+  g.save();
+  g.rotate(s * 0.06);
+  ell(g, -r * 0.08, 0, r * 0.54, r * 0.9, 0, p.shirt);
+  // chaleco con bolsillos
+  roundRect(g, -r * 0.45, -r * 0.62, r * 0.7, r * 1.24, r * 0.18);
+  g.fillStyle = p.vest;
+  g.fill();
+  g.lineWidth = 1.2;
+  g.strokeStyle = OUT;
+  g.stroke();
+  g.fillStyle = shade(p.vest, 1.25);
+  for (const yy of [-0.42, -0.1, 0.22]) g.fillRect(r * 0.0, r * yy, r * 0.2, r * 0.22);
+  g.fillStyle = '#c9c4b6';
+  g.fillRect(-r * 0.4, -r * 0.08, r * 0.3, r * 0.16);
+  rips(g, mulberry32(p.seed), -r * 0.08, 0, r * 0.5, r * 0.85, shade(p.shirt, 0.6), 3);
+  g.restore();
+  const ax = c * r * 0.08;
+  const ay = s * r * 0.08;
+  // brazo derecho estirado como cualquier caminante
+  limb(g, r * 0.05, r * 0.62, r * 1.1 - ax, r * 0.46 - ay, r * 0.3, p.shirt);
+  circ(g, r * 1.15 - ax, r * 0.46 - ay, r * 0.17, p.skin, OUT, 1);
+  // brazo izquierdo con el escudo atado
+  limb(g, r * 0.05, -r * 0.62, r * 0.8 + ax, -r * 0.62 + ay, r * 0.3, p.shirt);
+  g.save();
+  g.translate(r * 1.0 + ax, -r * 0.5 + ay);
+  g.rotate(-0.25);
+  roundRect(g, -r * 0.2, -r * 0.85, r * 0.4, r * 1.7, r * 0.1);
+  g.fillStyle = p.shield;
+  g.fill();
+  g.lineWidth = 1.8;
+  g.strokeStyle = OUT;
+  g.stroke();
+  g.fillStyle = 'rgba(225,238,248,0.45)';
+  g.fillRect(-r * 0.12, -r * 0.72, r * 0.08, r * 1.3);
+  g.fillStyle = '#e6e0d2';
+  g.fillRect(-r * 0.17, -r * 0.12, r * 0.34, r * 0.24);
+  g.fillStyle = '#2a2c30';
+  g.fillRect(-r * 0.2, r * 0.42, r * 0.4, r * 0.08);
+  g.fillRect(-r * 0.2, -r * 0.5, r * 0.4, r * 0.08);
+  g.restore();
+  // casco con visor
+  circ(g, r * 0.2, s * r * 0.03, r * 0.44, '#1a1c1f');
+  g.fillStyle = '#2c3036';
+  g.beginPath();
+  g.arc(r * 0.16, s * r * 0.03, r * 0.32, 0, TAU);
+  g.fill();
+  g.fillStyle = 'rgba(120,150,170,0.75)';
+  g.beginPath();
+  g.arc(r * 0.24, s * r * 0.03, r * 0.42, -0.9, 0.9);
+  g.lineTo(r * 0.24, s * r * 0.03);
+  g.closePath();
+  g.fill();
+  g.fillStyle = p.skin;
+  g.fillRect(r * 0.5, -r * 0.1, r * 0.12, r * 0.2);
 }
 
 // Velocista: flaco, inclinado hacia delante, zancada larga y brazos hacia atrás.
@@ -331,8 +403,8 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = { normal: drawNormal, swat: drawSwat, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
+const PALETTES = { normal: NORMAL_PALETTES, swat: SWAT_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -366,12 +438,13 @@ function buildSet(type, r, frames, pal, scale, pad) {
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], sprinter: [], fat: [], giant: [] };
+  ZSPRITES = { normal: [], swat: [], sprinter: [], fat: [], giant: [] };
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
     giant: { r: 42, frames: 8, scale: 2, pad: 1.45 },
     sprinter: { r: 11, frames: 6, scale: 2.6, pad: 1.8 },
+    swat: { r: 14, frames: 6, scale: 2.5, pad: 1.7 },
   };
   for (const type of Object.keys(conf)) {
     const k = conf[type];
