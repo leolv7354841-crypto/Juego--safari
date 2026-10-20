@@ -176,7 +176,7 @@ export class Player {
     const oy = this.y;
     this.x += (this.vx + this.kx) * dt;
     this.y += (this.vy + this.ky) * dt;
-    game.world.collide(this, this.r);
+    game.world.collide(this, this.r, true);
     this.x = clamp(this.x, 30, WORLD_SIZE - 30);
     this.y = clamp(this.y, 30, WORLD_SIZE - 30);
     const moved = Math.hypot(this.x - ox, this.y - oy);

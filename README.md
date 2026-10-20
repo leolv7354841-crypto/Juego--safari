@@ -42,7 +42,8 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Mina terrestre | $45 | Explota al pisarla |
 | Granada | $90 | Explosión en área que lanzas tú |
 
-Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches). Los zombis las golpean hasta
+Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches).
+Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
 Los zombis más rápidos rodean a los más lentos para adelantarlos.

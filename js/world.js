@@ -1087,7 +1087,8 @@ export class World {
   }
 
   // Empuja un círculo fuera de los obstáculos. Modifica e.x / e.y.
-  collide(e, r) {
+  // passBlocks: el jugador atraviesa sus propias barricadas; los zombis no.
+  collide(e, r, passBlocks = false) {
     const n = this.obsN;
     const x0 = clamp(Math.floor((e.x - r) / OBS_CELL), 0, n - 1);
     const y0 = clamp(Math.floor((e.y - r) / OBS_CELL), 0, n - 1);
@@ -1102,6 +1103,7 @@ export class World {
           const o = cell[k];
           if (o.stamp === stamp) continue;
           o.stamp = stamp;
+          if (passBlocks && o.block) continue;
           if (o.k === 0) {
             const px = e.x < o.x ? o.x : e.x > o.x + o.w ? o.x + o.w : e.x;
             const py = e.y < o.y ? o.y : e.y > o.y + o.h ? o.y + o.h : e.y;

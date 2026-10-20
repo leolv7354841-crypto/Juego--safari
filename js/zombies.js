@@ -273,7 +273,7 @@ export class Horde {
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
       z.y = clamp(z.y, 30, WORLD_SIZE - 30);
     }
-    if (p.alive) world.collide(p, p.r);
+    if (p.alive) world.collide(p, p.r, true);
     grid.clear();
     for (const z of list) grid.insert(z);
   }
