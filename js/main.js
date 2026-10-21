@@ -127,7 +127,7 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
-    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, giant: 0 };
+    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
     this.xpNeed = xpForLevel(1);
@@ -341,7 +341,7 @@ class Game {
     const kn = (b.knock * 3) / z.mass;
     z.kx += b.dx * kn;
     z.ky += b.dy * kn;
-    this.particles.hit(hx, hy, b.dx, b.dy, z.type === 'fat' || z.type === 'swat' || z.type === 'giant');
+    this.particles.hit(hx, hy, b.dx, b.dy, z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'giant');
     if (b.shot && !b.shot.hit) {
       b.shot.hit = true;
       this.player.shotsHit++;
@@ -462,7 +462,7 @@ class Game {
 
   totalKills() {
     const k = this.kills;
-    return k.normal + (k.swat || 0) + k.sprinter + k.fat + k.giant;
+    return k.normal + (k.swat || 0) + k.sprinter + k.fat + (k.heavy || 0) + k.giant;
   }
 
   onWaveCleared() {
@@ -679,6 +679,7 @@ class Game {
       ['Policías SWAT', this.kills.swat],
       ['Velocistas', this.kills.sprinter],
       ['Gordos', this.kills.fat],
+      ['Super blindados', this.kills.heavy],
       ['sep'],
       ['Precisión', `${acc}%`],
       ['Daño recibido', Math.round(p.damageTaken)],

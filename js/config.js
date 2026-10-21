@@ -32,7 +32,7 @@ export const WEAPONS = {
     id: 'smg', name: 'Subfusil', damage: 14, rate: 11, mag: 32,
     reserve: 128, reserveMax: Infinity, pickup: 64, reload: 1.5,
     spread: 0.09, bloom: 0.022, pellets: 1, speed: 1000, range: 520,
-    knock: 30, shake: 0.07, pierce: 0, len: 15,
+    knock: 30, shake: 0.03, pierce: 0, len: 15,
     price: 120, ammoPrice: 6, desc: 'Ráfagas rápidas para contener a la horda.',
   },
   shotgun: {
@@ -53,7 +53,7 @@ export const WEAPONS = {
     id: 'ar', name: 'Fusil de asalto', damage: 30, rate: 8, mag: 30,
     reserve: 90, reserveMax: Infinity, pickup: 30, reload: 1.6,
     spread: 0.05, bloom: 0.015, pellets: 1, speed: 1250, range: 700,
-    knock: 50, shake: 0.1, pierce: 1, len: 20,
+    knock: 50, shake: 0.04, pierce: 1, len: 20,
     price: 400, ammoPrice: 10, desc: 'Automático, preciso y perforante. El todoterreno.',
   },
   autoshotgun: {
@@ -74,7 +74,7 @@ export const WEAPONS = {
     id: 'lmg', name: 'Ametralladora', damage: 26, rate: 13, mag: 100,
     reserve: 200, reserveMax: Infinity, pickup: 100, reload: 3.2,
     spread: 0.08, bloom: 0.012, pellets: 1, speed: 1200, range: 650,
-    knock: 45, shake: 0.09, pierce: 1, len: 26,
+    knock: 45, shake: 0.015, pierce: 1, len: 26,
     price: 900, ammoPrice: 35, desc: 'Cargador de 100 balas a ritmo infernal. La reina del caos.',
   },
 };
@@ -96,6 +96,11 @@ export const ZOMBIES = {
     hp: 26, speed: [88, 104], radius: 11, damage: 6, attackRate: 1.3,
     xp: 2, mass: 0.8, reach: 6, frames: 6, turn: 7,
   },
+  // Super blindado: un gordo con armadura militar completa. Desde la oleada 11; 50 veces la vida de un normal.
+  heavy: {
+    hp: 42 * 50, speed: [19, 25], radius: 22, damage: 18, attackRate: 0.7,
+    xp: 25, mass: 6, reach: 9, frames: 6, turn: 2.5,
+  },
   fat: {
     hp: 130, speed: [21, 27], radius: 21, damage: 14, attackRate: 0.75,
     xp: 4, mass: 4, reach: 8, frames: 6, turn: 3,
@@ -110,7 +115,7 @@ export const ZOMBIES = {
 export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 7);
 
 // Dinero por cada zombi eliminado.
-export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, giant: 10 };
+export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, heavy: 25, giant: 10 };
 
 // Tienda entre oleadas. w/h en px del mundo; rotates = se coloca perpendicular a la mira.
 export const SHOP = {

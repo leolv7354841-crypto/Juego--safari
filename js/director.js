@@ -29,8 +29,11 @@ export class Director {
     const normals = normalTotal - swats;
     const sprinters = 5 * (3 + Math.floor((w - 1) * 3.5));
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
+    // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
+    const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
     const q = [];
-    for (let i = 0; i < normals; i++) q.push('normal');
+    for (let i = 0; i < normals - heavies; i++) q.push('normal');
+    for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
     for (let i = 0; i < swats; i++) q.splice(randInt(0, q.length), 0, 'swat');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
@@ -40,7 +43,7 @@ export class Director {
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, w === 11 ? 'Llegan los super blindados' : heavies ? 'Super blindados en la horda' : w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
@@ -96,48 +99,56 @@ export class Director {
     }
   }
 
-  spawnGroup(game) {
-    const size = Math.min(this.queue.length, randInt(14, 22 + this.wave * 3));
+  // Punto al azar sobre el borde de la pantalla (un poco por fuera), por cualquier lado.
+  edgePoint(game, margin) {
     const cam = game.camera;
-    const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 70;
     const p = game.player;
+    const hw = cam.viewW / 2 + margin;
+    const hh = cam.viewH / 2 + margin;
+    const per = 4 * (hw + hh);
+    let t = rand(0, per);
+    if (t < 2 * hw) return { x: p.x - hw + t, y: p.y - hh };
+    t -= 2 * hw;
+    if (t < 2 * hh) return { x: p.x + hw, y: p.y - hh + t };
+    t -= 2 * hh;
+    if (t < 2 * hw) return { x: p.x + hw - t, y: p.y + hh };
+    t -= 2 * hw;
+    return { x: p.x - hw, y: p.y + hh - t };
+  }
+
+  // Cada tanda se reparte en grupitos por todas las orillas de la pantalla.
+  spawnGroup(game) {
     const world = game.world;
-    for (let attempt = 0; attempt < 14; attempt++) {
-      const a = rand(0, TAU);
-      const d = radius + rand(30, 200);
-      const cx = p.x + Math.cos(a) * d;
-      const cy = p.y + Math.sin(a) * d;
-      if (cx < 80 || cy < 80 || cx > WORLD_SIZE - 80 || cy > WORLD_SIZE - 80) continue;
-      if (!world.reachable(cx, cy)) continue;
-      let placed = 0;
-      for (let i = 0; i < size; i++) {
+    let left = Math.min(this.queue.length, randInt(14, 22 + this.wave * 3));
+    let tries = 0;
+    while (left > 0 && this.queue.length && tries < 40) {
+      tries++;
+      const c = this.edgePoint(game, rand(40, 160));
+      if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
+      if (world.pointBlocked(c.x, c.y, 18) || !world.reachable(c.x, c.y)) continue;
+      const cluster = Math.min(left, randInt(2, 5));
+      for (let i = 0; i < cluster && this.queue.length; i++) {
         const type = this.queue[0];
-        const r = type === 'giant' ? 44 : type === 'fat' ? 22 : type === 'sprinter' ? 12 : type === 'swat' ? 15 : 14;
+        const r = type === 'fat' || type === 'heavy' ? 24 : type === 'sprinter' ? 12 : 15;
         for (let t = 0; t < 6; t++) {
-          const x = cx + rand(-150, 150);
-          const y = cy + rand(-150, 150);
+          const x = c.x + rand(-45, 45);
+          const y = c.y + rand(-45, 45);
           if (world.pointBlocked(x, y, r + 2) || !world.reachable(x, y)) continue;
           game.horde.spawn(type, x, y, this.hpMult, this.speedMult);
           this.queue.shift();
-          placed++;
+          left--;
           break;
         }
-        if (!this.queue.length) break;
       }
-      if (placed) return;
     }
-    // si el jugador está encerrado por barricadas no hay ruta: aparecer igualmente
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const a = rand(0, TAU);
-      const d = radius + rand(30, 200);
-      const x = p.x + Math.cos(a) * d;
-      const y = p.y + Math.sin(a) * d;
-      if (x < 80 || y < 80 || x > WORLD_SIZE - 80 || y > WORLD_SIZE - 80) continue;
-      const type = this.queue[0];
-      if (world.pointBlocked(x, y, type === 'giant' ? 46 : 24)) continue;
-      game.horde.spawn(type, x, y, this.hpMult, this.speedMult);
-      this.queue.shift();
-      return;
+    if (left <= 0 || !this.queue.length) return;
+    // si el jugador está encerrado por barricadas no hay ruta: aparecer igualmente en las orillas
+    for (let attempt = 0; attempt < 12 && left > 0 && this.queue.length; attempt++) {
+      const c = this.edgePoint(game, rand(40, 160));
+      if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
+      if (world.pointBlocked(c.x, c.y, 26)) continue;
+      game.horde.spawn(this.queue.shift(), c.x, c.y, this.hpMult, this.speedMult);
+      left--;
     }
   }
 }

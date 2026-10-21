@@ -164,6 +164,10 @@ const SWAT_PALETTES = [
   { skin: '#97a682', shirt: '#22262b', pants: '#1c1f23', hair: '#15171a', vest: '#2f353b', shield: '#5d7484' },
   { skin: '#8d9c78', shirt: '#262b22', pants: '#1f221c', hair: '#15171a', vest: '#363b31', shield: '#62788a' },
 ];
+const HEAVY_PALETTES = [
+  { skin: '#9fa676', shirt: '#b9a57a', pants: '#6e6247', hair: '#1d1a17', plate: '#5b6a3c', dark: '#3f4a2a', camo: '#8a7a52' },
+  { skin: '#a3a97c', shirt: '#5f6e40', pants: '#4a4a32', hair: '#1d1a17', plate: '#c2ad80', dark: '#7a6a48', camo: '#46532f' },
+];
 const SPRINTER_PALETTES = [
   { skin: '#a9b29c', shirt: '#8a3a2e', pants: '#2a2c30', hair: '#1a1714' },
   { skin: '#9fa894', shirt: '#9a5a2a', pants: '#33302a', hair: '#3a2a1c' },
@@ -312,6 +316,68 @@ function drawSprinter(g, r, p, ph) {
   g.fillRect(r * 0.86, r * 0.08, r * 0.1, r * 0.08);
 }
 
+// Super blindado: cuerpo de gordo cubierto con armadura militar (arena y verde),
+// casco con gafas, hombreras y placas sobre el pecho y la barriga.
+function drawHeavy(g, r, p, ph) {
+  softShadow(g, r * 1.25, 0.45);
+  const s = Math.sin(ph);
+  const stride = r * 0.3;
+  ell(g, s * stride, -r * 0.42, r * 0.38, r * 0.28, 0, p.pants);
+  ell(g, -s * stride, r * 0.42, r * 0.38, r * 0.28, 0, p.pants);
+  g.fillStyle = '#1a1a16';
+  g.fillRect(s * stride + r * 0.12, -r * 0.56, r * 0.26, r * 0.28);
+  g.fillRect(-s * stride + r * 0.12, r * 0.28, r * 0.26, r * 0.28);
+  g.save();
+  g.rotate(s * 0.05);
+  ell(g, -r * 0.1, 0, r * 0.74, r * 0.98, 0, p.shirt, OUT, 2);
+  // manchas de camuflaje
+  const rng = mulberry32(p.seed);
+  g.fillStyle = p.camo;
+  for (let i = 0; i < 7; i++) {
+    g.beginPath();
+    g.ellipse(-r * 0.1 + rrange(rng, -0.55, 0.55) * r, rrange(rng, -0.8, 0.8) * r, rrange(rng, 0.1, 0.22) * r, rrange(rng, 0.06, 0.14) * r, rng() * TAU, 0, TAU);
+    g.fill();
+  }
+  // placa de la espalda y del pecho/barriga
+  roundRect(g, -r * 0.7, -r * 0.55, r * 0.42, r * 1.1, r * 0.12);
+  g.fillStyle = p.plate;
+  g.fill();
+  g.lineWidth = 1.6;
+  g.strokeStyle = OUT;
+  g.stroke();
+  ell(g, r * 0.32, 0, r * 0.5, r * 0.62, 0, p.plate, OUT, 2);
+  g.strokeStyle = p.dark;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(r * 0.05, -r * 0.4);
+  g.lineTo(r * 0.05, r * 0.4);
+  g.moveTo(r * 0.35, -r * 0.5);
+  g.lineTo(r * 0.35, r * 0.5);
+  g.stroke();
+  g.fillStyle = p.dark;
+  for (const yy of [-0.3, 0, 0.3]) g.fillRect(r * 0.55, r * yy - r * 0.07, r * 0.14, r * 0.14);
+  g.restore();
+  const sw = s * r * 0.08;
+  // brazos con hombreras
+  limb(g, -r * 0.05, -r * 0.84, r * 0.72 + sw, -r * 0.8, r * 0.38, p.shirt);
+  limb(g, -r * 0.05, r * 0.84, r * 0.7 - sw, r * 0.82, r * 0.38, p.shirt);
+  ell(g, -r * 0.05, -r * 0.82, r * 0.3, r * 0.24, 0, p.plate, OUT, 1.6);
+  ell(g, -r * 0.05, r * 0.82, r * 0.3, r * 0.24, 0, p.plate, OUT, 1.6);
+  circ(g, r * 0.76 + sw, -r * 0.8, r * 0.17, '#2a2a22', OUT, 1);
+  circ(g, r * 0.74 - sw, r * 0.82, r * 0.17, '#2a2a22', OUT, 1);
+  // casco con gafas
+  circ(g, -r * 0.02, s * r * 0.03, r * 0.4, p.plate, OUT, 2);
+  g.fillStyle = p.dark;
+  g.beginPath();
+  g.arc(-r * 0.06, s * r * 0.03, r * 0.28, 0, TAU);
+  g.fill();
+  g.fillStyle = '#1b1d1a';
+  g.fillRect(r * 0.18, -r * 0.2, r * 0.14, r * 0.4);
+  g.fillStyle = 'rgba(160,190,150,0.7)';
+  g.fillRect(r * 0.24, -r * 0.16, r * 0.06, r * 0.12);
+  g.fillRect(r * 0.24, r * 0.04, r * 0.06, r * 0.12);
+}
+
 function drawFat(g, r, p, ph) {
   softShadow(g, r * 1.2);
   const s = Math.sin(ph);
@@ -403,8 +469,8 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, swat: drawSwat, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, swat: SWAT_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = { normal: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
+const PALETTES = { normal: NORMAL_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -438,13 +504,14 @@ function buildSet(type, r, frames, pal, scale, pad) {
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], swat: [], sprinter: [], fat: [], giant: [] };
+  ZSPRITES = { normal: [], swat: [], heavy: [], sprinter: [], fat: [], giant: [] };
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
     giant: { r: 42, frames: 8, scale: 2, pad: 1.45 },
     sprinter: { r: 11, frames: 6, scale: 2.6, pad: 1.8 },
     swat: { r: 14, frames: 6, scale: 2.5, pad: 1.7 },
+    heavy: { r: 22, frames: 6, scale: 2.4, pad: 1.45 },
   };
   for (const type of Object.keys(conf)) {
     const k = conf[type];

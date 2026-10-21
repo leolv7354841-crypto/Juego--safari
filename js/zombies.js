@@ -45,13 +45,10 @@ export class Grid {
 let nextId = 1;
 const near2 = [];
 
-// Papel de cada zombi en el cerco: unos llegan de frente, otros por los costados
-// (en abanico) y algunos se quedan rezagados, más lentos y torpes.
+// Ritmo de cada zombi: la mayoría camina normal y algunos se quedan rezagados, más lentos y torpes.
 function pickRole() {
-  const r = Math.random();
-  if (r < 0.4) return { role: 'front', fan: rand(-0.35, 0.35), pace: rand(0.92, 1.08) };
-  if (r < 0.8) return { role: 'flank', fan: (Math.random() < 0.5 ? -1 : 1) * rand(0.7, 1.9), pace: rand(0.95, 1.1) };
-  return { role: 'lag', fan: rand(-0.9, 0.9), pace: rand(0.6, 0.78) };
+  if (Math.random() < 0.8) return { role: 'walker', pace: rand(0.92, 1.1) };
+  return { role: 'lag', pace: rand(0.6, 0.78) };
 }
 
 // a avanza hacia b (n = dirección de a hacia b). Si a es más rápido y b le tapa el
@@ -111,9 +108,10 @@ export class Horde {
       spawnT: 0.6,
       lastStep: 0,
       chew: 0.4,
-      // lado del cerco: se fija al primer movimiento (ver update)
-      slot: null,
       ...pickRole(),
+      touchT: 0,
+      unstickT: 0,
+      unstickSide: 1,
       // deriva del rumbo, tropiezos y ritmo propio: nadie camina en línea perfecta
       wander: 0,
       wanderV: 0,
@@ -161,46 +159,29 @@ export class Horde {
       const d = Math.hypot(dx, dy) || 1;
       let mx;
       let my;
-      if (d < 170 || !p.alive) {
+      // persecución: de cerca van directo; de lejos siguen el mapa de rutas, que rodea
+      // edificios, coches y barricadas para no quedarse atorados en las paredes
+      const f = d >= 90 && p.alive ? world.flowDir(z.x, z.y, tmpDir) : null;
+      if (f) {
+        mx = f.x;
+        my = f.y;
+      } else {
         mx = dx / d;
         my = dy / d;
-      } else {
-        const f = world.flowDir(z.x, z.y, tmpDir);
-        if (f) {
-          mx = f.x;
-          my = f.y;
-        } else {
-          mx = dx / d;
-          my = dy / d;
-        }
       }
-      // cerco: cada zombi tiene asignado un lado alrededor del jugador. Mientras está lejos de
-      // ese lado camina en círculo (tangente) y sólo entra de frente al llegar; además apuntan a
-      // donde vas a estar, así los de delante te cortan el paso y la horda te encierra.
-      // cada grupo se abre en abanico (±110°) desde el lado por el que llega
-      if (z.slot === null) z.slot = Math.atan2(-dy, -dx) + z.fan;
-      if (p.alive && d > 60 && d < 1000) {
-        const ex = p.x + p.vx * 0.9 - z.x;
-        const ey = p.y + p.vy * 0.9 - z.y;
-        const ed = Math.hypot(ex, ey) || 1;
-        const bearing = Math.atan2(-ey, -ex);
-        let diff = z.slot - bearing;
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        const fade = d > 120 ? 1 : (d - 60) / 60;
-        const turn = Math.min(Math.abs(diff), 1.3) * fade;
-        if (turn > 0.02) {
-          const sgn = diff > 0 ? 1 : -1;
-          const tx = (sgn * ey) / ed;
-          const ty = (-sgn * ex) / ed;
-          const c = Math.cos(turn);
-          const sn = Math.sin(turn);
-          mx = mx * c + tx * sn;
-          my = my * c + ty * sn;
-          const l = Math.hypot(mx, my) || 1;
-          mx /= l;
-          my /= l;
-        }
+      // si se quedó atascado, se escurre de lado un momento para despegarse
+      if (z.unstickT > 0) {
+        z.unstickT -= dt;
+        const s = z.unstickSide;
+        const ux = mx * 0.35 - my * s;
+        const uy = my * 0.35 + mx * s;
+        const ul = Math.hypot(ux, uy) || 1;
+        mx = ux / ul;
+        my = uy / ul;
       }
+      // pegado a un obstáculo: se mueve más recto para seguir bien la ruta
+      const calm = z.touchT > 0 ? 0.2 : 1;
+      z.touchT -= dt;
       // evitar amontonarse: se apartan de los que tienen al lado y rodean al que tienen delante
       if (d > 50) {
         this.grid.query(z.x - z.r - 26, z.y - z.r - 26, z.x + z.r + 26, z.y + z.r + 26, near2);
@@ -217,32 +198,31 @@ export class Horde {
           const push = 1 - od / R;
           ax += (ox / od) * push;
           ay += (oy / od) * push;
-          // el de delante: paso al costado en vez de hacer fila detrás
           if (-(ox * mx + oy * my) / od > 0.75) {
             const side = z.id & 1 ? 1 : -1;
             ax += -my * side * push * 0.8;
             ay += mx * side * push * 0.8;
           }
         }
-        mx += ax * 0.9;
-        my += ay * 0.9;
+        mx += ax * 0.7 * calm;
+        my += ay * 0.7 * calm;
         const l = Math.hypot(mx, my) || 1;
         mx /= l;
         my /= l;
       }
-      // movimiento irregular: el rumbo deriva al azar, a ratos tropiezan y dan un tirón
-      z.wanderV = (z.wanderV + rand(-1, 1) * dt * 5) * Math.exp(-dt * 1.2);
-      z.wander = (z.wander + z.wanderV * dt) * Math.exp(-dt * 0.35);
-      if (z.wander > 0.65) z.wander = 0.65;
-      else if (z.wander < -0.65) z.wander = -0.65;
+      // movimiento irregular: el rumbo deriva un poco, a ratos tropiezan y dan un tirón
+      z.wanderV = (z.wanderV + rand(-1, 1) * dt * 4) * Math.exp(-dt * 1.2);
+      z.wander = (z.wander + z.wanderV * dt) * Math.exp(-dt * 0.5);
+      if (z.wander > 0.4) z.wander = 0.4;
+      else if (z.wander < -0.4) z.wander = -0.4;
       z.nextStumble -= dt;
       if (z.nextStumble <= 0 && d > 40) {
-        z.stumbleT = rand(0.25, 0.65);
-        z.wander += rand(-0.7, 0.7);
+        z.stumbleT = rand(0.25, 0.6);
+        z.wander += rand(-0.45, 0.45);
         z.nextStumble = z.role === 'lag' ? rand(1.5, 4) : rand(3, 9);
       }
       z.stumbleT -= dt;
-      const wob = z.wander + Math.sin(time * 1.6 + z.wob) * (z.type === 'giant' ? 0.08 : 0.22);
+      const wob = (z.wander + Math.sin(time * 1.6 + z.wob) * 0.18) * calm;
       const cw = Math.cos(wob);
       const sw = Math.sin(wob);
       const wx = mx * cw - my * sw;
@@ -348,7 +328,19 @@ export class Horde {
         }
       }
       world.lastBlock = null;
-      world.collide(z, z.r);
+      if (world.collide(z, z.r)) z.touchT = 0.5;
+      // detector de atasco: si en 1,2 s casi no avanzó y no está pegado al jugador
+      z.chkT = (z.chkT || 0) + dt;
+      if (z.chkT > 1.2) {
+        const moved = Math.hypot(z.x - (z.chkX ?? z.x), z.y - (z.chkY ?? z.y));
+        if (moved < 10 && !z.inRange && !world.lastBlock && p.alive) {
+          z.unstickT = rand(0.6, 1.1);
+          z.unstickSide = Math.random() < 0.5 ? -1 : 1;
+        }
+        z.chkT = 0;
+        z.chkX = z.x;
+        z.chkY = z.y;
+      }
       // golpea la barricada que le cierra el paso
       if (world.lastBlock && !z.inRange && !z.dead) {
         z.chew -= dt;

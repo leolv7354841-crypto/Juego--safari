@@ -14,6 +14,7 @@ de un cerco, no para pasear.
 |---------|------|---------------|---------------------------------------------------------------|
 | Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
 | Policía SWAT | 336 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 8× más       |
+| Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
 
@@ -27,7 +28,7 @@ El guardado vive en el navegador de cada dispositivo (y en cada sitio web por se
 
 ### Dinero y tienda
 
-Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · SWAT $10**. Al terminar cada oleada (después
+Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · SWAT $10 · super blindado $25**. Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
 | Estructura | Precio | Efecto |
@@ -47,9 +48,10 @@ Las barricadas se colocan delante de ti y las balas pasan por encima (también p
 Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
-Los zombis se mueven de forma irregular: se desvían, tropiezan y cambian de dirección. Al rodearte,
-unos llegan de frente, otros se abren por los costados y algunos se quedan rezagados. Se esquivan
-entre ellos para no amontonarse ni formar filas, y los más rápidos adelantan a los más lentos.
+Los zombis aparecen en grupitos por todas las orillas de la pantalla y van directo por ti siguiendo
+rutas que rodean edificios, coches y barricadas; si alguno se atasca, se escurre de lado para soltarse.
+Caminan de forma algo irregular (se desvían y tropiezan), algunos se quedan rezagados, se esquivan
+entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 
 ### Armas y munición
 
