@@ -1,6 +1,8 @@
 import { segCircleT } from './util.js';
 
 const near = [];
+// Parte de las balas rebota en la armadura del super blindado (sin hacer daño).
+const RICOCHET = 0.45;
 
 export class Bullets {
   constructor() {
@@ -47,6 +49,7 @@ export class Bullets {
 
       let dead = wall;
       let endT = 1;
+      let bounce = null;
       // procesar impactos en orden a lo largo del segmento
       for (;;) {
         let best = null;
@@ -64,6 +67,21 @@ export class Bullets {
         (b.hits || (b.hits = [])).push(best);
         const hx = x + (ex - x) * bt;
         const hy = y + (ey - y) * bt;
+        if (best.type === 'heavy' && Math.random() < RICOCHET) {
+          // rebote: se refleja sobre la placa con algo de desvío y pierde fuerza
+          const nl = Math.hypot(hx - best.x, hy - best.y) || 1;
+          const nx = (hx - best.x) / nl;
+          const ny = (hy - best.y) / nl;
+          const dot = b.dx * nx + b.dy * ny;
+          const a = Math.atan2(b.dy - 2 * dot * ny, b.dx - 2 * dot * nx) + (Math.random() - 0.5) * 0.9;
+          bounce = { dx: Math.cos(a), dy: Math.sin(a) };
+          game.particles.impact(hx, hy, bounce.dx, bounce.dy);
+          game.sfx.ricochet();
+          best.flash = 0.05;
+          wall = false;
+          endT = bt;
+          break;
+        }
         game.hitZombie(best, b, hx, hy);
         // el gigante absorbe la bala: protege a los que vienen detrás
         if (best.def.blocksBullets || b.pierce <= 0) {
@@ -80,6 +98,16 @@ export class Bullets {
       b.y = y + (ey - y) * endT;
       b.life -= step;
       b.trail = Math.min(b.trail + step * endT, 26);
+      if (bounce) {
+        b.dx = bounce.dx;
+        b.dy = bounce.dy;
+        b.x += b.dx * 3;
+        b.y += b.dy * 3;
+        b.trail = 0;
+        b.dmg *= 0.5;
+        b.pierce = 0;
+        b.life = Math.min(b.life, 240);
+      }
       if (wall) game.particles.impact(b.x, b.y, b.dx, b.dy);
       if (dead || b.life <= 0) {
         b.dead = true;

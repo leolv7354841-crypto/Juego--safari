@@ -334,10 +334,37 @@ export class Sfx {
     this.tone({ freq: 160, to: 70, dur: 0.06, gain: 0.18 });
   }
 
-  explosion() {
+  explosion(big = false) {
     if (!this.ok('explosion', 0.08, true)) return;
-    this.burst({ dur: 1.1, freq: 1800, sweep: 60, gain: 1 });
-    this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
+    this.burst({ dur: big ? 1.8 : 1.1, freq: 1800, sweep: 60, gain: 1 });
+    this.tone({ freq: big ? 70 : 90, to: 22, dur: big ? 1.5 : 0.9, gain: 1 });
+    if (big) {
+      // estruendo extra y metralla de la armadura
+      this.tone({ freq: 45, to: 18, dur: 1.2, gain: 0.8, type: 'triangle', delay: 0.05 });
+      for (let i = 0; i < 5; i++) this.burst({ dur: 0.05, freq: rand(2500, 5000), gain: 0.15, type: 'bandpass', q: 8, delay: 0.15 + i * rand(0.05, 0.12) });
+    }
+  }
+
+  // Reventón del gordo: chapoteo viscoso y siseo de ácido.
+  acid() {
+    if (!this.ok('acid', 0.1, true)) return;
+    this.burst({ dur: 0.35, freq: 500, sweep: 140, gain: 0.7, q: 2 });
+    this.tone({ freq: 140, to: 50, dur: 0.3, gain: 0.5 });
+    this.burst({ dur: 1.2, freq: 5200, gain: 0.12, type: 'highpass', attack: 0.15, delay: 0.1 });
+  }
+
+  // Quemadura de ácido sobre el jugador (cada segundo).
+  sizzle() {
+    if (!this.ok('sizzle', 0.4, true)) return;
+    this.burst({ dur: 0.45, freq: 6000, gain: 0.14, type: 'highpass', attack: 0.04 });
+  }
+
+  // Bala que rebota en la armadura.
+  ricochet() {
+    if (!this.ok('ricochet', 0.05)) return;
+    const f = rand(2200, 3400);
+    this.tone({ freq: f, to: f * rand(0.4, 0.6), dur: rand(0.16, 0.28), gain: 0.09, type: 'triangle' });
+    this.burst({ dur: 0.03, freq: 4200, gain: 0.2, type: 'bandpass', q: 7 });
   }
 
   blockHit(kind) {

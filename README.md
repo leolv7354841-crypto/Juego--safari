@@ -14,9 +14,9 @@ de un cerco, no para pasear.
 |---------|------|---------------|---------------------------------------------------------------|
 | Normal  | 42   | media (el doble que antes) | Llega en hordas enormes (cientos por oleada)     |
 | Policía SWAT | 336 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 8× más       |
-| Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más |
+| Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más. Las balas no lo frenan y casi la mitad rebotan en la armadura. **Al morir estalla**: lanza a volar a los zombis cercanos y destroza barricadas |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
-| Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
+| Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos. **Al morir revienta en ácido verde**: si te salpica te quema 5 s (2 de vida por segundo) y la vista se pone verde y borrosa |
 | Dorado  | 126  | rápida        | Raro (uno cada 35–65 s de ronda). No ataca: huye y desaparece a los 26 s. Si lo matas, da **$100–$250** |
 
 Cuando un zombi te golpea **pierdes dinero** ($16–$40 al azar, nunca te deja en negativo) y lo ves en un
@@ -27,7 +27,7 @@ La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
 
 Al entrar escribes un **nombre y un PIN de 4 números**: si la cuenta no existe se crea, y si existe entras
 con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (oleada más alta y bajas).
-La **Clasificación** del menú muestra los récords de las cuentas de ese dispositivo. Abierto como Artifact
+El **Salón de la fama** del menú principal (podio con los 3 mejores) y la insignia **Top #N** junto a tu nombre muestran los récords de las cuentas de ese dispositivo. Abierto como Artifact
 de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
 Para una clasificación global en GitHub Pages o Vercel haría falta un servidor (por ejemplo Firebase o Supabase).
 

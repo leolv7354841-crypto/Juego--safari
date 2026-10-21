@@ -8,6 +8,9 @@ const TRAP_WIRE = { slow: 0.35, dps: 14 };
 const TRAP_SPIKES = { slow: 0.5, dps: 45 };
 const TURRET_RANGE = 340;
 const BLAST_R = 140;
+// Al morir: el gordo revienta en ácido verde y el super blindado estalla como una granada enorme.
+export const ACID = { radius: 105, burn: 5, dps: 2 };
+export const HEAVY_BLAST = { radius: 215, power: 760, blockDmg: 2600 };
 const near = [];
 
 export class Structures {
@@ -17,9 +20,11 @@ export class Structures {
     this.grenades = [];
     this.blasts = [];
     this.scorches = [];
+    this.pending = [];
   }
 
   clear() {
+    this.pending.length = 0;
     this.blocks.length = 0;
     this.wires.length = 0;
     this.grenades.length = 0;
@@ -147,7 +152,25 @@ export class Structures {
     this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0 });
   }
 
-  explode(game, g, R = BLAST_R, power = 330) {
+  // Las explosiones de muerte se encolan: así una cadena (blindado → gordos) no se pisa
+  // a sí misma y además se ve como una reacción en cadena.
+  queueDeathBlast(kind, x, y) {
+    this.pending.push({ kind, x, y, t: kind === 'heavy' ? 0.18 : 0.06 });
+  }
+
+  acidBurst(game, x, y) {
+    const R = ACID.radius;
+    game.particles.acidBurst(x, y, R);
+    game.decals.acid(x, y, R * 0.75);
+    for (let i = 0; i < 4; i++) game.decals.acid(x + rand(-R, R) * 0.6, y + rand(-R, R) * 0.6, rand(14, 26));
+    game.sfx.acid();
+    const p = game.player;
+    const pd = Math.hypot(p.x - x, p.y - y);
+    game.camera.shake(0.2 * clamp(1 - pd / 500, 0, 1));
+    if (pd < R + p.r) game.applyAcid();
+  }
+
+  explode(game, g, R = BLAST_R, power = 330, opt = null) {
     const { x, y } = g;
     game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
@@ -158,14 +181,39 @@ export class Structures {
       if (d > R + z.r) continue;
       const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: 120 + 260 * f, shot: null }, z.x, z.y);
+      const knock = opt ? 380 + 620 * f : 120 + 260 * f;
+      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock, shot: null, blast: true }, z.x, z.y);
+      // la onda del blindado lanza a volar a los que sobreviven
+      if (opt && !z.dead) {
+        z.airV = Math.max(z.airV || 0, (180 + 320 * f) / Math.sqrt(z.mass));
+        z.air = z.air || 0.01;
+        z.spinV = rand(-9, 9);
+      }
+    }
+    if (opt) {
+      for (let i = this.blocks.length - 1; i >= 0; i--) {
+        const o = this.blocks[i];
+        const d = Math.hypot(o.x + o.w / 2 - x, o.y + o.h / 2 - y);
+        if (d < R + 30) this.damageBlock(game, o, opt.blockDmg * (0.4 + 0.6 * clamp(1 - d / R, 0, 1)));
+      }
+      for (let i = this.wires.length - 1; i >= 0; i--) {
+        const w = this.wires[i];
+        if (Math.hypot(w.x + w.w / 2 - x, w.y + w.h / 2 - y) < R * 0.7) this.wires.splice(i, 1);
+      }
     }
     const p = game.player;
     const pd = Math.hypot(p.x - x, p.y - y);
-    game.camera.shake(0.45 + 0.5 * clamp(1 - pd / 600, 0, 1));
+    if (opt && pd < R) {
+      // la onda te empuja, pero no te hiere (como tus granadas)
+      const n = pd || 1;
+      p.kx += ((p.x - x) / n) * 420 * (1 - pd / R);
+      p.ky += ((p.y - y) / n) * 420 * (1 - pd / R);
+    }
+    game.camera.shake((opt ? 0.7 : 0.45) + 0.5 * clamp(1 - pd / 600, 0, 1));
     game.particles.explosion(x, y, R);
-    game.sfx.explosion();
-    this.blasts.push({ x, y, t: 0.4 });
+    if (opt) game.particles.explosion(x, y, R * 0.6);
+    game.sfx.explosion(!!opt);
+    this.blasts.push({ x, y, t: opt ? 0.6 : 0.4 });
     this.scorches.push({ x, y, t: 0, life: 25, a: rand(0, TAU) });
     if (this.scorches.length > 20) this.scorches.shift();
   }
@@ -184,6 +232,14 @@ export class Structures {
         this.grenades.splice(i, 1);
         this.explode(game, g);
       }
+    }
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const b = this.pending[i];
+      b.t -= dt;
+      if (b.t > 0) continue;
+      this.pending.splice(i, 1);
+      if (b.kind === 'heavy') this.explode(game, b, HEAVY_BLAST.radius, HEAVY_BLAST.power, HEAVY_BLAST);
+      else this.acidBurst(game, b.x, b.y);
     }
     for (let i = this.blasts.length - 1; i >= 0; i--) {
       this.blasts[i].t -= dt;

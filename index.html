@@ -101,18 +101,19 @@
     </div>
 
     <section class="screen" id="screen-start">
+      <div class="menu-layout">
       <div class="panel title-panel">
         <p class="kicker">Día 47 · Zona de cuarentena 9</p>
         <h1 class="logo">Dead<span>Zone</span></h1>
         <p class="lead">La ciudad cayó. Los caminantes ya no son lentos y nunca dejan de llegar. Aguanta todas las oleadas que puedas.</p>
         <div class="account-bar">
           <span>Jugador: <b id="acct-name">Sin cuenta</b></span>
+          <span class="rank-badge" id="acct-rank" hidden></span>
           <button class="link-btn" id="btn-account" type="button">Cambiar cuenta</button>
         </div>
         <div class="start-actions">
           <button class="btn primary" id="btn-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-start">Jugar</button>
-          <button class="btn ghost" id="btn-leaderboard">Clasificación</button>
         </div>
         <p class="best" id="acct-best"></p>
         <div class="controls-help">
@@ -134,6 +135,20 @@
           </div>
         </div>
         <p class="best" id="best"></p>
+      </div>
+      <aside class="hall" aria-labelledby="hall-title">
+        <div class="hall-embers" aria-hidden="true"></div>
+        <p class="hall-kicker"><span aria-hidden="true">☠</span> Salón de la fama <span aria-hidden="true">☠</span></p>
+        <h2 class="hall-title" id="hall-title">Leyendas</h2>
+        <div class="board-tabs">
+          <button class="chip" id="hall-tab-global" type="button" hidden>Global</button>
+          <button class="chip" id="hall-tab-local" type="button">Este dispositivo</button>
+        </div>
+        <div class="podium" id="hall-podium"></div>
+        <ol class="hall-list" id="hall-list"></ol>
+        <div class="hall-me" id="hall-me"></div>
+        <button class="link-btn" id="btn-leaderboard" type="button">Ver clasificación completa</button>
+      </aside>
       </div>
     </section>
 
@@ -199,14 +214,16 @@
     </section>
 
     <section class="screen" id="screen-board" hidden>
-      <div class="panel">
-        <p class="kicker">Mejores supervivientes</p>
-        <h2>Clasificación</h2>
+      <div class="panel hall hall-full">
+        <div class="hall-embers" aria-hidden="true"></div>
+        <p class="hall-kicker"><span aria-hidden="true">☠</span> Mejores supervivientes <span aria-hidden="true">☠</span></p>
+        <h2 class="hall-title">Clasificación</h2>
         <div class="board-tabs">
           <button class="chip" id="board-tab-global" type="button" hidden>Global</button>
           <button class="chip" id="board-tab-local" type="button">Este dispositivo</button>
         </div>
-        <ol class="board" id="board-list"></ol>
+        <div class="podium" id="board-podium"></div>
+        <ol class="hall-list" id="board-list"></ol>
         <p class="acct-note" id="board-note"></p>
         <button class="btn ghost" id="btn-board-back" type="button">Volver al menú</button>
       </div>

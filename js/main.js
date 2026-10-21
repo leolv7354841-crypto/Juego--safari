@@ -2,7 +2,7 @@
 import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE } from './config.js';
 import { Music } from './music.js';
 import { Accounts } from './accounts.js';
-import { Structures } from './build.js';
+import { Structures, ACID } from './build.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -16,6 +16,8 @@ import { Input } from './input.js';
 import { Sfx } from './audio.js';
 import { drawSurvivor, drawGunIcon } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
+
+const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
 
 // Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
 // de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
@@ -106,7 +108,10 @@ class Game {
     this.accounts.initCloud().then(async (ok) => {
       if (!ok) return;
       if (this.state === 'account') this.$('acct-cloud').hidden = false;
-      if (this.accounts.current && (await this.accounts.cloudPull()) && this.state === 'menu') this.setupMenu();
+      const cur = this.accounts.current;
+      if (cur && cur.best) await this.accounts.pushScore(cur);
+      if (cur && (await this.accounts.cloudPull()) && this.state === 'menu') this.setupMenu();
+      else if (this.state === 'menu') this.refreshHall();
     });
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
@@ -138,6 +143,7 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
+    this.setAcid(0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
@@ -190,6 +196,7 @@ class Game {
     }
     this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
     this.$('btn-start').classList.toggle('primary', !save);
+    this.refreshHall();
     const best = storage.get('dz-best', null);
     this.$('best').textContent = best ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}` : '';
   }
@@ -368,14 +375,18 @@ class Game {
     z.flash = 0.08;
     // reacción breve: sacudida hacia un lado y leve agrandado (no frena su comportamiento)
     z.hitT = 0.18;
-    z.hitJolt = rand(0.2, 0.5) * (Math.random() < 0.5 ? -1 : 1);
+    z.hitJolt = rand(0.2, 0.5) * (Math.random() < 0.5 ? -1 : 1) * (z.type === 'heavy' && !b.blast ? 0.25 : 1);
     z.lastDx = b.dx;
     z.lastDy = b.dy;
     if (Math.random() < 0.12) this.decals.splat(hx + b.dx * 14, hy + b.dy * 14, rand(7, 12));
-    if (z.type !== 'giant') z.slow = 0.16;
-    const kn = (b.knock * 3) / z.mass;
-    z.kx += b.dx * kn;
-    z.ky += b.dy * kn;
+    // el super blindado no se frena ni retrocede con las balas: sólo las explosiones lo mueven
+    const armored = z.type === 'heavy' && !b.blast;
+    if (z.type !== 'giant' && !armored) z.slow = 0.16;
+    if (!armored) {
+      const kn = (b.knock * 3) / z.mass;
+      z.kx += b.dx * kn;
+      z.ky += b.dy * kn;
+    }
     const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'giant';
     this.particles.hit(hx, hy, b.dx, b.dy, big);
     if (b.shot && !b.shot.hit) {
@@ -402,6 +413,8 @@ class Game {
       this.particles.pickupFx(z.x, z.y, '#f0c040');
     }
     this.particles.death(z.x, z.y, z.r);
+    // el gordo revienta en ácido y el super blindado estalla
+    if ((z.type === 'fat' || z.type === 'heavy') && this.state !== 'menu') this.structures.queueDeathBlast(z.type, z.x, z.y);
     this.addXp(z.def.xp);
     if (this.state !== 'menu') {
       this.money += BOUNTY[z.type];
@@ -423,6 +436,59 @@ class Game {
       else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
       this.sfx.kill(z.type === 'fat' || z.type === 'heavy');
     }
+  }
+
+  // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.
+  applyAcid() {
+    if (this.state === 'menu' || !this.player.alive) return;
+    if (!(this.acidT > 0)) this.acidTick = 0;
+    this.acidT = ACID.burn;
+    this.hurtFlash = Math.min(1, this.hurtFlash + 0.3);
+    this.sfx.sizzle();
+    this.toast('¡Ácido! Te estás quemando');
+  }
+
+  setAcid(t) {
+    this.acidT = t;
+    const k = t > 0 ? Math.min(1, t / 0.8) : 0;
+    const q = Math.round(k * 10);
+    if (q === this.acidQ) return;
+    this.acidQ = q;
+    // desenfoque real del lienzo (Chrome y Safari); el HUD queda nítido
+    this.canvas.style.filter = q ? `blur(${(q * 0.32).toFixed(2)}px) saturate(${(1 - q * 0.04).toFixed(2)})` : '';
+  }
+
+  updateAcid(dt) {
+    if (!(this.acidT > 0)) return;
+    const p = this.player;
+    this.acidTick += dt;
+    while (this.acidTick >= 1 && p.alive) {
+      this.acidTick -= 1;
+      // daño directo y fijo: 2 de vida por segundo
+      p.hp -= ACID.dps;
+      p.damageTaken += ACID.dps;
+      p.hurtT = 0.2;
+      this.hurtFlash = Math.min(1, this.hurtFlash + 0.15);
+      this.particles.acidBurst(p.x, p.y, 18);
+      this.sfx.sizzle();
+      if (p.hp <= 0) {
+        p.hp = 0;
+        p.alive = false;
+        this.onPlayerDeath();
+      }
+    }
+    this.setAcid(p.alive ? Math.max(0, this.acidT - dt) : 0);
+  }
+
+  drawAcid(ctx, W, H) {
+    if (!(this.acidT > 0)) return;
+    const k = Math.min(1, this.acidT / 0.8);
+    const pulse = 0.85 + 0.15 * Math.sin(this.time * 5);
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.15, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, `rgba(110,190,40,${0.22 * k * pulse})`);
+    g.addColorStop(1, `rgba(60,130,20,${0.6 * k * pulse})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
   }
 
   // El dorado se fue sin que lo mataras: no da nada ni cuenta como baja.
@@ -613,43 +679,96 @@ class Game {
   async showBoard() {
     this.setState('board');
     const acc = this.accounts;
-    const render = (rows, empty) => {
-      const ol = this.$('board-list');
-      ol.innerHTML = '';
-      if (!rows || !rows.length) {
-        const li = document.createElement('li');
-        li.className = 'board-empty';
-        li.textContent = empty;
-        ol.appendChild(li);
-        return;
-      }
-      rows.forEach((r, i) => {
-        const li = document.createElement('li');
-        if (acc.current && r.name === acc.current.name) li.className = 'me';
-        const pos = document.createElement('b');
-        pos.textContent = i + 1;
-        const nm = document.createElement('span');
-        nm.className = 'nm';
-        nm.textContent = r.name;
-        const st = document.createElement('span');
-        st.className = 'st';
-        st.textContent = `Oleada ${r.wave} · ${r.kills} bajas · ${fmtTime(r.time || 0)}`;
-        li.append(pos, nm, st);
-        ol.appendChild(li);
-      });
-    };
     const tab = this.boardTab || (acc.cloud ? 'global' : 'local');
-    this.$('board-tab-global').hidden = !acc.cloud;
-    this.$('board-tab-global').classList.toggle('on', tab === 'global');
-    this.$('board-tab-local').classList.toggle('on', tab === 'local');
+    this.syncBoardTabs('board', tab);
     this.$('board-note').textContent = acc.cloud
       ? 'Global: récords de todos los que juegan esta página de Claude. Dispositivo: cuentas guardadas en este navegador.'
       : 'Récords de las cuentas creadas en este navegador. Para competir entre dispositivos hace falta un servidor (ver README).';
-    if (tab === 'global') {
-      render(null, 'Cargando…');
-      render(await acc.globalBoard(), 'Todavía no hay récords globales.');
-    } else {
-      render(acc.localBoard(), 'Todavía no hay récords. ¡Termina una oleada!');
+    const target = { podium: this.$('board-podium'), list: this.$('board-list'), me: null, max: 50 };
+    if (tab === 'global') this.renderBoard(null, target, 'Cargando…');
+    const rows = await this.boardRows(tab);
+    if (this.state === 'board') this.renderBoard(rows, target, tab === 'global' ? 'Todavía no hay récords globales.' : 'Todavía no hay récords. ¡Termina una oleada!');
+  }
+
+  syncBoardTabs(prefix, tab) {
+    const g = this.$(prefix + '-tab-global');
+    g.hidden = !this.accounts.cloud;
+    g.classList.toggle('on', tab === 'global');
+    this.$(prefix + '-tab-local').classList.toggle('on', tab === 'local');
+  }
+
+  async boardRows(tab) {
+    return tab === 'global' ? await this.accounts.globalBoard() : this.accounts.localBoard();
+  }
+
+  // Salón de la fama del menú principal + tu puesto junto al nombre.
+  async refreshHall() {
+    const acc = this.accounts;
+    const tab = this.boardTab || (acc.cloud ? 'global' : 'local');
+    this.syncBoardTabs('hall', tab);
+    const target = { podium: this.$('hall-podium'), list: this.$('hall-list'), me: this.$('hall-me'), max: 8 };
+    const local = acc.localBoard();
+    this.renderBoard(tab === 'local' ? local : null, target, tab === 'global' ? 'Cargando…' : '');
+    const rows = tab === 'global' ? await acc.globalBoard() : local;
+    if (this.state !== 'menu') return;
+    if (tab === 'global') this.renderBoard(rows, target, '');
+    const badge = this.$('acct-rank');
+    const cur = acc.current;
+    const i = cur && rows ? rows.findIndex((r) => r.name === cur.name) : -1;
+    badge.hidden = !cur;
+    badge.className = 'rank-badge' + (i === 0 ? ' r1' : i === 1 ? ' r2' : i === 2 ? ' r3' : i < 0 ? ' none' : '');
+    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' ? ' global' : ''}` : 'Sin rango';
+  }
+
+  renderBoard(rows, t, empty) {
+    const cur = this.accounts.current;
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    const list = rows || [];
+    const top = list.length ? Math.max(1, list[0].wave) : 1;
+    // podio: 2.º, 1.º, 3.º
+    t.podium.innerHTML = '';
+    for (const i of [1, 0, 2]) {
+      const r = list[i];
+      const pod = el('div', `pod p${i + 1}${r ? '' : ' empty'}${r && cur && r.name === cur.name ? ' me' : ''}`);
+      if (i === 0) pod.appendChild(el('div', 'pod-crown')).innerHTML = CROWN_SVG;
+      pod.appendChild(el('div', 'pod-medal', String(i + 1)));
+      pod.appendChild(el('b', 'pod-name', r ? r.name : rows ? (i === 0 ? '¡Sé el primero!' : 'Libre') : '…'));
+      const wv = pod.appendChild(el('span', 'pod-wave'));
+      wv.appendChild(el('b', null, r ? String(r.wave) : '—'));
+      wv.appendChild(document.createTextNode(' oleada'));
+      pod.appendChild(el('span', 'pod-kills', r ? `${r.kills} bajas · ${fmtTime(r.time || 0)}` : ' '));
+      pod.appendChild(el('div', 'pod-base'));
+      t.podium.appendChild(pod);
+    }
+    t.list.innerHTML = '';
+    if (!list.length && empty) {
+      t.list.appendChild(el('li', 'board-empty', empty));
+    }
+    list.slice(3, t.max).forEach((r, k) => {
+      const li = el('li', cur && r.name === cur.name ? 'me' : '');
+      li.appendChild(el('b', 'rk', String(k + 4)));
+      li.appendChild(el('span', 'nm', r.name));
+      li.appendChild(el('span', 'st', `Oleada ${r.wave} · ${r.kills} bajas · ${fmtTime(r.time || 0)}`));
+      const bar = li.appendChild(el('i', 'bar-w'));
+      bar.style.setProperty('--w', `${Math.round((r.wave / top) * 100)}%`);
+      t.list.appendChild(li);
+    });
+    if (t.me) {
+      t.me.innerHTML = '';
+      const i = cur ? list.findIndex((r) => r.name === cur.name) : -1;
+      if (cur && i >= 0) {
+        t.me.appendChild(el('span', 'me-tag', 'Tu puesto'));
+        t.me.appendChild(el('b', 'me-rank', `#${i + 1}`));
+        t.me.appendChild(el('span', 'me-st', `Oleada ${list[i].wave} · ${list[i].kills} bajas`));
+      } else if (cur && rows) {
+        t.me.appendChild(el('span', 'me-tag', 'Tu puesto'));
+        t.me.appendChild(el('span', 'me-st', 'Supera una oleada para entrar al salón'));
+      }
     }
   }
 
@@ -938,6 +1057,14 @@ class Game {
       this.boardTab = 'global';
       this.showBoard();
     });
+    on('hall-tab-local', () => {
+      this.boardTab = 'local';
+      this.refreshHall();
+    });
+    on('hall-tab-global', () => {
+      this.boardTab = 'global';
+      this.refreshHall();
+    });
     on('btn-acct-back', () => {
       if (this.accounts.current) this.setupMenu();
     });
@@ -1204,6 +1331,7 @@ class Game {
     this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
     this.muzzle = Math.max(0, this.muzzle - dt * 14);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);
+    this.updateAcid(dt);
     this.updateHud(false);
     if (!p.alive) {
       this.deathT -= dt;
@@ -1279,6 +1407,7 @@ class Game {
         ctx.drawImage(this.redVignette, 0, 0, W, H);
         ctx.globalAlpha = 1;
       }
+      this.drawAcid(ctx, W, H);
       if (this.state === 'play') {
         this.drawGiantMarkers(ctx, W, H);
         if (this.input.mode === 'mouse' && p.alive) this.drawCrosshair(ctx);

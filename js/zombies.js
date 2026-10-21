@@ -122,6 +122,9 @@ export class Horde {
       inRange: false,
       kx: 0,
       ky: 0,
+      air: 0,
+      airV: 0,
+      spinV: 0,
       lunge: 0,
       wob: rand(0, 100),
       dead: false,
@@ -186,6 +189,18 @@ export class Horde {
       z.lunge = Math.max(0, z.lunge - dt * 4);
       z.spawnT = Math.max(0, z.spawnT - dt);
       z.hitT -= dt;
+      // lanzado por una explosión: vuela, gira y cae
+      if (z.air > 0) {
+        z.air += z.airV * dt;
+        z.airV -= 900 * dt;
+        z.angle += z.spinV * dt;
+        if (z.air <= 0) {
+          z.air = 0;
+          z.airV = 0;
+          z.stumbleT = Math.max(z.stumbleT || 0, 0.5);
+          game.particles.dust(z.x, z.y, 6);
+        }
+      }
       const dx = p.x - z.x;
       const dy = p.y - z.y;
       const d = Math.hypot(dx, dy) || 1;
@@ -297,11 +312,12 @@ export class Horde {
       z.my = my;
 
       const reach = z.r + p.r + def.reach;
-      const inRange = d < reach && p.alive && z.type !== 'golden';
+      const inRange = d < reach && p.alive && z.type !== 'golden' && !(z.air > 0);
       z.angle = angleTo(z.angle, Math.atan2(inRange ? dy : my, inRange ? dx : mx), def.turn * dt);
       // ritmo propio que sube y baja; al tropezar casi se frenan
       let sp = z.speed * z.pace * (0.85 + 0.15 * Math.sin(time * 0.7 + z.wob)) * (z.slow > 0 ? 0.35 : 1);
       if (z.stumbleT > 0) sp *= 0.25;
+      if (z.air > 0) sp = 0;
       if (inRange) sp *= 0.15;
       // alambre de púas: frena y hiere
       const trap = game.structures.wires.length ? game.structures.trapAt(z, dt, game) : null;
@@ -312,7 +328,7 @@ export class Horde {
       if (z.hp <= 0 && !z.dead) game.killZombie(z);
       z.x += mx * sp * dt + z.kx * dt;
       z.y += my * sp * dt + z.ky * dt;
-      const kd = Math.exp(-dt * 7);
+      const kd = Math.exp(-dt * (z.air > 0 ? 1.5 : 7));
       z.kx *= kd;
       z.ky *= kd;
       z.anim += (sp * dt) / (z.r * 0.55);
@@ -467,9 +483,20 @@ export class Horde {
         ctx.globalAlpha = blink;
       }
       const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
-      const k = s * pop * grow;
+      const lift = z.air > 0 ? z.air : 0;
+      const k = s * pop * grow * (1 + lift / 140);
       const lx = z.x + c * z.lunge * 5;
-      const ly = z.y + sn * z.lunge * 5;
+      const ly = z.y + sn * z.lunge * 5 - lift * 0.7;
+      if (lift > 0) {
+        // sombra en el suelo mientras vuela
+        ctx.setTransform(s, 0, 0, s, tx, ty);
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(z.x, z.y, z.r * 0.9, z.r * 0.6, 0, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
       if (z.type !== 'golden') ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
       ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
       ctx.drawImage(img, -half, -half, half * 2, half * 2);

@@ -127,6 +127,21 @@ export class Particles {
     }
   }
 
+  // reventón verde del gordo: chorros de ácido y vapor
+  acidBurst(x, y, R) {
+    this.ring(x, y, R * 0.6, '150,230,70');
+    for (let i = 0; i < 40; i++) {
+      const a = rand(0, TAU);
+      const s = rand(90, 420);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.7), rand(2, 5), pick(['#8fd13a', '#6fae22', '#c4f060', '#4f8a1c']), 4);
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = rand(0, TAU);
+      const s = rand(20, 90);
+      this.add(SMOKE, x + Math.cos(a) * 8, y + Math.sin(a) * 8, Math.cos(a) * s, Math.sin(a) * s, rand(0.9, 1.8), rand(10, 18), i < 6 ? '130,200,60' : '80,110,50', 2.5, 34);
+    }
+  }
+
   pickupFx(x, y, color) {
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * TAU;
@@ -207,14 +222,15 @@ export class Particles {
 // Restos en el suelo: cuerpos que caen con una animación (varias variantes),
 // charcos de sangre estilizada y salpicaduras. Todo tiene tope y se desvanece solo.
 const POOLS = [];
-function poolSprite(seed) {
+const ACID_POOLS = [];
+function poolSprite(seed, dark = '#5e1411', light = 'rgba(160,40,32,0.45)') {
   const size = 96;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d');
   let s = seed;
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  g.fillStyle = '#5e1411';
+  g.fillStyle = dark;
   g.beginPath();
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * TAU;
@@ -230,7 +246,7 @@ function poolSprite(seed) {
     g.arc(48 + Math.cos(a) * d, 48 + Math.sin(a) * d * 0.8, 3 + r() * 5, 0, TAU);
     g.fill();
   }
-  g.fillStyle = 'rgba(160,40,32,0.45)';
+  g.fillStyle = light;
   g.beginPath();
   g.ellipse(42, 42, 14, 9, -0.5, 0, TAU);
   g.fill();
@@ -244,6 +260,7 @@ export class Decals {
     this.list = [];
     this.pools = [];
     if (!POOLS.length) for (let i = 1; i <= 4; i++) POOLS.push(poolSprite(i * 7919));
+    if (!ACID_POOLS.length) for (let i = 1; i <= 3; i++) ACID_POOLS.push(poolSprite(i * 4801, '#4f8a1c', 'rgba(190,255,90,0.5)'));
   }
   clear() {
     this.list.length = 0;
@@ -271,6 +288,11 @@ export class Decals {
   splat(x, y, size) {
     if (this.pools.length >= this.maxPools) this.pools.shift();
     this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 9, delay: 0 });
+  }
+  // charco de ácido del gordo al reventar
+  acid(x, y, size) {
+    if (this.pools.length >= this.maxPools) this.pools.shift();
+    this.pools.push({ img: ACID_POOLS[(Math.random() * ACID_POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 14, delay: 0 });
   }
   update(dt) {
     for (const d of this.list) {
