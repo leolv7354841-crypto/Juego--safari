@@ -1,4 +1,4 @@
-import { ZOMBIES, WORLD_SIZE } from './config.js';
+import { ZOMBIES, WORLD_SIZE, GOLDEN } from './config.js';
 import { clamp, rand, randInt, angleTo, TAU } from './util.js';
 import { zombieSprites } from './sprites.js';
 
@@ -45,12 +45,18 @@ export class Grid {
 let nextId = 1;
 const near2 = [];
 
-// Ritmo de cada zombi: la mayoría camina normal y algunos se quedan rezagados, más lentos y torpes.
+// Táctica de cada zombi en la horda: unos van directo, otros buscan tu costado y otros
+// tu espalda (siempre por rutas reales). Además, algunos son rezagados: más lentos y torpes.
 function pickRole() {
-  if (Math.random() < 0.8) return { role: 'walker', pace: rand(0.92, 1.1) };
-  return { role: 'lag', pace: rand(0.6, 0.78) };
+  const r = Math.random();
+  const tactic = r < 0.45 ? 'direct' : r < 0.8 ? 'flank' : 'rear';
+  const lag = Math.random() < 0.18;
+  return { tactic, side: Math.random() < 0.5 ? -1 : 1, role: lag ? 'lag' : 'walker', pace: lag ? rand(0.6, 0.78) : rand(0.9, 1.1) };
 }
 
+// Con menos zombis que esto todos van directo; con más, la horda empieza a rodearte.
+const ENCIRCLE_MIN = 18;
+const OCT = TAU / 8;
 // a avanza hacia b (n = dirección de a hacia b). Si a es más rápido y b le tapa el
 // camino, a se desliza de lado para adelantarlo en lugar de quedarse atascado detrás.
 function overtake(a, b, nx, ny, dt) {
@@ -77,6 +83,20 @@ export class Horde {
     this.list = [];
     this.grid = new Grid(WORLD_SIZE, CELL);
     this.sprites = zombieSprites();
+    this.frame = 0;
+    this.danger = 0;
+    this.nearCount = 0;
+  }
+
+  // Elige (una sola vez) el punto de flanqueo al que irá este zombi: a tu costado o a tu
+  // espalda respecto a por dónde llega, con algo de azar para que no formen un círculo perfecto.
+  planRoute(z, p, world) {
+    z.planned = true;
+    if (z.tactic === 'direct' || this.list.length < ENCIRCLE_MIN) return;
+    const b = Math.atan2(z.y - p.y, z.x - p.x);
+    const off = z.tactic === 'rear' ? Math.PI + rand(-0.6, 0.6) : z.side * (Math.PI / 2) + rand(-0.5, 0.5);
+    const k = (((Math.round((b + off) / OCT) % 8) + 8) % 8);
+    if (world.anchors[k].ok) z.anchor = k;
   }
 
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
@@ -117,6 +137,14 @@ export class Horde {
       wanderV: 0,
       stumbleT: 0,
       nextStumble: rand(1, 6),
+      anchor: -1,
+      planned: false,
+      stuck: 0,
+      avx: 0,
+      avy: 0,
+      hitT: 0,
+      hitJolt: 0,
+      life: type === 'golden' ? GOLDEN.life : 0,
     };
     this.list.push(z);
     return z;
@@ -146,6 +174,9 @@ export class Horde {
     const world = game.world;
     const time = game.time;
     const list = this.list;
+    this.frame++;
+    let danger = 0;
+    let nearCount = 0;
 
     for (let i = 0; i < list.length; i++) {
       const z = list[i];
@@ -154,20 +185,48 @@ export class Horde {
       z.slow -= dt;
       z.lunge = Math.max(0, z.lunge - dt * 4);
       z.spawnT = Math.max(0, z.spawnT - dt);
+      z.hitT -= dt;
       const dx = p.x - z.x;
       const dy = p.y - z.y;
       const d = Math.hypot(dx, dy) || 1;
+      if (d < 650) {
+        danger += 1 - d / 650;
+        if (d < 300) nearCount++;
+      }
       let mx;
       let my;
-      // persecución: de cerca van directo; de lejos siguen el mapa de rutas, que rodea
-      // edificios, coches y barricadas para no quedarse atorados en las paredes
-      const f = d >= 90 && p.alive ? world.flowDir(z.x, z.y, tmpDir) : null;
-      if (f) {
-        mx = f.x;
-        my = f.y;
+      if (z.type === 'golden') {
+        // el dorado huye de ti; si estás lejos, merodea a distancia
+        z.life -= dt;
+        if (z.life <= 0) {
+          game.onGoldenExpired(z);
+          continue;
+        }
+        const t = Math.sin(time * 0.6 + z.wob);
+        if (d < 460) {
+          mx = -dx / d + (-dy / d) * t * 0.6;
+          my = -dy / d + (dx / d) * t * 0.6;
+        } else {
+          mx = (-dy / d) * z.side + (dx / d) * 0.25;
+          my = (dx / d) * z.side + (dy / d) * 0.25;
+        }
       } else {
-        mx = dx / d;
-        my = dy / d;
+        // ruta: hacia su punto de flanqueo mientras esté lejos; después, directo por ti
+        if (!z.planned && d > 320 && p.alive) this.planRoute(z, p, world);
+        let field = world.main;
+        if (z.anchor >= 0) {
+          const a = world.anchors[z.anchor];
+          if (!a.ok || d < 170 || Math.hypot(a.x - z.x, a.y - z.y) < 90) z.anchor = -2;
+          else field = a;
+        }
+        const f = d >= 90 && p.alive ? world.flowDir(z.x, z.y, tmpDir, field) : null;
+        if (f) {
+          mx = f.x;
+          my = f.y;
+        } else {
+          mx = dx / d;
+          my = dy / d;
+        }
       }
       // si se quedó atascado, se escurre de lado un momento para despegarse
       if (z.unstickT > 0) {
@@ -182,35 +241,40 @@ export class Horde {
       // pegado a un obstáculo: se mueve más recto para seguir bien la ruta
       const calm = z.touchT > 0 ? 0.2 : 1;
       z.touchT -= dt;
-      // evitar amontonarse: se apartan de los que tienen al lado y rodean al que tienen delante
+      // evitar amontonarse: se apartan de los vecinos y rodean al que tienen delante.
+      // Se recalcula en fotogramas alternos (mitad de la horda cada vez) para rendir con cientos.
       if (d > 50) {
-        this.grid.query(z.x - z.r - 26, z.y - z.r - 26, z.x + z.r + 26, z.y + z.r + 26, near2);
-        let ax = 0;
-        let ay = 0;
-        for (let k = 0; k < near2.length; k++) {
-          const o = near2[k];
-          if (o === z || o.dead) continue;
-          const ox = z.x - o.x;
-          const oy = z.y - o.y;
-          const R = z.r + o.r + 22;
-          const od = Math.hypot(ox, oy);
-          if (od >= R || od < 0.01) continue;
-          const push = 1 - od / R;
-          ax += (ox / od) * push;
-          ay += (oy / od) * push;
-          if (-(ox * mx + oy * my) / od > 0.75) {
-            const side = z.id & 1 ? 1 : -1;
-            ax += -my * side * push * 0.8;
-            ay += mx * side * push * 0.8;
+        if (((z.id + this.frame) & 1) === 0) {
+          this.grid.query(z.x - z.r - 26, z.y - z.r - 26, z.x + z.r + 26, z.y + z.r + 26, near2);
+          let ax = 0;
+          let ay = 0;
+          for (let k = 0; k < near2.length; k++) {
+            const o = near2[k];
+            if (o === z || o.dead) continue;
+            const ox = z.x - o.x;
+            const oy = z.y - o.y;
+            const R = z.r + o.r + 22;
+            const od = Math.hypot(ox, oy);
+            if (od >= R || od < 0.01) continue;
+            const push = 1 - od / R;
+            ax += (ox / od) * push;
+            ay += (oy / od) * push;
+            if (-(ox * mx + oy * my) / od > 0.75) {
+              const side = z.id & 1 ? 1 : -1;
+              ax += -my * side * push * 0.8;
+              ay += mx * side * push * 0.8;
+            }
           }
+          z.avx = ax;
+          z.avy = ay;
         }
-        mx += ax * 0.7 * calm;
-        my += ay * 0.7 * calm;
+        mx += z.avx * 0.7 * calm;
+        my += z.avy * 0.7 * calm;
         const l = Math.hypot(mx, my) || 1;
         mx /= l;
         my /= l;
       }
-      // movimiento irregular: el rumbo deriva un poco, a ratos tropiezan y dan un tirón
+      // movimiento torpe: el rumbo deriva un poco, a ratos tropiezan y dan un tirón
       z.wanderV = (z.wanderV + rand(-1, 1) * dt * 4) * Math.exp(-dt * 1.2);
       z.wander = (z.wander + z.wanderV * dt) * Math.exp(-dt * 0.5);
       if (z.wander > 0.4) z.wander = 0.4;
@@ -233,7 +297,7 @@ export class Horde {
       z.my = my;
 
       const reach = z.r + p.r + def.reach;
-      const inRange = d < reach && p.alive;
+      const inRange = d < reach && p.alive && z.type !== 'golden';
       z.angle = angleTo(z.angle, Math.atan2(inRange ? dy : my, inRange ? dx : mx), def.turn * dt);
       // ritmo propio que sube y baja; al tropezar casi se frenan
       let sp = z.speed * z.pace * (0.85 + 0.15 * Math.sin(time * 0.7 + z.wob)) * (z.slow > 0 ? 0.35 : 1);
@@ -271,6 +335,7 @@ export class Horde {
           z.atk = 1 / def.attackRate;
           z.lunge = 1;
           p.hurt(def.damage, game);
+          game.onZombieHit(z);
           p.kx += (dx / d) * 40 * Math.sqrt(z.mass);
           p.ky += (dy / d) * 40 * Math.sqrt(z.mass);
         }
@@ -279,6 +344,8 @@ export class Horde {
       }
     }
 
+    this.danger = danger;
+    this.nearCount = nearCount;
     // separación entre zombis y contra el jugador
     const grid = this.grid;
     grid.clear();
@@ -334,8 +401,13 @@ export class Horde {
       if (z.chkT > 1.2) {
         const moved = Math.hypot(z.x - (z.chkX ?? z.x), z.y - (z.chkY ?? z.y));
         if (moved < 10 && !z.inRange && !world.lastBlock && p.alive) {
+          // atascado: se escurre de lado y recalcula su ruta (otro punto de flanqueo o directo)
           z.unstickT = rand(0.6, 1.1);
           z.unstickSide = Math.random() < 0.5 ? -1 : 1;
+          z.stuck++;
+          if (z.anchor >= 0) z.anchor = z.stuck > 1 ? -2 : (z.anchor + (z.side > 0 ? 1 : 7)) % 8;
+        } else if (moved > 30) {
+          z.stuck = 0;
         }
         z.chkT = 0;
         z.chkX = z.x;
@@ -376,14 +448,29 @@ export class Horde {
       const frames = z.flash > 0 ? z.spr.flash : z.spr.frames;
       const f = ((z.anim | 0) % frames.length + frames.length) % frames.length;
       const img = frames[f];
-      const c = Math.cos(z.angle);
-      const sn = Math.sin(z.angle);
-      const pop = z.flash > 0 ? 1.06 : 1;
+      const ang = z.angle + (z.hitT > 0 ? z.hitJolt * (z.hitT / 0.18) : 0);
+      const c = Math.cos(ang);
+      const sn = Math.sin(ang);
+      const pop = z.hitT > 0 ? 1 + 0.08 * (z.hitT / 0.18) : 1;
+      if (z.type === 'golden') {
+        // aura dorada; parpadea cuando está por desaparecer
+        const warn = z.life < GOLDEN.warnAt;
+        const blink = warn ? 0.35 + 0.65 * Math.abs(Math.sin(z.life * 9)) : 1;
+        ctx.setTransform(s, 0, 0, s, tx, ty);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.35 * blink;
+        ctx.fillStyle = '#e8b830';
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.r * 2.1, 0, TAU);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = blink;
+      }
       const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
       const k = s * pop * grow;
       const lx = z.x + c * z.lunge * 5;
       const ly = z.y + sn * z.lunge * 5;
-      ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
+      if (z.type !== 'golden') ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
       ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
       ctx.drawImage(img, -half, -half, half * 2, half * 2);
     }

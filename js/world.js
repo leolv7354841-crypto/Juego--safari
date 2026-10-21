@@ -1253,39 +1253,54 @@ export class World {
         if (this.pointBlocked(x, y, 12)) this.blocked[j * n + i] = 1;
       }
     }
-    this.dist = new Uint16Array(n * n).fill(65535);
     this.queue = new Int32Array(n * n);
-    this.flowCell = -1;
+    // campo principal (rutas hacia el jugador) y 8 campos de flanqueo hacia puntos
+    // alrededor del jugador, para que algunos zombis lo rodeen por los lados o por detrás
+    this.main = { dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false };
+    this.dist = this.main.dist;
+    this.anchors = Array.from({ length: 8 }, (_, k) => ({ dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false, k, x: 0, y: 0 }));
+    this.anchorTurn = 0;
   }
 
-  updateFlow(px, py) {
+  set flowCell(v) {
+    // al cambiar barricadas se fuerza el recálculo de todos los campos
+    if (v === -1 && this.main) {
+      this.main.cell = -1;
+      for (const a of this.anchors) a.cell = -1;
+    }
+  }
+
+  // Celda libre más cercana a (px, py), o -1.
+  freeCell(px, py) {
     const n = this.navN;
-    let ci = clamp(Math.floor(px / NAV_CELL), 0, n - 1);
-    let cj = clamp(Math.floor(py / NAV_CELL), 0, n - 1);
-    let start = cj * n + ci;
-    if (start === this.flowCell) return;
-    this.flowCell = start;
-    if (this.blocked[start]) {
-      // el jugador está pegado a un obstáculo: usar la celda libre más cercana
-      let best = -1;
-      for (let r = 1; r < 3 && best < 0; r++) {
-        for (let dj = -r; dj <= r; dj++) {
-          for (let di = -r; di <= r; di++) {
-            const i = ci + di;
-            const j = cj + dj;
-            if (i < 0 || j < 0 || i >= n || j >= n) continue;
-            if (!this.blocked[j * n + i]) {
-              best = j * n + i;
-              break;
-            }
-          }
-          if (best >= 0) break;
+    const ci = clamp(Math.floor(px / NAV_CELL), 0, n - 1);
+    const cj = clamp(Math.floor(py / NAV_CELL), 0, n - 1);
+    if (!this.blocked[cj * n + ci]) return cj * n + ci;
+    for (let r = 1; r < 4; r++) {
+      for (let dj = -r; dj <= r; dj++) {
+        for (let di = -r; di <= r; di++) {
+          const i = ci + di;
+          const j = cj + dj;
+          if (i < 0 || j < 0 || i >= n || j >= n) continue;
+          if (!this.blocked[j * n + i]) return j * n + i;
         }
       }
-      if (best < 0) return;
-      start = best;
     }
-    const dist = this.dist;
+    return -1;
+  }
+
+  // BFS desde la celda objetivo: dist[c] = pasos hasta el objetivo rodeando obstáculos.
+  computeField(field, px, py) {
+    const start = this.freeCell(px, py);
+    if (start < 0) {
+      field.ok = false;
+      return;
+    }
+    if (start === field.cell) return;
+    field.cell = start;
+    field.ok = true;
+    const n = this.navN;
+    const dist = field.dist;
     const blocked = this.blocked;
     const q = this.queue;
     dist.fill(65535);
@@ -1310,12 +1325,33 @@ export class World {
     }
   }
 
-  // Dirección hacia el jugador según el campo de flujo (o null si no hay ruta).
-  flowDir(x, y, out) {
+  updateFlow(px, py) {
+    this.computeField(this.main, px, py);
+  }
+
+  // Recalcula UN campo de flanqueo por llamada (repartido entre fotogramas).
+  updateAnchors(px, py, radius = 230) {
+    const a = this.anchors[this.anchorTurn];
+    this.anchorTurn = (this.anchorTurn + 1) % this.anchors.length;
+    const ang = (a.k / this.anchors.length) * TAU;
+    a.x = px + Math.cos(ang) * radius;
+    a.y = py + Math.sin(ang) * radius;
+    if (a.x < 60 || a.y < 60 || a.x > this.size - 60 || a.y > this.size - 60) {
+      a.ok = false;
+      a.cell = -1;
+      return;
+    }
+    this.computeField(a, a.x, a.y);
+    // un punto de flanqueo sin conexión con el jugador no sirve
+    if (a.ok && this.main.ok && this.main.dist[a.cell] === 65535) a.ok = false;
+  }
+
+  // Dirección por el campo indicado (por defecto, hacia el jugador) o null si no hay ruta.
+  flowDir(x, y, out, field = this.main) {
     const n = this.navN;
     const ci = clamp(Math.floor(x / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(y / NAV_CELL), 0, n - 1);
-    const dist = this.dist;
+    const dist = field.dist;
     const here = dist[cj * n + ci];
     let best = here;
     let bi = -1;

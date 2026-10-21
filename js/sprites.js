@@ -160,6 +160,10 @@ const NORMAL_PALETTES = [
   { skin: '#a2ad88', shirt: '#9a8a5c', pants: '#343b46', hair: '#3a2c20' },
   { skin: '#95a37f', shirt: '#55605c', pants: '#46392b', hair: '#262019' },
 ];
+const GOLDEN_PALETTES = [
+  { skin: '#e3bd4f', shirt: '#b7862a', pants: '#7a5a1a', hair: '#5a3e10' },
+  { skin: '#f0cc5e', shirt: '#c9962c', pants: '#6e4f16', hair: '#4a330c' },
+];
 const SWAT_PALETTES = [
   { skin: '#97a682', shirt: '#22262b', pants: '#1c1f23', hair: '#15171a', vest: '#2f353b', shield: '#5d7484' },
   { skin: '#8d9c78', shirt: '#262b22', pants: '#1f221c', hair: '#15171a', vest: '#363b31', shield: '#62788a' },
@@ -469,8 +473,8 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = { normal: drawNormal, golden: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
+const PALETTES = { normal: NORMAL_PALETTES, golden: GOLDEN_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -504,12 +508,13 @@ function buildSet(type, r, frames, pal, scale, pad) {
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], swat: [], heavy: [], sprinter: [], fat: [], giant: [] };
+  ZSPRITES = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], giant: [] };
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
     giant: { r: 42, frames: 8, scale: 2, pad: 1.45 },
     sprinter: { r: 11, frames: 6, scale: 2.6, pad: 1.8 },
+    golden: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     swat: { r: 14, frames: 6, scale: 2.5, pad: 1.7 },
     heavy: { r: 22, frames: 6, scale: 2.4, pad: 1.45 },
   };
@@ -914,6 +919,12 @@ export function drawSurvivor(g, p, time) {
   // arma + brazos
   g.save();
   g.translate(kick, 0);
+  // durante la recarga el arma baja e inclina (sincronizado con los sonidos de cada paso)
+  if (p.reloadT > 0) {
+    const k = Math.sin((p.reloadProg || 0) * Math.PI);
+    g.translate(-k * 3, k * 4);
+    g.rotate(k * 0.55);
+  }
   GUNS[p.weapon.id](g, r);
   if (longGun) {
     limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, '#6b4f3a');

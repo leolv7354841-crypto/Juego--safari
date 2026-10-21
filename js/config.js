@@ -83,8 +83,10 @@ export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autosho
 export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
 
 export const ZOMBIES = {
+  // velocidad base x2 respecto a versiones anteriores ([30, 44] → [60, 88]); la animación
+  // de pasos avanza con la distancia recorrida, así que se acelera sola y no patinan.
   normal: {
-    hp: 42, speed: [30, 44], radius: 13, damage: 8, attackRate: 0.9,
+    hp: 42, speed: [60, 88], radius: 13, damage: 8, attackRate: 0.9,
     xp: 1, mass: 1, reach: 7, frames: 6, turn: 4,
   },
   // Policía SWAT: como un normal, con escudo antidisturbios; aguanta 8 veces más.
@@ -105,17 +107,43 @@ export const ZOMBIES = {
     hp: 130, speed: [21, 27], radius: 21, damage: 14, attackRate: 0.75,
     xp: 4, mass: 4, reach: 8, frames: 6, turn: 3,
   },
+  // Zombi dorado: poco común, huye de ti y desaparece si no lo matas a tiempo.
+  golden: {
+    hp: 42 * 3, speed: [74, 86], radius: 13, damage: 6, attackRate: 0.9,
+    xp: 15, mass: 1, reach: 7, frames: 6, turn: 6,
+  },
   giant: {
     hp: 1500, speed: [13, 16], radius: 42, damage: 32, attackRate: 0.45,
     xp: 30, mass: 40, reach: 14, frames: 8, turn: 1.4, blocksBullets: true,
   },
 };
 
-// Con hordas 5 veces mayores la experiencia necesaria sube igual para no saturar de mejoras.
-export const xpForLevel = (lvl) => Math.floor((6 + lvl * 4 + Math.pow(lvl, 1.6) * 1.5) * 7);
+// Curva de experiencia: barata al principio (mejoras seguidas en los primeros minutos)
+// y cuadrática después, sin saltos bruscos entre niveles.
+//   nv1 51 · nv2 89 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
+export const xpForLevel = (lvl) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
 
 // Dinero por cada zombi eliminado.
-export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, heavy: 25, giant: 10 };
+export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, heavy: 25, giant: 10, golden: 0 };
+
+// Zombi dorado: recompensa al matarlo y cuánto vive antes de desaparecer.
+export const GOLDEN = { rewardMin: 100, rewardMax: 250, life: 26, warnAt: 7, firstAfter: 12, every: [35, 65] };
+
+// Dinero que pierdes con cada golpe de zombi (siempre más de $15).
+export const MONEY_LOSS = { min: 16, max: 40 };
+
+// Probabilidad de que cada tipo suelte munición o botiquín al morir.
+export const DROPS = {
+  normal: { ammo: 0.06, med: 0.02 },
+  sprinter: { ammo: 0.06, med: 0.02 },
+  swat: { ammo: 0.18, med: 0.06 },
+  fat: { ammo: 0.3, med: 0.1 },
+  heavy: { ammo: 0.6, med: 0.25 },
+  golden: { ammo: 0.5, med: 0.5 },
+};
+
+// Umbrales de la música dinámica (peligro = suma de cercanía de zombis).
+export const MUSIC = { threatOn: 4, threatOff: 2, hordeOn: 14, hordeOff: 8, minHold: 4 };
 
 // Tienda entre oleadas. w/h en px del mundo; rotates = se coloca perpendicular a la mira.
 export const SHOP = {

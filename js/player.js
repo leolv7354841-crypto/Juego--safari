@@ -1,5 +1,6 @@
 import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER } from './config.js';
 import { clamp, rand, angleTo } from './util.js';
+import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41 };
@@ -95,6 +96,7 @@ export class Player {
     if (i < 0 || i >= this.weapons.length || i === this.wi) return;
     this.wi = i;
     this.reloadT = 0;
+    this.reloadProg = 0;
     this.fireCd = Math.max(this.fireCd, 0.18);
   }
 
@@ -108,12 +110,14 @@ export class Player {
     return any;
   }
 
-  startReload(game) {
+  startReload() {
     const w = this.weapon;
     if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
     this.reloadDur = w.def.reload / this.stats.reloadMult;
     this.reloadT = this.reloadDur;
-    game.sfx.reload();
+    // cada paso de la recarga suena una sola vez, en su momento de la animación
+    this.reloadStep = 0;
+    this.reloadProg = 0;
   }
 
   hurt(dmg, game) {
@@ -208,7 +212,14 @@ export class Player {
     this.bloom = Math.max(0, this.bloom - dt * 0.5);
     if (this.reloadT > 0) {
       this.reloadT -= dt;
+      this.reloadProg = Math.min(1, 1 - this.reloadT / this.reloadDur);
+      const steps = RELOAD_STEPS[this.weapon.id] || RELOAD_STEPS.pistol;
+      while (this.reloadStep < steps.length && steps[this.reloadStep][0] <= this.reloadProg) {
+        game.sfx.reloadStep(steps[this.reloadStep][1]);
+        this.reloadStep++;
+      }
       if (this.reloadT <= 0) {
+        this.reloadProg = 0;
         this.reloadT = 0;
         const w = this.weapon;
         const need = this.magSize(w.def) - w.mag;

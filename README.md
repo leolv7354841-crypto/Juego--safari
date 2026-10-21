@@ -12,11 +12,24 @@ de un cerco, no para pasear.
 
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
-| Normal  | 42   | lenta         | Llega en hordas enormes (cientos por oleada)                  |
+| Normal  | 42   | media (el doble que antes) | Llega en hordas enormes (cientos por oleada)     |
 | Policía SWAT | 336 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 8× más       |
 | Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos                      |
+| Dorado  | 126  | rápida        | Raro (uno cada 35–65 s de ronda). No ataca: huye y desaparece a los 26 s. Si lo matas, da **$100–$250** |
+
+Cuando un zombi te golpea **pierdes dinero** ($16–$40 al azar, nunca te deja en negativo) y lo ves en un
+indicador rojo junto a tu dinero. El zombi dorado parpadea cuando está por escaparse; si se va, no da nada.
+La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
+
+### Cuentas y clasificación
+
+Al entrar escribes un **nombre y un PIN de 4 números**: si la cuenta no existe se crea, y si existe entras
+con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (oleada más alta y bajas).
+La **Clasificación** del menú muestra los récords de las cuentas de ese dispositivo. Abierto como Artifact
+de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
+Para una clasificación global en GitHub Pages o Vercel haría falta un servidor (por ejemplo Firebase o Supabase).
 
 ### Progreso guardado
 
@@ -48,8 +61,10 @@ Las barricadas se colocan delante de ti y las balas pasan por encima (también p
 Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
-Los zombis aparecen en grupitos por todas las orillas de la pantalla y van directo por ti siguiendo
-rutas que rodean edificios, coches y barricadas; si alguno se atasca, se escurre de lado para soltarse.
+Los zombis aparecen en grupitos por todas las orillas de la pantalla. Unos van directo por ti, otros te
+flanquean por los lados y otros dan la vuelta para llegarte por la espalda, así que cuando son muchos te
+van cerrando poco a poco. Todos siguen rutas que rodean edificios, coches y barricadas; si alguno se
+atasca, se escurre de lado y recalcula su camino.
 Caminan de forma algo irregular (se desvían y tropiezan), algunos se quedan rezagados, se esquivan
 entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 
@@ -69,17 +84,24 @@ mejoras de nivel). Puedes **vender** cualquier arma que tengas por la mitad de s
 | Ametralladora | $900 | 100 |
 
 En la sección **Munición** de la tienda compras cargadores de cualquier arma que tengas, de 1 en 1 o de
-10 en 10. La reserva de balas no tiene límite.
+10 en 10. La reserva de balas no tiene límite. Los zombis sueltan munición y botiquines más a menudo
+(sobre todo los grandes), y la munición se recoge al instante al pasar cerca.
+
+### Sonido y música
+
+Cada arma tiene su propio disparo y su recarga (cargador, cerrojo, cartuchos) sincronizada con la
+animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cambia sola entre **calma**,
+**amenaza** y **horda** según cuántos zombis tengas cerca, con transiciones suaves.
 
 ### Controles
 
 | Computadora | Celular |
 |-------------|---------|
 | `WASD` / flechas: moverse | Joystick virtual (lado izquierdo) |
-| `Shift`: correr | Botón **Correr** (activa/desactiva) |
+| `Shift`: correr · `Espacio`: disparar | Botón **Correr** (activa/desactiva) |
 | Ratón: apuntar · clic: disparar | Botón de disparo con **apuntado automático** |
 | `R`: recargar | Botón de recarga |
-| `1`–`8` o `Q`: cambiar arma | Botón de cambio de arma |
+| `1`–`8`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
 | `G`: lanzar granada | Botón **Granada** (apunta solo) |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
@@ -116,7 +138,7 @@ js/main.js          Bucle principal, cámara, render, HUD y menús
 js/config.js        Equilibrio: armas, zombis, experiencia
 js/world.js         Ciudad procedural, colisiones, campo de flujo y suelo por trozos
 js/player.js        Movimiento, estamina, armas, recarga y retroceso
-js/zombies.js       Horda, rejilla espacial, separación y ataques
+js/zombies.js       Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
 js/bullets.js       Balas con colisión segmento-círculo y perforación
 js/director.js      Oleadas y aparición de zombis
 js/upgrades.js      Mejoras al subir de nivel
@@ -126,6 +148,8 @@ js/particles.js     Partículas y restos en el suelo
 js/pickups.js       Munición, botiquines y cajas de armas
 js/input.js         Teclado, ratón y controles táctiles
 js/audio.js         Sonido sintetizado con Web Audio
+js/music.js         Música dinámica (calma, amenaza, horda)
+js/accounts.js      Cuentas, guardado por cuenta y clasificación
 js/sprites.js       Todo el arte, generado por código
 ```
 

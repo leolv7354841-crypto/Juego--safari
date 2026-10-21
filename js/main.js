@@ -1,7 +1,9 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER, SELL_RATE } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE } from './config.js';
+import { Music } from './music.js';
+import { Accounts } from './accounts.js';
 import { Structures } from './build.js';
-import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './util.js';
+import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { Horde } from './zombies.js';
@@ -15,10 +17,8 @@ import { Sfx } from './audio.js';
 import { drawSurvivor, drawGunIcon } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
-// SAVE_KEY: guardado automático (también a mitad de ronda).
-// CHECK_KEY: punto de control al terminar cada ronda, para continuar tras morir.
-const SAVE_KEY = 'dz-save-v1';
-const CHECK_KEY = 'dz-check-v1';
+// Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
+// de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet' };
 const ITEM_ICONS = {
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
@@ -75,7 +75,10 @@ class Game {
     this.input = new Input(this.root, this.canvas);
     this.input.onModeChange = (m) => this.root.classList.toggle('touch', m === 'touch');
     this.root.classList.toggle('touch', this.input.mode === 'touch');
+    this.accounts = new Accounts();
     this.sfx = new Sfx();
+    this.music = new Music(this.sfx);
+    this.sfx.onReady = () => this.music.start();
     this.lighting = new Lighting();
     this.camera = new Camera();
     this.particles = new Particles();
@@ -97,6 +100,14 @@ class Game {
     this.resize();
     this.newWorld();
     this.setupMenu();
+    // al entrar: crear cuenta o elegir una
+    if (!this.accounts.current) this.showAccount();
+    // como Artifact de Claude: progreso en la nube y clasificación global
+    this.accounts.initCloud().then(async (ok) => {
+      if (!ok) return;
+      if (this.state === 'account') this.$('acct-cloud').hidden = false;
+      if (this.accounts.current && (await this.accounts.cloudPull()) && this.state === 'menu') this.setupMenu();
+    });
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
     window.addEventListener('pagehide', () => this.player && this.saveProgress());
@@ -140,6 +151,9 @@ class Game {
     this.shopPending = false;
     this.structures.clear();
     this.deathT = 0;
+    this.goldenT = GOLDEN.firstAfter;
+    this.stepT = 0;
+    this.music.reset();
     this.muzzle = 0;
     this.hurtFlash = 0;
     this.flowT = 0;
@@ -166,7 +180,10 @@ class Game {
       }
     }
     this.setState('menu');
-    const save = storage.get(SAVE_KEY, null) || storage.get(CHECK_KEY, null);
+    const cur = this.accounts.current;
+    this.$('acct-name').textContent = cur ? cur.name : 'Sin cuenta';
+    this.$('acct-best').textContent = cur && cur.best ? `Tu récord: oleada ${cur.best.wave} · ${cur.best.kills} bajas` : '';
+    const save = storage.get(this.accounts.saveKey(), null) || storage.get(this.accounts.checkKey(), null);
     this.$('btn-continue').hidden = !save;
     if (save) {
       this.$('btn-continue').textContent = save.dstate === 'active' ? `Continuar · ronda ${save.wave}` : `Continuar · ronda ${save.wave + 1}`;
@@ -180,8 +197,8 @@ class Game {
   start(freshWorld) {
     this.sfx.unlock();
     // una partida nueva sustituye al progreso guardado
-    storage.remove(SAVE_KEY);
-    storage.remove(CHECK_KEY);
+    storage.remove(this.accounts.saveKey());
+    storage.remove(this.accounts.checkKey());
     if (freshWorld) this.newWorld();
     this.resetRun();
     this.input.reset();
@@ -192,11 +209,14 @@ class Game {
 
   setState(s) {
     this.state = s;
+    this.music.setPaused(s !== 'play' && s !== 'menu');
     this.root.className = this.root.className.replace(/\bstate-\w+/g, '').trim() + ' state-' + s;
     this.$('screen-pause').hidden = s !== 'pause';
     this.$('screen-level').hidden = s !== 'levelup';
     this.$('screen-over').hidden = s !== 'over';
     this.$('screen-shop').hidden = s !== 'shop';
+    this.$('screen-account').hidden = s !== 'account';
+    this.$('screen-board').hidden = s !== 'board';
   }
 
   pause() {
@@ -226,10 +246,11 @@ class Game {
     for (const t of this.director.queue) queue[t] = (queue[t] || 0) + 1;
     const data = {
       v: 1,
+      savedAt: Date.now(),
       dstate: ds,
       queue,
       waveSize: this.director.waveSize,
-      zombies: ds === 'active' ? this.horde.list.filter((z) => !z.dead).map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)]) : [],
+      zombies: ds === 'active' ? this.horde.list.filter((z) => !z.dead && z.type !== 'golden').map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)]) : [],
       seed: this.world.seedBase,
       wave: this.director.wave,
       time: this.time,
@@ -256,14 +277,22 @@ class Game {
       blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
       wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
     };
-    storage.set(SAVE_KEY, data);
-    if (ds === 'waiting') storage.set(CHECK_KEY, data);
+    storage.set(this.accounts.saveKey(), data);
+    if (ds === 'waiting') storage.set(this.accounts.checkKey(), data);
+    // copia en la nube (si el juego corre como Artifact con base de datos), sin saturar
+    const now = Date.now();
+    if (ds === 'waiting' || now - (this.cloudSavedAt || 0) > 20000) {
+      this.cloudSavedAt = now;
+      this.accounts.cloudSave('save', data);
+      if (ds === 'waiting') this.accounts.cloudSave('check', data);
+    }
     this.saveT = 0;
   }
 
-  loadProgress(key = SAVE_KEY) {
+  loadProgress(kind = 'save') {
+    const key = kind === 'check' ? this.accounts.checkKey() : this.accounts.saveKey();
     let d = storage.get(key, null);
-    if (!d && key === SAVE_KEY) d = storage.get(CHECK_KEY, null);
+    if (!d && kind === 'save') d = storage.get(this.accounts.checkKey(), null);
     if (!d || d.v !== 1) return false;
     this.sfx.unlock();
     if (this.world.seedBase !== d.seed) this.newWorld(d.seed);
@@ -337,23 +366,41 @@ class Game {
     if (z.dead) return;
     z.hp -= b.dmg;
     z.flash = 0.08;
+    // reacción breve: sacudida hacia un lado y leve agrandado (no frena su comportamiento)
+    z.hitT = 0.18;
+    z.hitJolt = rand(0.2, 0.5) * (Math.random() < 0.5 ? -1 : 1);
+    z.lastDx = b.dx;
+    z.lastDy = b.dy;
+    if (Math.random() < 0.12) this.decals.splat(hx + b.dx * 14, hy + b.dy * 14, rand(7, 12));
     if (z.type !== 'giant') z.slow = 0.16;
     const kn = (b.knock * 3) / z.mass;
     z.kx += b.dx * kn;
     z.ky += b.dy * kn;
-    this.particles.hit(hx, hy, b.dx, b.dy, z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'giant');
+    const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'giant';
+    this.particles.hit(hx, hy, b.dx, b.dy, big);
     if (b.shot && !b.shot.hit) {
       b.shot.hit = true;
       this.player.shotsHit++;
     }
-    this.sfx.hit();
+    this.sfx.hit(big);
     if (z.hp <= 0) this.killZombie(z);
   }
 
   killZombie(z) {
+    if (z.dead) return;
     z.dead = true;
-    this.kills[z.type]++;
-    this.decals.corpse(z);
+    this.kills[z.type] = (this.kills[z.type] || 0) + 1;
+    this.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
+    if (z.type === 'golden' && this.state !== 'menu') {
+      // recompensa única del zombi dorado
+      const reward = randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
+      this.money += reward;
+      this.moneyEarned += reward;
+      this.moneyPop(`+$${reward}`, 'gold');
+      this.sfx.gold();
+      this.toast(`¡Zombi dorado! +$${reward}`);
+      this.particles.pickupFx(z.x, z.y, '#f0c040');
+    }
     this.particles.death(z.x, z.y, z.r);
     this.addXp(z.def.xp);
     if (this.state !== 'menu') {
@@ -371,13 +418,56 @@ class Game {
       this.sfx.kill(true);
       this.toast('Gigante abatido');
     } else {
-      if (z.type === 'fat') {
-        if (r < 0.22 && hasGuns) this.pickups.drop('ammo', z.x, z.y);
-        else if (r < 0.3) this.pickups.drop('med', z.x, z.y);
-      } else if (r < 0.02 && hasGuns) this.pickups.drop('ammo', z.x, z.y);
-      else if (r > 0.995) this.pickups.drop('med', z.x, z.y);
-      this.sfx.kill(false);
+      const drop = DROPS[z.type] || DROPS.normal;
+      if (r < drop.ammo && hasGuns) this.pickups.drop('ammo', z.x, z.y);
+      else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
+      this.sfx.kill(z.type === 'fat' || z.type === 'heavy');
     }
+  }
+
+  // El dorado se fue sin que lo mataras: no da nada ni cuenta como baja.
+  onGoldenExpired(z) {
+    z.dead = true;
+    this.particles.dust(z.x, z.y, 20);
+    this.particles.pickupFx(z.x, z.y, '#8a7a40');
+    this.toast('El zombi dorado escapó');
+  }
+
+  // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
+  onZombieHit() {
+    if (this.state === 'menu') return;
+    const loss = Math.min(this.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+    if (loss <= 0) return;
+    this.money -= loss;
+    this.moneyPop(`-$${loss}`, 'loss');
+    this.sfx.moneyLost();
+    this.updateHud(false);
+  }
+
+  // Indicador flotante de dinero junto al contador (rojo al perder, dorado al ganar).
+  moneyPop(text, kind) {
+    const host = this.$('money-pops');
+    if (!host) return;
+    if (host.childElementCount > 5) host.firstElementChild.remove();
+    const el = document.createElement('span');
+    el.className = 'money-pop ' + kind;
+    el.textContent = text;
+    host.appendChild(el);
+    setTimeout(() => el.remove(), 1300);
+  }
+
+  spawnGolden() {
+    const d = this.director;
+    for (let i = 0; i < 20; i++) {
+      const c = d.edgePoint(this, rand(60, 140));
+      if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
+      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y)) continue;
+      this.horde.spawn('golden', c.x, c.y, 1, 1);
+      this.sfx.goldenSpawn();
+      this.toast('¡Apareció un zombi dorado! Atrápalo antes de que escape');
+      return true;
+    }
+    return false;
   }
 
   onGiantStep(z) {
@@ -403,7 +493,8 @@ class Game {
 
   onPlayerDeath() {
     // el guardado de mitad de ronda ya no sirve: se continuará desde el último punto de control
-    storage.remove(SAVE_KEY);
+    storage.remove(this.accounts.saveKey());
+    this.recordScore();
     this.deathT = 1.6;
     this.input.reset();
     this.camera.shake(0.6);
@@ -462,13 +553,104 @@ class Game {
 
   totalKills() {
     const k = this.kills;
-    return k.normal + (k.swat || 0) + k.sprinter + k.fat + (k.heavy || 0) + k.giant;
+    return k.normal + (k.swat || 0) + k.sprinter + k.fat + (k.heavy || 0) + (k.golden || 0) + k.giant;
   }
 
   onWaveCleared() {
     this.shopPending = true;
     this.sfx.level();
     this.saveProgress();
+    this.recordScore();
+  }
+
+  // Mejor marca de la cuenta: oleada alcanzada y bajas.
+  recordScore() {
+    if (this.state === 'menu') return;
+    if (this.accounts.recordScore({ wave: this.director.wave, kills: this.totalKills(), time: Math.round(this.time), level: this.level })) {
+      this.toast('Nuevo récord de tu cuenta');
+    }
+  }
+
+  /* ---------- cuentas y clasificación ---------- */
+
+  showAccount() {
+    this.setState('account');
+    const acc = this.accounts;
+    this.$('acct-error').textContent = '';
+    this.$('acct-name-in').value = acc.current ? acc.current.name : '';
+    this.$('acct-pin-in').value = '';
+    const names = Object.values(acc.list).map((a) => a.name);
+    const box = this.$('acct-known');
+    box.innerHTML = '';
+    box.hidden = !names.length;
+    for (const n of names) {
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.type = 'button';
+      b.textContent = n;
+      b.addEventListener('click', () => {
+        this.$('acct-name-in').value = n;
+        this.$('acct-pin-in').focus();
+      });
+      box.appendChild(b);
+    }
+    this.$('acct-cloud').hidden = !acc.cloud;
+  }
+
+  async submitAccount(e) {
+    e.preventDefault();
+    const err = this.accounts.login(this.$('acct-name-in').value, this.$('acct-pin-in').value);
+    if (err) {
+      this.$('acct-error').textContent = err;
+      return;
+    }
+    this.sfx.unlock();
+    await this.accounts.cloudPull();
+    this.newWorld();
+    this.setupMenu();
+  }
+
+  async showBoard() {
+    this.setState('board');
+    const acc = this.accounts;
+    const render = (rows, empty) => {
+      const ol = this.$('board-list');
+      ol.innerHTML = '';
+      if (!rows || !rows.length) {
+        const li = document.createElement('li');
+        li.className = 'board-empty';
+        li.textContent = empty;
+        ol.appendChild(li);
+        return;
+      }
+      rows.forEach((r, i) => {
+        const li = document.createElement('li');
+        if (acc.current && r.name === acc.current.name) li.className = 'me';
+        const pos = document.createElement('b');
+        pos.textContent = i + 1;
+        const nm = document.createElement('span');
+        nm.className = 'nm';
+        nm.textContent = r.name;
+        const st = document.createElement('span');
+        st.className = 'st';
+        st.textContent = `Oleada ${r.wave} · ${r.kills} bajas · ${fmtTime(r.time || 0)}`;
+        li.append(pos, nm, st);
+        ol.appendChild(li);
+      });
+    };
+    const tab = this.boardTab || (acc.cloud ? 'global' : 'local');
+    this.$('board-tab-global').hidden = !acc.cloud;
+    this.$('board-tab-global').classList.toggle('on', tab === 'global');
+    this.$('board-tab-local').classList.toggle('on', tab === 'local');
+    this.$('board-note').textContent = acc.cloud
+      ? 'Global: récords de todos los que juegan esta página de Claude. Dispositivo: cuentas guardadas en este navegador.'
+      : 'Récords de las cuentas creadas en este navegador. Para competir entre dispositivos hace falta un servidor (ver README).';
+    if (tab === 'global') {
+      render(null, 'Cargando…');
+      render(await acc.globalBoard(), 'Todavía no hay récords globales.');
+    } else {
+      render(acc.localBoard(), 'Todavía no hay récords. ¡Termina una oleada!');
+    }
   }
 
   startNextRound() {
@@ -679,6 +861,7 @@ class Game {
       ['Policías SWAT', this.kills.swat],
       ['Velocistas', this.kills.sprinter],
       ['Gordos', this.kills.fat],
+      ['Dorados', this.kills.golden || 0],
       ['Super blindados', this.kills.heavy],
       ['sep'],
       ['Precisión', `${acc}%`],
@@ -700,7 +883,7 @@ class Game {
       dd.textContent = v;
       dl.append(dt, dd);
     }
-    const save = storage.get(CHECK_KEY, null);
+    const save = storage.get(this.accounts.checkKey(), null);
     this.$('btn-over-continue').hidden = !save;
     if (save) this.$('btn-over-continue').textContent = `Continuar desde la ronda ${save.wave + 1}`;
     this.$('btn-again').textContent = save ? 'Nueva partida' : 'Reintentar';
@@ -728,7 +911,7 @@ class Game {
       if (!this.loadProgress()) this.start(false);
     });
     on('btn-over-continue', () => {
-      if (!this.loadProgress(CHECK_KEY)) this.start(true);
+      if (!this.loadProgress('check')) this.start(true);
     });
     on('btn-menu', () => {
       this.newWorld();
@@ -744,6 +927,21 @@ class Game {
     });
     this.syncSoundLabel();
     on('btn-shop-done', () => this.closeShop());
+    on('btn-account', () => this.showAccount());
+    on('btn-leaderboard', () => this.showBoard());
+    on('btn-board-back', () => this.setupMenu());
+    on('board-tab-local', () => {
+      this.boardTab = 'local';
+      this.showBoard();
+    });
+    on('board-tab-global', () => {
+      this.boardTab = 'global';
+      this.showBoard();
+    });
+    on('btn-acct-back', () => {
+      if (this.accounts.current) this.setupMenu();
+    });
+    this.$('acct-form').addEventListener('submit', (e) => this.submitAccount(e));
     on('btn-next-round', () => this.startNextRound());
     on('btn-round-shop', () => {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
@@ -974,7 +1172,18 @@ class Game {
       this.world.updateFlow(p.x, p.y);
       this.flowT = 0.2;
     }
+    // un campo de flanqueo por fotograma (repartido): los zombis rodean por rutas reales
+    if (p.alive) this.world.updateAnchors(p.x, p.y);
     this.director.update(dt, this);
+    // zombi dorado: de vez en cuando durante una ronda, nunca dos a la vez
+    if (this.director.state === 'active' && p.alive) {
+      this.goldenT -= dt;
+      if (this.goldenT <= 0) {
+        const alive = this.horde.list.some((z) => z.type === 'golden' && !z.dead);
+        if (!alive && this.spawnGolden()) this.goldenT = rand(GOLDEN.every[0], GOLDEN.every[1]);
+        else this.goldenT = 5;
+      }
+    }
     this.horde.update(dt, this);
     this.bullets.update(dt, this);
     this.horde.removeDead();
@@ -982,7 +1191,15 @@ class Game {
     this.particles.update(dt);
     this.decals.update(dt);
     this.emitFires(dt);
-    if (this.horde.list.length && Math.random() < dt * 0.5) this.sfx.groan();
+    // gemidos y pasos según cuántos zombis hay cerca (con tope para no saturar)
+    const nc = this.horde.nearCount;
+    if (this.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05))) this.sfx.groan(Math.min(3, 0.5 + nc / 10));
+    this.stepT -= dt;
+    if (nc > 0 && this.stepT <= 0) {
+      this.sfx.footstep(Math.min(1, nc / 20));
+      this.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
+    }
+    this.music.setDanger(p.alive ? this.horde.danger : 0, dt);
     const look = this.input.mode === 'mouse' ? 50 : 24;
     this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
     this.muzzle = Math.max(0, this.muzzle - dt * 14);
@@ -1029,6 +1246,7 @@ class Game {
     ctx.setTransform(z, 0, 0, z, tx, ty);
     this.world.drawGround(ctx, v.x0, v.y0, v.x1, v.y1);
     this.structures.drawGround(ctx, v);
+    this.decals.drawPools(ctx, v);
     this.decals.draw(ctx, v);
     this.structures.drawBlocks(ctx, v);
     this.pickups.draw(ctx, v, this.time);
@@ -1132,7 +1350,7 @@ class Game {
     const m = 34 * this.dpr;
     const few = !this.director.queue.length && this.horde.list.length <= 5;
     for (const zb of this.horde.list) {
-      if (zb.type !== 'giant' && !few) continue;
+      if (zb.type !== 'giant' && zb.type !== 'golden' && !few) continue;
       const sx = zb.x * b.z + b.tx;
       const sy = zb.y * b.z + b.ty;
       if (sx > 0 && sx < W && sy > 0 && sy < H) continue;
@@ -1146,7 +1364,7 @@ class Game {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(a);
-      ctx.fillStyle = zb.type === 'giant' ? 'rgba(217,120,58,0.9)' : 'rgba(230,224,210,0.75)';
+      ctx.fillStyle = zb.type === 'golden' ? 'rgba(240,192,64,0.95)' : zb.type === 'giant' ? 'rgba(217,120,58,0.9)' : 'rgba(230,224,210,0.75)';
       ctx.beginPath();
       ctx.moveTo(s, 0);
       ctx.lineTo(-s * 0.6, -s * 0.8);

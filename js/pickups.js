@@ -25,12 +25,16 @@ export class Pickups {
       const d = Math.hypot(dx, dy);
       // sólo se atrae lo que se puede recoger: un botiquín con la vida llena se queda en el suelo
       const usable = p.alive && this.canCollect(it, p);
-      if (d < 80 && usable) {
-        const pull = Math.min(d, (1 - d / 80) * 380 * dt);
+      if (it.taken) continue;
+      // imán rápido; al tocarla se recoge en ese mismo fotograma, sin esperas
+      if (d < 120 && usable) {
+        const pull = Math.min(d, 900 * dt);
         it.x += (dx / (d || 1)) * pull;
         it.y += (dy / (d || 1)) * pull;
       }
-      if (d < p.r + 14 && usable && this.collect(it, game)) {
+      const reach = p.r + (it.k === 'ammo' ? 26 : 16);
+      if (Math.hypot(p.x - it.x, p.y - it.y) < reach && usable && this.collect(it, game)) {
+        it.taken = true;
         this.list.splice(i, 1);
         continue;
       }
@@ -49,6 +53,7 @@ export class Pickups {
     if (it.k === 'ammo') {
       if (!p.addAmmo(1)) return false;
       game.toast('+ Munición');
+      game.updateHud(false);
       game.particles.pickupFx(it.x, it.y, '#c9a54a');
     } else if (it.k === 'med') {
       if (p.hp >= p.stats.maxHp) return false;

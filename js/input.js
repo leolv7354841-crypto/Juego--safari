@@ -34,6 +34,8 @@ export class Input {
   bind() {
     const prevent = (e) => e.preventDefault();
     this.on(window, 'keydown', (e) => {
+      // escribiendo en un campo (nombre, PIN): no son atajos del juego
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
       if (e.repeat && this.keys.has(e.code)) return;
       this.keys.add(e.code);
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();

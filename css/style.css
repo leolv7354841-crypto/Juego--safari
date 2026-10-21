@@ -326,6 +326,102 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .round-key { margin: 5px 0 0; font-size: 11px; color: var(--dim); }
 .touch .round-key { display: none; }
 
+/* ---------- Dinero flotante ---------- */
+
+#money-pops { position: relative; height: 0; }
+.money-pop {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  animation: pop-up 1.25s ease-out forwards;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.money-pop.loss { color: #e05a48; }
+.money-pop.gold { color: #f0c040; font-size: 30px; }
+@keyframes pop-up {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  15% { opacity: 1; transform: translateY(0) scale(1.08); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px) scale(1); }
+}
+
+/* ---------- Cuenta y clasificación ---------- */
+
+.account-bar {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -8px 0 16px;
+  font-size: 16px;
+  color: var(--dim);
+}
+.account-bar b { color: var(--ink); letter-spacing: 0.04em; }
+.link-btn { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-size: 15px; }
+#btn-leaderboard { width: min(300px, 100%); font-size: 20px; padding: 10px 18px 7px; }
+.acct-lead, .acct-note { margin: 0 0 14px; font-size: 15px; line-height: 1.35; color: #cfc8b8; text-align: left; }
+.acct-note { font-size: 13px; color: var(--dim); margin: 10px 0 0; }
+.acct-form { display: grid; gap: 6px; text-align: left; margin-bottom: 12px; }
+.acct-form label { font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.acct-form input {
+  font: inherit;
+  font-size: 20px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.acct-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.acct-error { min-height: 1.2em; margin: 4px 0; color: #e05a48; font-size: 15px; }
+.acct-known { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+#btn-acct-back { margin-top: 12px; }
+.board-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.board-tabs .chip { font-size: 13px; padding: 4px 12px 2px; }
+.board { list-style: none; margin: 0 0 6px; padding: 0; max-height: 52vh; overflow-y: auto; text-align: left; }
+.board li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.board li b { grid-row: span 2; align-self: center; font-family: var(--display); font-size: 26px; color: var(--dim); text-align: center; }
+.board li:nth-child(1) b { color: #f0c040; }
+.board li:nth-child(2) b { color: #c9c4b6; }
+.board li:nth-child(3) b { color: #c98a52; }
+.board li.me { background: rgba(134, 168, 146, 0.12); }
+.board .nm { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .st { font-size: 14px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.board-empty { display: block !important; color: var(--dim); text-align: center; }
+
+/* ---------- Pausa ---------- */
+
+.panel.pause-panel { width: min(760px, 100%); }
+.pause-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr); gap: 22px; text-align: left; }
+.keys-title { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+.keys-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 15px; align-items: center; }
+.keys-list dt { color: var(--ink); white-space: nowrap; }
+.keys-list dd { margin: 0; color: #cfc8b8; }
+.keys-list kbd { margin-right: 2px; }
+.help-touch-block { display: none !important; }
+.touch .help-touch-block { display: block !important; }
+.touch dl.help-touch-block { display: grid !important; }
+.touch .help-desktop-block { display: none !important; }
+@media (max-width: 640px) {
+  .pause-grid { grid-template-columns: 1fr; }
+  .keys-list { font-size: 14px; }
+}
+
 /* ---------- Tienda ---------- */
 
 .panel.shop { text-align: left; }

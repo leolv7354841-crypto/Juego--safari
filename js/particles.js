@@ -1,5 +1,7 @@
 import { rand, TAU, pick } from './util.js';
 
+const BLOOD = ['#8a1f1a', '#6e1714', '#a3281f', '#5a1210'];
+
 // Tipos de partícula
 const DOT = 0;
 const SMOKE = 1;
@@ -65,22 +67,23 @@ export class Particles {
     this.add(SMOKE, x, y, -dx * 20, -dy * 20, 0.5, 3, '120,115,105', 3, 16);
   }
 
-  // Impacto sobre un zombi: salpicadura oscura y polvo, sin gore explícito.
+  // Impacto sobre un zombi: salpicadura de sangre estilizada en la dirección de la bala.
   hit(x, y, dx, dy, big) {
-    const n = big ? 6 : 4;
+    const n = big ? 7 : 5;
+    const base = Math.atan2(dy, dx);
     for (let i = 0; i < n; i++) {
-      const a = Math.atan2(dy, dx) + rand(-0.7, 0.7);
-      const s = rand(40, 150);
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.25, 0.5), rand(1.2, 2.6), pick(['#3a4a2c', '#2b3322', '#4b4a32']), 6);
+      const a = base + rand(-0.6, 0.6);
+      const s = rand(60, 190);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.25, 0.5), rand(1.6, 3.2), pick(BLOOD), 6);
     }
-    this.add(SMOKE, x, y, dx * 30, dy * 30, 0.35, 3, '110,115,90', 4, 12);
+    this.add(SMOKE, x, y, dx * 30, dy * 30, 0.3, 2.5, '120,30,28', 4, 10);
   }
 
   death(x, y, r) {
     for (let i = 0; i < 10 + r * 0.5; i++) {
       const a = rand(0, TAU);
       const s = rand(30, 110);
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.7), rand(1.5, 3), pick(['#3a4a2c', '#2b3322', '#55503e']), 5);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.7), rand(1.5, 3), pick(i % 3 ? BLOOD : ['#3a4a2c', '#55503e']), 5);
     }
     for (let i = 0; i < 3 + r * 0.1; i++) {
       this.add(SMOKE, x + rand(-r, r) * 0.5, y + rand(-r, r) * 0.5, rand(-20, 20), rand(-20, 20), rand(0.6, 1), r * 0.3, '95,90,78', 2, r * 0.8);
@@ -201,33 +204,114 @@ export class Particles {
   }
 }
 
-// Restos en el suelo: cuerpos abatidos y manchas que se desvanecen.
+// Restos en el suelo: cuerpos que caen con una animación (varias variantes),
+// charcos de sangre estilizada y salpicaduras. Todo tiene tope y se desvanece solo.
+const POOLS = [];
+function poolSprite(seed) {
+  const size = 96;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  let s = seed;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = '#5e1411';
+  g.beginPath();
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * TAU;
+    const d = 26 + r() * 14;
+    g.lineTo(48 + Math.cos(a) * d, 48 + Math.sin(a) * d * 0.8);
+  }
+  g.closePath();
+  g.fill();
+  for (let i = 0; i < 7; i++) {
+    const a = r() * TAU;
+    const d = 34 + r() * 10;
+    g.beginPath();
+    g.arc(48 + Math.cos(a) * d, 48 + Math.sin(a) * d * 0.8, 3 + r() * 5, 0, TAU);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(160,40,32,0.45)';
+  g.beginPath();
+  g.ellipse(42, 42, 14, 9, -0.5, 0, TAU);
+  g.fill();
+  return c;
+}
+
 export class Decals {
-  constructor(max = 140) {
+  constructor(max = 150, maxPools = 110) {
     this.max = max;
+    this.maxPools = maxPools;
     this.list = [];
+    this.pools = [];
+    if (!POOLS.length) for (let i = 1; i <= 4; i++) POOLS.push(poolSprite(i * 7919));
   }
   clear() {
     this.list.length = 0;
+    this.pools.length = 0;
   }
-  corpse(z) {
+  // dx, dy: dirección del último impacto, para caer hacia ese lado
+  corpse(z, dx = 0, dy = 0) {
     if (this.list.length >= this.max) this.list.shift();
-    this.list.push({ img: z.spr.dead, x: z.x, y: z.y, a: z.angle + rand(-0.4, 0.4), half: z.spr.half, t: 0, life: z.type === 'giant' ? 40 : 18 });
+    const l = Math.hypot(dx, dy) || 1;
+    const fx = dx / l;
+    const fy = dy / l;
+    const variant = (Math.random() * 3) | 0;
+    const slide = variant === 0 ? rand(10, 18) : variant === 1 ? rand(4, 8) : rand(2, 5);
+    const spin = variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5);
+    this.list.push({
+      img: z.spr.dead, x: z.x, y: z.y, x0: z.x, y0: z.y,
+      x1: z.x + fx * slide * (z.r / 13), y1: z.y + fy * slide * (z.r / 13),
+      a0: z.angle, a1: z.angle + spin, half: z.spr.half, t: 0, fall: variant === 2 ? 0.55 : 0.4,
+      shrink: variant === 2 ? 0.82 : 0.92, life: z.type === 'heavy' || z.type === 'fat' ? 26 : 16,
+    });
+    if (this.pools.length >= this.maxPools) this.pools.shift();
+    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x: z.x + fx * slide * 1.2, y: z.y + fy * slide * 1.2,
+      a: rand(0, TAU), size: z.r * rand(2.6, 3.4), t: 0, life: 22, delay: 0.3 });
+  }
+  splat(x, y, size) {
+    if (this.pools.length >= this.maxPools) this.pools.shift();
+    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 9, delay: 0 });
   }
   update(dt) {
-    for (const d of this.list) d.t += dt;
+    for (const d of this.list) {
+      d.t += dt;
+      const k = Math.min(1, d.t / d.fall);
+      const e = 1 - (1 - k) * (1 - k);
+      d.x = d.x0 + (d.x1 - d.x0) * e;
+      d.y = d.y0 + (d.y1 - d.y0) * e;
+    }
+    for (const p of this.pools) p.t += dt;
     while (this.list.length && this.list[0].t > this.list[0].life) this.list.shift();
+    while (this.pools.length && this.pools[0].t > this.pools[0].life) this.pools.shift();
+  }
+  drawPools(ctx, view) {
+    for (const p of this.pools) {
+      if (p.x + p.size < view.x0 || p.x - p.size > view.x1 || p.y + p.size < view.y0 || p.y - p.size > view.y1) continue;
+      const tt = p.t - p.delay;
+      if (tt <= 0) continue;
+      const grow = Math.min(1, tt / 1.1);
+      const s = p.size * (0.35 + 0.65 * (1 - (1 - grow) * (1 - grow)));
+      ctx.globalAlpha = 0.7 * Math.min(1, (p.life - p.t) / 4);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.a);
+      ctx.drawImage(p.img, -s, -s, s * 2, s * 2);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
   draw(ctx, view) {
     for (const d of this.list) {
       if (d.x + d.half < view.x0 || d.x - d.half > view.x1 || d.y + d.half < view.y0 || d.y - d.half > view.y1) continue;
-      const fadeIn = Math.min(1, d.t * 3);
+      const k = Math.min(1, d.t / d.fall);
+      const e = 1 - (1 - k) * (1 - k);
       const fadeOut = Math.min(1, (d.life - d.t) / 3);
-      ctx.globalAlpha = 0.85 * fadeIn * fadeOut;
+      ctx.globalAlpha = (0.95 - 0.1 * e) * fadeOut;
       ctx.save();
       ctx.translate(d.x, d.y);
-      ctx.rotate(d.a);
-      ctx.scale(1, 0.92);
+      ctx.rotate(d.a0 + (d.a1 - d.a0) * e);
+      const sc = 1 - (1 - d.shrink) * e;
+      ctx.scale(sc, sc * (1 - 0.08 * e));
       ctx.drawImage(d.img, -d.half, -d.half, d.half * 2, d.half * 2);
       ctx.restore();
     }

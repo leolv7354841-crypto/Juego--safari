@@ -47,6 +47,7 @@
           <div class="reload-track"><div class="reload-fill" id="reload-fill"></div></div>
           <div class="inv" id="inv"></div>
         </div>
+        <div id="money-pops" aria-live="polite"></div>
       </div>
       <div class="hud-right">
         <div class="stat"><small>Tiempo</small><b id="time">00:00</b></div>
@@ -103,11 +104,17 @@
       <div class="panel title-panel">
         <p class="kicker">Día 47 · Zona de cuarentena 9</p>
         <h1 class="logo">Dead<span>Zone</span></h1>
-        <p class="lead">La ciudad cayó. Los caminantes son lentos, pero nunca dejan de llegar. Aguanta todas las oleadas que puedas.</p>
+        <p class="lead">La ciudad cayó. Los caminantes ya no son lentos y nunca dejan de llegar. Aguanta todas las oleadas que puedas.</p>
+        <div class="account-bar">
+          <span>Jugador: <b id="acct-name">Sin cuenta</b></span>
+          <button class="link-btn" id="btn-account" type="button">Cambiar cuenta</button>
+        </div>
         <div class="start-actions">
           <button class="btn primary" id="btn-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-start">Jugar</button>
+          <button class="btn ghost" id="btn-leaderboard">Clasificación</button>
         </div>
+        <p class="best" id="acct-best"></p>
         <div class="controls-help">
           <div class="help-desktop">
             <span><kbd>WASD</kbd> moverse</span>
@@ -131,14 +138,77 @@
     </section>
 
     <section class="screen" id="screen-pause" hidden>
-      <div class="panel">
+      <div class="panel pause-panel">
         <h2>Pausa</h2>
-        <div class="stack">
-          <button class="btn primary" id="btn-resume">Continuar</button>
-          <button class="btn" id="btn-sound">Sonido: activado</button>
-          <button class="btn" id="btn-restart">Reiniciar partida</button>
-          <button class="btn ghost" id="btn-menu">Salir al menú</button>
+        <div class="pause-grid">
+          <div class="stack">
+            <button class="btn primary" id="btn-resume">Continuar</button>
+            <button class="btn" id="btn-sound">Sonido: activado</button>
+            <button class="btn" id="btn-restart">Reiniciar partida</button>
+            <button class="btn ghost" id="btn-menu">Salir al menú principal</button>
+          </div>
+          <div class="keys">
+            <h3 class="keys-title help-desktop-block">Controles de PC</h3>
+            <dl class="keys-list help-desktop-block">
+              <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o flechas</dt><dd>Moverse</dd>
+              <dt><kbd>Shift</kbd></dt><dd>Correr (gasta estamina)</dd>
+              <dt>Ratón</dt><dd>Apuntar</dd>
+              <dt>Clic izquierdo o <kbd>Espacio</kbd></dt><dd>Disparar</dd>
+              <dt><kbd>R</kbd></dt><dd>Recargar</dd>
+              <dt><kbd>1</kbd>–<kbd>8</kbd></dt><dd>Elegir arma</dd>
+              <dt><kbd>Q</kbd> o <kbd>Tab</kbd></dt><dd>Siguiente arma</dd>
+              <dt><kbd>F</kbd></dt><dd>Construir estructura</dd>
+              <dt><kbd>V</kbd></dt><dd>Cambiar estructura</dd>
+              <dt><kbd>G</kbd></dt><dd>Lanzar granada</dd>
+              <dt><kbd>Enter</kbd></dt><dd>Iniciar siguiente ronda</dd>
+              <dt><kbd>Esc</kbd> o <kbd>P</kbd></dt><dd>Pausa / continuar</dd>
+            </dl>
+            <h3 class="keys-title help-touch-block">Controles táctiles</h3>
+            <dl class="keys-list help-touch-block">
+              <dt>Joystick izquierdo</dt><dd>Moverse</dd>
+              <dt>Botón naranja</dt><dd>Disparar (apunta solo)</dd>
+              <dt>Correr</dt><dd>Activar o desactivar</dd>
+              <dt>Flecha circular</dt><dd>Recargar</dd>
+              <dt>Dos flechas</dt><dd>Cambiar arma</dd>
+              <dt>Cuadritos</dt><dd>Construir</dd>
+              <dt>Granada</dt><dd>Lanzar granada</dd>
+            </dl>
+          </div>
         </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-account" hidden>
+      <div class="panel">
+        <p class="kicker">Antes de entrar</p>
+        <h2>Tu cuenta</h2>
+        <p class="acct-lead">Escribe un nombre y un PIN de 4 números. Si la cuenta no existe se crea; si existe, entras a ella con tu progreso guardado.</p>
+        <form id="acct-form" class="acct-form" autocomplete="off">
+          <label for="acct-name-in">Nombre de jugador</label>
+          <input id="acct-name-in" maxlength="16" placeholder="Ej. Leo" autocapitalize="off" spellcheck="false">
+          <label for="acct-pin-in">PIN</label>
+          <input id="acct-pin-in" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="4 números" type="password">
+          <p class="acct-error" id="acct-error" role="alert"></p>
+          <button class="btn primary" type="submit">Entrar o crear cuenta</button>
+        </form>
+        <div class="acct-known" id="acct-known" hidden></div>
+        <p class="acct-note" id="acct-cloud" hidden>Conectado a Claude: tu progreso también se guarda en tu cuenta de Claude y tus récords aparecen en la clasificación global.</p>
+        <p class="acct-note">Las cuentas viven en este navegador. El PIN evita que otros en este dispositivo usen tu partida; no es una contraseña segura.</p>
+        <button class="btn ghost" id="btn-acct-back" type="button">Volver</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-board" hidden>
+      <div class="panel">
+        <p class="kicker">Mejores supervivientes</p>
+        <h2>Clasificación</h2>
+        <div class="board-tabs">
+          <button class="chip" id="board-tab-global" type="button" hidden>Global</button>
+          <button class="chip" id="board-tab-local" type="button">Este dispositivo</button>
+        </div>
+        <ol class="board" id="board-list"></ol>
+        <p class="acct-note" id="board-note"></p>
+        <button class="btn ghost" id="btn-board-back" type="button">Volver al menú</button>
       </div>
     </section>
 
