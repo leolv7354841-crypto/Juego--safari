@@ -77,8 +77,21 @@ export const WEAPONS = {
     knock: 45, shake: 0.015, pierce: 1, len: 26,
     price: 900, ammoPrice: 35, desc: 'Cargador de 100 balas a ritmo infernal. La reina del caos.',
   },
+  // Lanza cohetes (ver ROCKET): explota al impactar; tarda 5 s en recargar.
+  bazooka: {
+    id: 'bazooka', name: 'Bazuca antitanque', damage: 0, rate: 1, mag: 1,
+    reserve: 4, reserveMax: Infinity, pickup: 1, reload: 5,
+    spread: 0.01, bloom: 0, pellets: 1, speed: 640, range: 950,
+    knock: 260, shake: 0.5, pierce: 0, len: 30, rocket: true,
+    price: 1400, ammoPrice: 40, desc: 'Cohete con el doble de explosión que una granada. Revienta gordos y blindados. Recarga en 5 s.',
+  },
 };
-export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autoshotgun', 'sniper', 'lmg'];
+export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autoshotgun', 'sniper', 'lmg', 'bazooka'];
+
+// Cohete de la bazuca. La granada tiene radio 140 y 330 de daño: el cohete abarca el doble de área.
+// Contra un gordo se queda clavado en su panza (stick s), brilla en verde (glow s) y estalla más fuerte;
+// contra un super blindado se incrusta en la placa de la panza y lo revienta de un solo tiro.
+export const ROCKET = { radius: 200, power: 660, fatStick: 1, fatGlow: 0.6, fatRadius: 250, fatPower: 950, heavyStick: 0.35 };
 // cajas de armas (las básicas); las mejores se compran
 export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
 

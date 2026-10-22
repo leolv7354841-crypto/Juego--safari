@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET } from './config.js';
 import { Music } from './music.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
@@ -21,7 +21,7 @@ const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2
 
 // Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
 // de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
-const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet' };
+const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet', bazooka: 'Baz' };
 const ITEM_ICONS = {
   molotov: '<svg viewBox="0 0 12 12"><ellipse cx="5" cy="7.5" rx="3.2" ry="3.4" fill="#7a9660" stroke="#141612" stroke-width=".8"/><rect x="4" y="2" width="2" height="3" fill="#7a9660" stroke="#141612" stroke-width=".6"/><circle cx="5" cy="1.6" r="1.5" fill="#ff9a30"/></svg>',
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
@@ -446,6 +446,16 @@ class Game {
     }
   }
 
+  // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
+  rocketHit(z, x, y, b) {
+    if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(this, z, x, y, b);
+    else this.rocketBlast(x, y);
+  }
+
+  rocketBlast(x, y) {
+    this.structures.explode(this, { x, y }, ROCKET.radius, ROCKET.power, 1);
+  }
+
   // Super golpe del blindado (al jugador o a una estructura).
   onSuperPunch(z, x, y) {
     this.particles.dust(x, y, 18);
@@ -837,7 +847,7 @@ class Game {
       const mag = p.magSize(d);
       return `<div class="shop-item">
         <canvas class="shop-ic" data-gun="${w.id}" width="96" height="96"></canvas>
-        <div class="shop-txt"><b>Balas · ${d.name}</b><span>Cargador de ${mag} balas por $${d.ammoPrice}. Sin límite de reserva.</span><small>Reserva: ${w.reserve} balas</small></div>
+        <div class="shop-txt"><b>${d.rocket ? 'Cohetes' : 'Balas'} · ${d.name}</b><span>${d.rocket ? `1 cohete por $${d.ammoPrice}` : `Cargador de ${mag} balas por $${d.ammoPrice}`}. Sin límite de reserva.</span><small>Reserva: ${w.reserve} ${d.rocket ? 'cohetes' : 'balas'}</small></div>
         <div class="buy-col">
           ${buyBtn(`data-ammo="${w.id}" data-n="1"`, d.ammoPrice, `+1 · $${d.ammoPrice}`, ' sm')}
           ${buyBtn(`data-ammo="${w.id}" data-n="10"`, d.ammoPrice * 10, `+10 · $${d.ammoPrice * 10}`, ' sm')}
@@ -1403,6 +1413,7 @@ class Game {
     if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0) this.structures.drawGhost(ctx, this, this.buildSel, this.time);
     this.horde.draw(ctx, v, base, 'small');
     this.structures.drawFires(ctx, v, this.time);
+    this.structures.drawStuck(ctx, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
       drawSurvivor(ctx, p, this.time);

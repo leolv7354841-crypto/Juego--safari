@@ -15,6 +15,7 @@ const SHOTS = {
   autoshotgun: { crack: 2900, body: 820, thump: 105, tail: 0.3, gain: 0.85, dur: 0.18 },
   sniper: { crack: 6200, body: 900, thump: 80, tail: 0.65, gain: 1, dur: 0.26 },
   lmg: { crack: 4400, body: 1250, thump: 125, tail: 0.14, gain: 0.55, dur: 0.09 },
+  bazooka: { crack: 1500, body: 420, thump: 60, tail: 0.9, gain: 1, dur: 0.45 },
 };
 
 // Etapas de recarga sincronizadas con el progreso de la animación (0..1).
@@ -27,6 +28,7 @@ export const RELOAD_STEPS = {
   shotgun: [[0.15, 'shell'], [0.32, 'shell'], [0.49, 'shell'], [0.66, 'shell'], [0.88, 'pump']],
   autoshotgun: [[0.12, 'magOut'], [0.55, 'drumIn'], [0.86, 'bolt']],
   lmg: [[0.08, 'coverOpen'], [0.3, 'magOut'], [0.55, 'belt'], [0.75, 'coverClose'], [0.9, 'bolt']],
+  bazooka: [[0.12, 'coverOpen'], [0.45, 'rocketIn'], [0.7, 'rocketSeat'], [0.92, 'boltClose']],
 };
 
 export class Sfx {
@@ -141,6 +143,8 @@ export class Sfx {
       this.tone({ freq: 60 * v, to: 30, dur: 0.3, gain: gv * 0.6 });
     }
     if (kind === 'sniper') this.burst({ dur: 0.9, freq: 400, sweep: 60, gain: 0.28, attack: 0.05, delay: 0.05 });
+    // bazuca: silbido del cohete al salir
+    if (kind === 'bazooka') this.burst({ dur: 1.1, freq: 900, sweep: 3200, gain: 0.35, type: 'bandpass', q: 1.5, attack: 0.03, delay: 0.04 });
   }
 
   // Un paso de la recarga: cada tipo suena distinto (metal contra metal, plástico, muelle).
@@ -189,6 +193,13 @@ export class Sfx {
         break;
       case 'belt':
         for (let i = 0; i < 4; i++) click(3600 + i * 120, 0.18, 0.02, i * 0.04);
+        break;
+      case 'rocketIn':
+        this.burst({ dur: 0.35, freq: 500, sweep: 900, gain: 0.35, type: 'bandpass', q: 2 });
+        break;
+      case 'rocketSeat':
+        this.tone({ freq: 140, to: 80, dur: 0.12, gain: 0.5 });
+        click(1400, 0.55, 0.05);
         break;
       case 'coverClose':
         this.burst({ dur: 0.06, freq: 500, gain: 0.5, type: 'bandpass', q: 2 });
@@ -339,6 +350,20 @@ export class Sfx {
     if (!this.ok('explosion', 0.08, true)) return;
     this.burst({ dur: 1.1, freq: 1800, sweep: 60, gain: 1 });
     this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
+  }
+
+  // Cohete que se clava en carne o en metal.
+  rocketStick(fat) {
+    if (!this.ok('rocketStick', 0.05, true)) return;
+    if (fat) this.burst({ dur: 0.2, freq: 400, sweep: 150, gain: 0.7, q: 1.5 });
+    else this.burst({ dur: 0.08, freq: 3000, gain: 0.5, type: 'bandpass', q: 6 });
+    this.tone({ freq: fat ? 90 : 300, to: fat ? 50 : 140, dur: 0.18, gain: 0.6 });
+  }
+
+  // Pitido del cohete a punto de estallar dentro del gordo.
+  rocketArm() {
+    if (!this.ok('rocketArm', 0.05, true)) return;
+    for (let i = 0; i < 6; i++) this.tone({ freq: 1800 + i * 150, dur: 0.05, gain: 0.12, type: 'square', delay: i * (0.11 - i * 0.012) });
   }
 
   // Super golpe del blindado: impacto sordo y metálico.

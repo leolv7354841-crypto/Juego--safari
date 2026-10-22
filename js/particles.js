@@ -148,6 +148,21 @@ export class Particles {
     if (Math.random() < 0.45) this.add(SMOKE, x + rand(-4, 4), y + rand(-4, 4), rand(-10, 10), rand(-40, -18), rand(0.8, 1.4), r * 0.35, '35,30,26', 0.6, r * 1.4);
   }
 
+  // estela de humo y chispas del cohete
+  rocketTrail(x, y, dx, dy) {
+    this.add(SMOKE, x - dx * 10 + rand(-2, 2), y - dy * 10 + rand(-2, 2), -dx * 30 + rand(-10, 10), -dy * 30 + rand(-10, 10), rand(0.6, 1.1), 4, '180,175,165', 1.5, 16);
+    this.add(EMBER, x - dx * 12, y - dy * 12, -dx * 90 + rand(-30, 30), -dy * 90 + rand(-30, 30), rand(0.1, 0.25), rand(1.2, 2.2), pick(['#ffd890', '#ffb060']), 3);
+  }
+
+  // rebufo de la bazuca hacia atrás
+  backblast(x, y, a) {
+    for (let i = 0; i < 10; i++) {
+      const aa = a + rand(-0.45, 0.45);
+      const s = rand(60, 220);
+      this.add(SMOKE, x, y, Math.cos(aa) * s, Math.sin(aa) * s, rand(0.6, 1.2), rand(5, 9), '170,165,155', 3, 26);
+    }
+  }
+
   // botella rota: vidrio y llamarada
   shatter(x, y) {
     for (let i = 0; i < 14; i++) {
@@ -294,12 +309,16 @@ export class Decals {
     const fx = dx / l;
     const fy = dy / l;
     const variant = (Math.random() * 3) | 0;
-    const slide = variant === 0 ? rand(10, 18) : variant === 1 ? rand(4, 8) : rand(2, 5);
-    const spin = variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5);
+    // una explosión fuerte (dirección de más de 1) lanza el cuerpo mucho más lejos
+    const power = Math.min(5, Math.max(1, l));
+    const slide = (variant === 0 ? rand(10, 18) : variant === 1 ? rand(4, 8) : rand(2, 5)) * power;
+    const spin = (variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5)) * (power > 1.5 ? 3 : 1);
+    // lanzado por una explosión: vuela en arco antes de caer
+    const lift = power > 1.5 ? power * rand(8, 12) : 0;
     this.list.push({
       img: z.burnt ? z.spr.burnt : z.spr.dead, x: z.x, y: z.y, x0: z.x, y0: z.y,
       x1: z.x + fx * slide * (z.r / 13), y1: z.y + fy * slide * (z.r / 13),
-      a0: z.angle, a1: z.angle + spin, half: z.spr.half, t: 0, fall: variant === 2 ? 0.55 : 0.4,
+      a0: z.angle, a1: z.angle + spin, half: z.spr.half, t: 0, fall: (variant === 2 ? 0.55 : 0.4) + (lift ? 0.35 : 0), lift,
       shrink: variant === 2 ? 0.82 : 0.92, life: z.type === 'heavy' || z.type === 'fat' ? 26 : 16,
     });
     if (this.pools.length >= this.maxPools) this.pools.shift();
@@ -356,9 +375,10 @@ export class Decals {
       const fadeOut = Math.min(1, (d.life - d.t) / 3);
       ctx.globalAlpha = (0.95 - 0.1 * e) * fadeOut;
       ctx.save();
-      ctx.translate(d.x, d.y);
+      const up = d.lift && k < 1 ? Math.sin(k * Math.PI) * d.lift : 0;
+      ctx.translate(d.x, d.y - up);
       ctx.rotate(d.a0 + (d.a1 - d.a0) * e);
-      const sc = 1 - (1 - d.shrink) * e;
+      const sc = (1 - (1 - d.shrink) * e) * (1 + up / 70);
       ctx.scale(sc, sc * (1 - 0.08 * e));
       ctx.drawImage(d.img, -d.half, -d.half, d.half * 2, d.half * 2);
       ctx.restore();

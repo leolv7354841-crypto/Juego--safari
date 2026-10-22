@@ -906,7 +906,7 @@ export function coneSprite() {
 
 /* ---------- Superviviente ---------- */
 
-const GUN_LEN = { pistol: 23, smg: 30, shotgun: 33, rifle: 38, ar: 35, autoshotgun: 35, sniper: 47, lmg: 42 };
+const GUN_LEN = { pistol: 23, smg: 30, shotgun: 33, rifle: 38, ar: 35, autoshotgun: 35, sniper: 47, lmg: 42, bazooka: 48 };
 
 const GUNS = {
   pistol: (g, r) => {
@@ -970,6 +970,30 @@ const GUNS = {
     g.fillRect(r * 0.15 + 28, -1.5, 9, 3);
     g.fillStyle = '#c9a54a';
     g.fillRect(r * 0.15 + 9, 10, 8, 2);
+  },
+  // tubo verde oliva al hombro, con mira, empuñadura y la ojiva asomando cuando está cargada
+  bazooka: (g, r, p) => {
+    const loaded = !p || !p.weapon || p.weapon.mag > 0;
+    g.fillStyle = '#3f4b2c';
+    g.fillRect(r * -0.3, -4.2, 44, 8.4);
+    g.fillStyle = '#56653c';
+    g.fillRect(r * -0.3, -4.2, 44, 2.4);
+    g.fillStyle = '#2a3220';
+    g.fillRect(r * -0.3 - 2, -5.2, 5, 10.4);
+    g.fillRect(r * -0.3 + 40, -5.2, 5, 10.4);
+    g.fillStyle = '#1b1c1e';
+    g.fillRect(r * -0.3 + 14, 3.6, 4, 7);
+    g.fillRect(r * -0.3 + 22, -7.5, 8, 3.3);
+    g.fillStyle = '#c9a54a';
+    g.fillRect(r * -0.3 + 8, -4.2, 2, 8.4);
+    if (loaded) {
+      g.fillStyle = '#5a5e52';
+      g.beginPath();
+      g.moveTo(r * -0.3 + 45, -3.6);
+      g.lineTo(r * -0.3 + 51, 0);
+      g.lineTo(r * -0.3 + 45, 3.6);
+      g.fill();
+    }
   },
   rifle: (g, r) => {
     g.fillStyle = '#4b3a2a';
@@ -1035,7 +1059,7 @@ export function drawSurvivor(g, p, time) {
     g.translate(-k * 3, k * 4);
     g.rotate(k * 0.55);
   }
-  GUNS[p.weapon.id](g, r);
+  GUNS[p.weapon.id](g, r, p);
   if (longGun) {
     limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, '#6b4f3a');
     limb(g, 0, -r * 0.62, r * 1.25, -r * 0.05, r * 0.28, '#6b4f3a');

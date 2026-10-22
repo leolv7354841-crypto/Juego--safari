@@ -3,7 +3,7 @@ import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
-const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41 };
+const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41, bazooka: 46 };
 
 export class Player {
   constructor(x, y) {
@@ -56,7 +56,7 @@ export class Player {
     return this.weapons[this.wi];
   }
   get gunTip() {
-    return GUN_TIP[this.weapon.id];
+    return GUN_TIP[this.weapon.id] || 30;
   }
 
   makeWeapon(id) {
@@ -278,6 +278,7 @@ export class Player {
         knock: d.knock,
         shot,
         hits: null,
+        rocket: !!d.rocket,
       });
     }
     this.shotsFired++;
@@ -291,7 +292,8 @@ export class Player {
     game.muzzle = 1;
     game.muzzleX = sx;
     game.muzzleY = sy;
-    game.particles.casing(this.x + ca * 8, this.y + sa * 8, this.angle + Math.PI / 2);
+    if (d.rocket) game.particles.backblast(this.x - ca * 14, this.y - sa * 14, this.angle + Math.PI);
+    else game.particles.casing(this.x + ca * 8, this.y + sa * 8, this.angle + Math.PI / 2);
     game.particles.muzzleSmoke(sx, sy, this.angle);
     game.sfx.shot(d.id);
     if (w.mag === 0 && w.reserve > 0) this.startReload(game);

@@ -84,9 +84,14 @@ mejoras de nivel). Puedes **vender** cualquier arma que tengas por la mitad de s
 | Escopeta automática | $600 | 12 (9 perdigones) |
 | Francotirador | $750 | 5 (atraviesa 6) |
 | Ametralladora | $900 | 100 |
+| Bazuca antitanque | $1400 | 1 cohete (recarga 5 s) |
 
 En la sección **Munición** de la tienda compras cargadores de cualquier arma que tengas, de 1 en 1 o de
-10 en 10. La reserva de balas no tiene límite. Los zombis sueltan munición y botiquines más a menudo
+10 en 10. La reserva de balas no tiene límite.
+
+La **bazuca** dispara cohetes que estallan con el doble de área que una granada y lanzan los cuerpos por
+los aires. Si le das a un gordo, el cohete se le queda clavado en la panza, brilla en verde y estalla
+más fuerte; si le das a un super blindado, se incrusta en su placa y lo revienta de un solo tiro. Los zombis sueltan munición y botiquines más a menudo
 (sobre todo los grandes), y la munición se recoge al instante al pasar cerca.
 
 ### Sonido y música
@@ -103,7 +108,7 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 | `Shift`: correr · `Espacio`: disparar | Botón **Correr** (activa/desactiva) |
 | Ratón: apuntar · clic: disparar | Botón de disparo con **apuntado automático** |
 | `R`: recargar | Botón de recarga |
-| `1`–`8`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
+| `1`–`9`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
 | `G`: lanzar granada · `T`: molotov | Botones **Granada** y **Molotov** (apuntan solos) |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |

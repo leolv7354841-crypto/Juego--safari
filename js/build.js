@@ -1,7 +1,8 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV } from './config.js';
+import { SHOP, MOLOTOV, ROCKET } from './config.js';
 import { TAU, rand, clamp } from './util.js';
 import { OUT, flameSprite } from './sprites.js';
+import { drawRocket } from './bullets.js';
 
 const SNAP = 20;
 const TRAP_WIRE = { slow: 0.35, dps: 14 };
@@ -21,11 +22,13 @@ export class Structures {
     this.scorches = [];
     this.pending = [];
     this.fires = [];
+    this.stuck = [];
   }
 
   clear() {
     this.pending.length = 0;
     this.fires.length = 0;
+    this.stuck.length = 0;
     this.blocks.length = 0;
     this.wires.length = 0;
     this.grenades.length = 0;
@@ -158,6 +161,94 @@ export class Structures {
     this.pending.push({ kind, x, y, t: 0.06 });
   }
 
+  /* ---------- cohetes clavados ---------- */
+
+  // El cohete se queda clavado en la panza (gordo) o en la placa (super blindado) y estalla después.
+  stickRocket(game, z, x, y, b) {
+    const fat = z.type === 'fat';
+    // posición relativa al cuerpo, en el sistema del zombi, para que se mueva con él
+    const c = Math.cos(-z.angle);
+    const s = Math.sin(-z.angle);
+    const lx = x - z.x;
+    const ly = y - z.y;
+    this.stuck.push({
+      z, kind: z.type, x, y,
+      ox: (lx * c - ly * s) * 0.7, oy: (lx * s + ly * c) * 0.7,
+      a: Math.atan2(b.dy, b.dx) - z.angle,
+      t: 0, stick: fat ? ROCKET.fatStick : ROCKET.heavyStick, glow: fat ? ROCKET.fatGlow : 0,
+    });
+    game.sfx.rocketStick(fat);
+    game.particles.impact(x, y, -b.dx, -b.dy);
+  }
+
+  updateStuck(dt, game) {
+    for (let i = this.stuck.length - 1; i >= 0; i--) {
+      const r = this.stuck[i];
+      const z = r.z;
+      r.t += dt;
+      if (!z.dead) {
+        const c = Math.cos(z.angle);
+        const s = Math.sin(z.angle);
+        r.x = z.x + r.ox * c - r.oy * s;
+        r.y = z.y + r.ox * s + r.oy * c;
+        r.ang = r.a + z.angle;
+      }
+      if (r.glow && r.t > r.stick && !r.beeped) {
+        r.beeped = true;
+        game.sfx.rocketArm();
+      }
+      if (r.t < r.stick + r.glow) continue;
+      this.stuck.splice(i, 1);
+      if (r.kind === 'fat') {
+        // estalla en verde: revienta al gordo y manda a volar a todos
+        if (!z.dead) game.killZombie(z);
+        game.particles.acidBurst(r.x, r.y, ROCKET.fatRadius);
+        this.explode(game, r, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
+      } else {
+        // super blindado: lo revienta de un solo tiro
+        if (!z.dead) {
+          z.lastDx = Math.cos(r.ang || 0) * 3;
+          z.lastDy = Math.sin(r.ang || 0) * 3;
+          game.killZombie(z);
+        }
+        this.explode(game, r, ROCKET.radius, ROCKET.power, 1);
+      }
+    }
+  }
+
+  drawStuck(ctx, time) {
+    for (const r of this.stuck) {
+      const glowing = r.glow && r.t > r.stick;
+      if (glowing) {
+        // brillo verde que pulsa cada vez más rápido antes de estallar
+        const k = (r.t - r.stick) / r.glow;
+        const pulse = 0.55 + 0.45 * Math.abs(Math.sin(time * (10 + k * 30)));
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (0.35 + 0.5 * k) * pulse;
+        const g = ctx.createRadialGradient(r.x, r.y, 2, r.x, r.y, 30 + k * 30);
+        g.addColorStop(0, 'rgba(200,255,120,1)');
+        g.addColorStop(0.5, 'rgba(110,220,60,0.6)');
+        g.addColorStop(1, 'rgba(60,160,20,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 30 + k * 30, 0, TAU);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+      // sólo asoma la cola del cohete: la ojiva está dentro
+      drawRocket(ctx, r.x - Math.cos(r.ang || 0) * 6, r.y - Math.sin(r.ang || 0) * 6, r.ang || 0, false);
+      if (glowing) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(170,255,90,0.8)';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 4, 0, TAU);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+  }
+
   /* ---------- molotov ---------- */
 
   throwMolotov(game, tx, ty) {
@@ -253,7 +344,8 @@ export class Structures {
     if (pd < R + p.r) game.applyAcid();
   }
 
-  explode(game, g, R = BLAST_R, power = 330) {
+  // fling > 0: la onda lanza a volar a los que sobreviven (cohetes de bazuca)
+  explode(game, g, R = BLAST_R, power = 330, fling = 0) {
     const { x, y } = g;
     game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
@@ -264,7 +356,17 @@ export class Structures {
       if (d > R + z.r) continue;
       const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: 120 + 260 * f, shot: null, blast: true }, z.x, z.y);
+      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: (120 + 260 * f) * (1 + fling), shot: null, blast: true }, z.x, z.y);
+      if (fling && !z.dead) {
+        z.airV = Math.max(z.airV || 0, ((160 + 320 * f) * fling) / Math.sqrt(z.mass));
+        z.air = z.air || 0.01;
+        z.spinV = rand(-9, 9);
+      }
+      // los cuerpos salen despedidos lejos
+      if (fling && z.dead) {
+        z.lastDx = (dx / n) * (2 + 3 * f);
+        z.lastDy = (dy / n) * (2 + 3 * f);
+      }
     }
     const p = game.player;
     const pd = Math.hypot(p.x - x, p.y - y);
@@ -300,6 +402,7 @@ export class Structures {
       this.acidBurst(game, b.x, b.y);
     }
     this.updateFires(dt, game);
+    this.updateStuck(dt, game);
     for (let i = this.blasts.length - 1; i >= 0; i--) {
       this.blasts[i].t -= dt;
       if (this.blasts[i].t <= 0) this.blasts.splice(i, 1);

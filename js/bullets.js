@@ -24,6 +24,7 @@ export class Bullets {
     const grid = game.horde.grid;
     for (let i = list.length - 1; i >= 0; i--) {
       const b = list[i];
+      if (b.rocket) game.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
       let step = b.speed * dt;
       if (step > b.life) step = b.life;
       const x = b.x;
@@ -67,6 +68,15 @@ export class Bullets {
         (b.hits || (b.hits = [])).push(best);
         const hx = x + (ex - x) * bt;
         const hy = y + (ey - y) * bt;
+        if (b.rocket) {
+          // el cohete no rebota ni atraviesa: impacta en el primero que toca
+          game.rocketHit(best, hx, hy, b);
+          b.exploded = true;
+          dead = true;
+          wall = false;
+          endT = bt;
+          break;
+        }
         if (best.type === 'heavy' && Math.random() < RICOCHET) {
           // rebote: se refleja sobre la placa con algo de desvío y pierde fuerza
           const nl = Math.hypot(hx - best.x, hy - best.y) || 1;
@@ -108,7 +118,8 @@ export class Bullets {
         b.pierce = 0;
         b.life = Math.min(b.life, 240);
       }
-      if (wall) game.particles.impact(b.x, b.y, b.dx, b.dy);
+      if (b.rocket && !b.exploded && (wall || b.life <= 0)) game.rocketBlast(b.x - b.dx * 4, b.y - b.dy * 4);
+      else if (wall) game.particles.impact(b.x, b.y, b.dx, b.dy);
       if (dead || b.life <= 0) {
         b.dead = true;
         list[i] = list[list.length - 1];
@@ -120,6 +131,10 @@ export class Bullets {
   draw(ctx) {
     ctx.lineCap = 'round';
     for (const b of this.list) {
+      if (b.rocket) {
+        drawRocket(ctx, b.x, b.y, Math.atan2(b.dy, b.dx), true);
+        continue;
+      }
       const len = b.trail;
       ctx.strokeStyle = 'rgba(255,214,150,0.25)';
       ctx.lineWidth = 3.2;
@@ -135,4 +150,42 @@ export class Bullets {
       ctx.stroke();
     }
   }
+}
+
+// Cohete de la bazuca (también se dibuja clavado en un zombi). flame = tobera encendida.
+export function drawRocket(ctx, x, y, a, flame) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(a);
+  if (flame) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,170,60,0.9)';
+    ctx.beginPath();
+    ctx.ellipse(-13, 0, 6 + Math.random() * 4, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.fillStyle = '#4a5636';
+  ctx.strokeStyle = '#141612';
+  ctx.lineWidth = 1;
+  ctx.fillRect(-9, -2.6, 13, 5.2);
+  ctx.strokeRect(-9, -2.6, 13, 5.2);
+  ctx.fillStyle = '#6d6f68';
+  ctx.beginPath();
+  ctx.moveTo(4, -3.4);
+  ctx.lineTo(11, 0);
+  ctx.lineTo(4, 3.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#2a3220';
+  ctx.beginPath();
+  ctx.moveTo(-9, -2.6);
+  ctx.lineTo(-12, -5);
+  ctx.lineTo(-7, -2.6);
+  ctx.moveTo(-9, 2.6);
+  ctx.lineTo(-12, 5);
+  ctx.lineTo(-7, 2.6);
+  ctx.fill();
+  ctx.restore();
 }
