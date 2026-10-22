@@ -175,7 +175,7 @@ export const DROPS = {
 // Clasificación mundial (Firebase Realtime Database, sin librerías: API REST).
 // Pega aquí la URL de tu base de datos, p. ej. 'https://mi-juego-default-rtdb.firebaseio.com'.
 // Vacía = sólo clasificación de este dispositivo (y la de Claude si se abre como Artifact).
-export const ONLINE = { url: '' };
+export const ONLINE = { url: 'https://dead-zone-73dcc-default-rtdb.firebaseio.com' };
 
 // Umbrales de la música dinámica (peligro = suma de cercanía de zombis).
 export const MUSIC = { threatOn: 4, threatOff: 2, hordeOn: 14, hordeOff: 8, minHold: 4 };
