@@ -130,6 +130,18 @@ export class Accounts {
     }
   }
 
+  // Al morir: borra también la partida guardada en la nube.
+  async cloudClear() {
+    if (!this.cloud || !this.active) return;
+    for (const kind of ['save', 'check']) {
+      try {
+        await this.cloud.db.doc(`data/users/${this.cloud.id}/${kind}-${this.active}`).delete();
+      } catch {
+        /* sin conexión: el guardado local ya se borró */
+      }
+    }
+  }
+
   // Si la nube tiene una partida más reciente que la local, la trae a este navegador.
   async cloudPull() {
     if (!this.cloud || !this.active) return false;

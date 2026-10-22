@@ -36,8 +36,8 @@ Para una clasificación global en GitHub Pages o Vercel haría falta un servidor
 
 El juego se guarda solo en el navegador cada pocos segundos, **también a mitad de ronda** (con los
 zombis que siguen vivos), y al cerrar o minimizar la página. Al volver a abrir el sitio aparece
-**Continuar** y sigues donde estabas. Al terminar cada ronda se crea además un punto de control: si
-caes, puedes **continuar desde la última ronda superada**. *Nueva partida* borra el progreso.
+**Continuar** y sigues donde estabas. **Si mueres, pierdes la partida** y la siguiente empieza desde la
+oleada 1 (tu récord en la clasificación se conserva). *Nueva partida* también borra el progreso.
 El guardado vive en el navegador de cada dispositivo (y en cada sitio web por separado).
 
 ### Dinero y tienda

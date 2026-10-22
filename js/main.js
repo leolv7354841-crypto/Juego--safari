@@ -573,8 +573,10 @@ class Game {
   }
 
   onPlayerDeath() {
-    // el guardado de mitad de ronda ya no sirve: se continuará desde el último punto de control
+    // al morir se pierde la partida: la siguiente empieza desde cero (el récord sí se guarda)
     storage.remove(this.accounts.saveKey());
+    storage.remove(this.accounts.checkKey());
+    this.accounts.cloudClear();
     this.recordScore();
     this.deathT = 1.6;
     this.input.reset();
@@ -1024,11 +1026,6 @@ class Game {
       dd.textContent = v;
       dl.append(dt, dd);
     }
-    const save = storage.get(this.accounts.checkKey(), null);
-    this.$('btn-over-continue').hidden = !save;
-    if (save) this.$('btn-over-continue').textContent = `Continuar desde la ronda ${save.wave + 1}`;
-    this.$('btn-again').textContent = save ? 'Nueva partida' : 'Reintentar';
-    this.$('btn-again').classList.toggle('primary', !save);
     const best = storage.get('dz-best', null);
     const record = !best || this.time > best.time;
     if (record) storage.set('dz-best', { time: this.time, kills: total, wave: this.director.wave });
@@ -1050,9 +1047,6 @@ class Game {
     on('btn-continue', () => {
       this.tryFullscreen();
       if (!this.loadProgress()) this.start(false);
-    });
-    on('btn-over-continue', () => {
-      if (!this.loadProgress('check')) this.start(true);
     });
     on('btn-menu', () => {
       this.newWorld();
