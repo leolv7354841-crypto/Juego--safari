@@ -73,6 +73,14 @@ atasca, se escurre de lado y recalcula su camino.
 Caminan de forma algo irregular (se desvían y tropiezan), algunos se quedan rezagados, se esquivan
 entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 
+### Robot de combate
+
+En la tienda puedes comprar un **robot de combate** ($3000) del doble de tamaño de un gordo, con
+10 000 de vida. Acércate y pulsa `E` (botón **ROBOT** en el celular) para subirte o bajarte: caminas
+entre la horda apartando zombis, recibe él los golpes en vez de ti y usa tus armas montadas en su brazo
+derecho (puedes cambiarlas igual que siempre). No se cura solo: repáralo en la tienda después de cada
+oleada. Si su vida llega a 0 explota, sales despedido y hay que repararlo para volver a usarlo.
+
 ### Armas y munición
 
 La pistola tiene balas infinitas. Todas las demás se compran en la tienda (las básicas también salen en
@@ -93,8 +101,8 @@ En la sección **Munición** de la tienda compras cargadores de cualquier arma q
 10 en 10. La reserva de balas no tiene límite.
 
 La **bazuca** dispara cohetes que estallan con el doble de área que una granada y lanzan los cuerpos por
-los aires. Si le das a un gordo, el cohete se le queda clavado en la panza, brilla en verde y estalla
-más fuerte; si le das a un super blindado, se incrusta en su placa y lo revienta de un solo tiro. Los zombis sueltan munición y botiquines más a menudo
+los aires. Si le das a un gordo, el cohete se le queda clavado en la panza, el gordo se hincha y brilla en
+amarillo y revienta brutalmente; si le das a un super blindado, se incrusta en su placa y lo revienta de un solo tiro. Los zombis sueltan munición y botiquines más a menudo
 (sobre todo los grandes), y la munición se recoge al instante al pasar cerca.
 
 ### Sonido y música
@@ -113,7 +121,7 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 | `R`: recargar | Botón de recarga |
 | `1`–`9`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
-| `G`: lanzar granada · `T`: molotov | Botones **Granada** y **Molotov** (apuntan solos) |
+| `G`: lanzar granada · `T`: molotov · `E`: robot | Botones **Granada** y **Molotov** (apuntan solos) |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
 | `Esc` / `P`: pausa | Botón de pausa |
 
@@ -192,6 +200,7 @@ js/input.js         Teclado, ratón y controles táctiles
 js/audio.js         Sonido sintetizado con Web Audio
 js/music.js         Música dinámica (calma, amenaza, horda)
 js/accounts.js      Cuentas, guardado por cuenta y clasificación
+js/robot.js         Robot de combate pilotable
 js/sprites.js       Todo el arte, generado por código
 ```
 

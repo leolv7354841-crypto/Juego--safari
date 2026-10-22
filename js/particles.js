@@ -9,6 +9,27 @@ const SPARK = 2;
 const CASING = 3;
 const EMBER = 4;
 const RING = 5;
+const FIREBALL = 6;
+const CHUNK = 7;
+
+// Bola de fuego (se dibuja aditiva y crece mientras se apaga).
+let FIRE = null;
+function fireSprite() {
+  if (FIRE) return FIRE;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,230,1)');
+  gr.addColorStop(0.25, 'rgba(255,220,120,0.95)');
+  gr.addColorStop(0.55, 'rgba(255,130,40,0.75)');
+  gr.addColorStop(0.8, 'rgba(200,60,20,0.35)');
+  gr.addColorStop(1, 'rgba(120,20,0,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  FIRE = c;
+  return c;
+}
 
 export class Particles {
   constructor(max = 1000) {
@@ -21,8 +42,9 @@ export class Particles {
     for (const q of this.p) q.life = 0;
   }
 
-  add(type, x, y, vx, vy, life, size, color, drag = 4, grow = 0) {
+  add(type, x, y, vx, vy, life, size, color, drag = 4, grow = 0, delay = 0) {
     const q = this.p[this.idx];
+    q.delay = delay;
     this.idx = (this.idx + 1) % this.max;
     q.type = type;
     q.x = x;
@@ -148,6 +170,40 @@ export class Particles {
     if (Math.random() < 0.45) this.add(SMOKE, x + rand(-4, 4), y + rand(-4, 4), rand(-10, 10), rand(-40, -18), rand(0.8, 1.4), r * 0.35, '35,30,26', 0.6, r * 1.4);
   }
 
+  // impacto del cohete: una bola de fuego corta y después el humo que sube
+  rocketImpact(x, y, R) {
+    this.add(FIREBALL, x, y, 0, 0, 0.32, R * 0.42, '', 0);
+    for (let i = 0; i < 4; i++) {
+      const a = rand(0, TAU);
+      this.add(FIREBALL, x + Math.cos(a) * R * 0.15, y + Math.sin(a) * R * 0.15, Math.cos(a) * 60, Math.sin(a) * 60, rand(0.18, 0.3), R * rand(0.16, 0.26), '', 3);
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = rand(0, TAU);
+      const s = rand(20, 70);
+      this.add(SMOKE, x + Math.cos(a) * R * 0.2, y + Math.sin(a) * R * 0.2, Math.cos(a) * s, Math.sin(a) * s - 25, rand(1.6, 2.8), rand(10, 18), i < 4 ? '90,80,70' : '58,55,52', 1.2, 22, rand(0.18, 0.35));
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU);
+      const s = rand(200, 480);
+      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.12, 0.28), 1, pick(['#ffd890', '#ffb060', '#fff2d0']), 5);
+    }
+  }
+
+  // el gordo revienta: trozos de carne, chorros de sangre por todos lados
+  gore(x, y, R) {
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      const s = rand(150, 520);
+      this.add(CHUNK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.6, 1.2), rand(4, 9), pick(['#a8ad7e', '#9fa676', '#8a2a20', '#b0b287']), 3.5);
+    }
+    for (let i = 0; i < 60; i++) {
+      const a = rand(0, TAU);
+      const s = rand(80, 600);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.9), rand(2, 6), pick(BLOOD), 3);
+    }
+    this.ring(x, y, R * 0.7, '200,60,40');
+  }
+
   // estela de humo y chispas del cohete
   rocketTrail(x, y, dx, dy) {
     this.add(SMOKE, x - dx * 10 + rand(-2, 2), y - dy * 10 + rand(-2, 2), -dx * 30 + rand(-10, 10), -dy * 30 + rand(-10, 10), rand(0.6, 1.1), 4, '180,175,165', 1.5, 16);
@@ -188,6 +244,10 @@ export class Particles {
   update(dt) {
     for (const q of this.p) {
       if (q.life <= 0) continue;
+      if (q.delay > 0) {
+        q.delay -= dt;
+        continue;
+      }
       q.life -= dt;
       const d = Math.exp(-q.drag * dt);
       q.vx *= d;
@@ -202,7 +262,7 @@ export class Particles {
   draw(ctx, view) {
     for (const q of this.p) {
       if (q.life <= 0) continue;
-      if (q.x < view.x0 - 40 || q.x > view.x1 + 40 || q.y < view.y0 - 40 || q.y > view.y1 + 40) continue;
+      if (q.delay > 0 || q.x < view.x0 - 40 || q.x > view.x1 + 40 || q.y < view.y0 - 40 || q.y > view.y1 + 40) continue;
       const t = q.life / q.max;
       switch (q.type) {
         case DOT:
@@ -240,6 +300,26 @@ export class Particles {
           ctx.globalAlpha = t * (0.6 + Math.random() * 0.4);
           ctx.fillStyle = q.color;
           ctx.fillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+          break;
+        case FIREBALL: {
+          const s = q.size * (0.6 + (1 - t) * 0.9);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = Math.min(1, t * 1.6);
+          ctx.drawImage(fireSprite(), q.x - s, q.y - s, s * 2, s * 2);
+          ctx.globalCompositeOperation = 'source-over';
+          break;
+        }
+        case CHUNK:
+          // trozo de carne que vuela girando
+          ctx.globalAlpha = Math.min(1, t * 3);
+          ctx.save();
+          ctx.translate(q.x, q.y);
+          ctx.rotate(q.rot);
+          ctx.fillStyle = q.color;
+          ctx.fillRect(-q.size / 2, -q.size / 3, q.size, q.size * 0.66);
+          ctx.fillStyle = '#5e1411';
+          ctx.fillRect(-q.size / 2, -q.size / 3, q.size * 0.4, q.size * 0.66);
+          ctx.restore();
           break;
         case RING:
           ctx.globalAlpha = t * 0.6;

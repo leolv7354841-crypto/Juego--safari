@@ -16,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=6feb6c3d">
+  <link rel="stylesheet" href="css/style.css?v=336032a9">
   <!-- version:start -->
-  <script type="importmap">{"imports":{"./js/accounts.js":"./js/accounts.js?v=6feb6c3d","./js/audio.js":"./js/audio.js?v=6feb6c3d","./js/build.js":"./js/build.js?v=6feb6c3d","./js/bullets.js":"./js/bullets.js?v=6feb6c3d","./js/config.js":"./js/config.js?v=6feb6c3d","./js/director.js":"./js/director.js?v=6feb6c3d","./js/input.js":"./js/input.js?v=6feb6c3d","./js/lighting.js":"./js/lighting.js?v=6feb6c3d","./js/main.js":"./js/main.js?v=6feb6c3d","./js/music.js":"./js/music.js?v=6feb6c3d","./js/particles.js":"./js/particles.js?v=6feb6c3d","./js/pickups.js":"./js/pickups.js?v=6feb6c3d","./js/player.js":"./js/player.js?v=6feb6c3d","./js/sprites.js":"./js/sprites.js?v=6feb6c3d","./js/upgrades.js":"./js/upgrades.js?v=6feb6c3d","./js/util.js":"./js/util.js?v=6feb6c3d","./js/world.js":"./js/world.js?v=6feb6c3d","./js/zombies.js":"./js/zombies.js?v=6feb6c3d"}}</script>
+  <script type="importmap">{"imports":{"./js/accounts.js":"./js/accounts.js?v=336032a9","./js/audio.js":"./js/audio.js?v=336032a9","./js/build.js":"./js/build.js?v=336032a9","./js/bullets.js":"./js/bullets.js?v=336032a9","./js/config.js":"./js/config.js?v=336032a9","./js/director.js":"./js/director.js?v=336032a9","./js/input.js":"./js/input.js?v=336032a9","./js/lighting.js":"./js/lighting.js?v=336032a9","./js/main.js":"./js/main.js?v=336032a9","./js/music.js":"./js/music.js?v=336032a9","./js/particles.js":"./js/particles.js?v=336032a9","./js/pickups.js":"./js/pickups.js?v=336032a9","./js/player.js":"./js/player.js?v=336032a9","./js/robot.js":"./js/robot.js?v=336032a9","./js/sprites.js":"./js/sprites.js?v=336032a9","./js/upgrades.js":"./js/upgrades.js?v=336032a9","./js/util.js":"./js/util.js?v=336032a9","./js/world.js":"./js/world.js?v=336032a9","./js/zombies.js":"./js/zombies.js?v=336032a9"}}</script>
   <!-- version:end -->
 </head>
 <body>
@@ -38,6 +38,10 @@
             <div class="bar st" id="st-bar">
               <div class="fill" id="st-fill"></div>
               <span class="lbl">Estamina</span>
+            </div>
+            <div class="bar rb" id="rb-bar" hidden>
+              <div class="fill" id="rb-fill"></div>
+              <span class="lbl">Robot</span><span class="val" id="rb-val">10000</span>
             </div>
           </div>
         </div>
@@ -83,6 +87,7 @@
           <svg viewBox="0 0 24 24"><path d="M9 9h6v2.5c2 1 3 2.8 3 5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-3.5c0-2.2 1-4 3-5Z"/><path d="M10 9V5h4v4M12 5c0-1.5 1-2 2-3"/></svg>
           <span class="badge" id="molo-count">0</span>
         </button>
+        <button class="tbtn small robot gone" id="btn-robot" aria-label="Subir o bajar del robot">Robot</button>
         <button class="tbtn small off" id="btn-build" aria-label="Construir">
           <svg viewBox="0 0 24 24"><rect x="3" y="12" width="8" height="8"/><rect x="13" y="12" width="8" height="8"/><rect x="8" y="4" width="8" height="8"/></svg>
           <span class="badge" id="build-count">0</span>
@@ -131,7 +136,7 @@
             <span><kbd>R</kbd> recargar</span>
             <span><kbd>1-9</kbd>/<kbd>Q</kbd> armas</span>
             <span><kbd>F</kbd> construir · <kbd>V</kbd> cambiar bloque</span>
-            <span><kbd>G</kbd> granada · <kbd>T</kbd> molotov</span>
+            <span><kbd>G</kbd> granada · <kbd>T</kbd> molotov · <kbd>E</kbd> robot</span>
             <span><kbd>Esc</kbd> pausa</span>
           </div>
           <div class="help-touch">
@@ -142,7 +147,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 6feb6c3d</span></p>
+        <p class="ver"><span id="ver">Versión 336032a9</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -184,6 +189,7 @@
               <dt><kbd>V</kbd></dt><dd>Cambiar estructura</dd>
               <dt><kbd>G</kbd></dt><dd>Lanzar granada</dd>
               <dt><kbd>T</kbd></dt><dd>Lanzar molotov</dd>
+              <dt><kbd>E</kbd></dt><dd>Subir / bajar del robot</dd>
               <dt><kbd>Enter</kbd></dt><dd>Iniciar siguiente ronda</dd>
               <dt><kbd>Esc</kbd> o <kbd>P</kbd></dt><dd>Pausa / continuar</dd>
             </dl>
@@ -197,6 +203,7 @@
               <dt>Cuadritos</dt><dd>Construir</dd>
               <dt>Granada</dt><dd>Lanzar granada</dd>
               <dt>Botella</dt><dd>Lanzar molotov</dd>
+              <dt>Robot</dt><dd>Subir / bajar del robot</dd>
             </dl>
           </div>
         </div>
@@ -275,6 +282,6 @@
     </section>
 
   </div>
-  <script type="module" src="js/main.js?v=6feb6c3d"></script>
+  <script type="module" src="js/main.js?v=336032a9"></script>
 </body>
 </html>

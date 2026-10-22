@@ -360,6 +360,14 @@ export class Sfx {
     this.tone({ freq: fat ? 90 : 300, to: fat ? 50 : 140, dur: 0.18, gain: 0.6 });
   }
 
+  // Reventón brutal del gordo: chapoteo grave y salpicaduras.
+  gore() {
+    if (!this.ok('gore', 0.1, true)) return;
+    this.tone({ freq: 70, to: 25, dur: 0.6, gain: 1 });
+    this.burst({ dur: 0.5, freq: 600, sweep: 120, gain: 0.9, q: 1.5 });
+    for (let i = 0; i < 6; i++) this.burst({ dur: 0.08, freq: rand(300, 900), gain: 0.35, q: 2, delay: 0.1 + i * rand(0.04, 0.09) });
+  }
+
   // Pitido del cohete a punto de estallar dentro del gordo.
   rocketArm() {
     if (!this.ok('rocketArm', 0.05, true)) return;

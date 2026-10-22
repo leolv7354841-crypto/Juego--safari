@@ -45,6 +45,7 @@ export class Input {
       if (e.code === 'KeyV') this.pressed.cycleBuild = true;
       if (e.code === 'KeyG') this.pressed.grenade = true;
       if (e.code === 'KeyT') this.pressed.molotov = true;
+      if (e.code === 'KeyE') this.pressed.robot = true;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
       const m = /^Digit([1-9])$/.exec(e.code);
@@ -172,6 +173,7 @@ export class Input {
     tap('#btn-build', () => (this.pressed.build = true));
     tap('#btn-grenade', () => (this.pressed.grenade = true));
     tap('#btn-molotov', () => (this.pressed.molotov = true));
+    tap('#btn-robot', () => (this.pressed.robot = true));
 
     // evita zoom por gestos y menú contextual en iOS
     this.on(document, 'gesturestart', prevent);

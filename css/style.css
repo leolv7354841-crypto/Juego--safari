@@ -129,6 +129,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 }
 .bar.hp .fill { background: linear-gradient(180deg, #c8574a, var(--hp)); }
 .bar.st .fill { background: linear-gradient(180deg, #d6b45e, var(--st)); }
+.bar.rb { height: 14px; }
+.bar.rb .fill { background: linear-gradient(180deg, #8fa3b3, #4f6574); }
+.bar.rb .lbl, .bar.rb .val { font-size: 10px; }
 .bar.st.exhausted .fill { background: #6d5d38; }
 .bar.hp.low { animation: pulse 0.8s ease-in-out infinite; }
 @keyframes pulse { 50% { border-color: rgba(200, 80, 60, 0.9); } }
@@ -562,6 +565,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 }
 #btn-grenade { right: 144px; bottom: 88px; }
 #btn-molotov { right: 100px; bottom: 156px; }
+#btn-robot { right: 160px; bottom: 200px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-color: rgba(201, 165, 74, 0.7); }
+.tbtn.gone { display: none; }
 #btn-build { right: 34px; bottom: 176px; }
 #btn-reload { right: 4px; bottom: 112px; }
 #btn-swap { right: 74px; bottom: 96px; }

@@ -1,6 +1,7 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT } from './config.js';
 import { Music } from './music.js';
+import { Robot } from './robot.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
@@ -89,6 +90,7 @@ class Game {
     this.pickups = new Pickups();
     this.bullets = new Bullets();
     this.structures = new Structures();
+    this.robot = new Robot();
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
     this.ash = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), v: rand(0.004, 0.012), p: rand(0, TAU) }));
@@ -146,6 +148,7 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
+    this.robot.reset();
     this.setAcid(0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
     this.level = 1;
@@ -286,6 +289,7 @@ class Game {
       },
       blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
       wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
+      robot: { ...this.robot.serialize(), piloted: this.robot.piloted },
     };
     storage.set(this.accounts.saveKey(), data);
     if (ds === 'waiting') storage.set(this.accounts.checkKey(), data);
@@ -336,6 +340,8 @@ class Game {
       this.world.addDynamic(o);
     }
     this.structures.relayer();
+    this.robot.restore(d.robot);
+    if (d.robot && d.robot.piloted && !this.robot.broken) this.robot.board(p);
     for (const b of d.wires) if (SHOP[b.kind]) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
     const dir = this.director;
     dir.wave = d.wave;
@@ -449,6 +455,58 @@ class Game {
     }
   }
 
+  /* ---------- robot ---------- */
+
+  // Subirse o bajarse del robot (E o el botón ROBOT).
+  toggleRobot() {
+    const rb = this.robot;
+    const p = this.player;
+    if (!rb.owned) return this.toast('Compra el robot de combate en la tienda');
+    if (rb.piloted) {
+      rb.leave(p, this.world);
+      this.sfx.build();
+      return;
+    }
+    if (rb.broken) return this.toast('Robot destruido: repáralo en la tienda');
+    if (!rb.near(p)) return this.toast('Acércate al robot para subirte');
+    rb.board(p);
+    this.sfx.punch();
+    this.camera.shake(0.2);
+  }
+
+  onRobotHit(dmg) {
+    const rb = this.robot;
+    this.sfx.blockHit('metal');
+    if (!rb.damage(dmg)) return;
+    // se acabó el blindaje: explota y sales despedido
+    const p = this.player;
+    this.structures.explode(this, { x: rb.x, y: rb.y }, 170, 450, 1);
+    rb.leave(p, this.world);
+    rb.hp = 0;
+    this.toast('¡Robot destruido! Repáralo en la tienda');
+  }
+
+  buyRobot() {
+    const rb = this.robot;
+    if (rb.owned || this.money < ROBOT.price) return;
+    this.money -= ROBOT.price;
+    rb.deploy(this.player, this.world);
+    this.sfx.buy();
+    this.toast(this.input.mode === 'touch' ? 'Robot listo: acércate y toca ROBOT' : 'Robot listo: acércate y pulsa E');
+    this.renderShop();
+  }
+
+  repairRobot() {
+    const rb = this.robot;
+    const cost = rb.repairCost;
+    if (!rb.owned || cost <= 0 || this.money < cost) return;
+    this.money -= cost;
+    rb.hp = ROBOT.hp;
+    this.sfx.build();
+    this.toast('Robot reparado');
+    this.renderShop();
+  }
+
   // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
   rocketHit(z, x, y, b) {
     if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(this, z, x, y, b);
@@ -468,7 +526,7 @@ class Game {
 
   // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.
   applyAcid() {
-    if (this.state === 'menu' || !this.player.alive) return;
+    if (this.state === 'menu' || !this.player.alive || this.player.inRobot) return;
     if (!(this.acidT > 0)) this.acidTick = 0;
     this.acidT = ACID.burn;
     this.hurtFlash = Math.min(1, this.hurtFlash + 0.3);
@@ -529,7 +587,8 @@ class Game {
 
   // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
   onZombieHit() {
-    if (this.state === 'menu') return;
+    // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
+    if (this.state === 'menu' || this.player.inRobot) return;
     const loss = Math.min(this.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
     if (loss <= 0) return;
     this.money -= loss;
@@ -877,8 +936,20 @@ class Game {
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
       <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
-      <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}`;
+      <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
+      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
+    const rc = this.$('shop-items').querySelector('canvas[data-robot]');
+    if (rc) {
+      const g = rc.getContext('2d');
+      const demo = new Robot();
+      demo.x = 48 / 0.95;
+      demo.y = 48 / 0.95;
+      demo.angle = 0;
+      demo.legAngle = 0;
+      g.setTransform(0.95, 0, 0, 0.95, 0, 0);
+      demo.draw(g, this.player, 0);
+    }
     this.$('shop-items').querySelectorAll('canvas[data-gun]').forEach((c) => {
       const g = c.getContext('2d');
       g.setTransform(2.1, 0, 0, 2.1, 4, 48);
@@ -886,6 +957,29 @@ class Game {
       g.shadowBlur = 3;
       drawGunIcon(g, c.dataset.gun);
     });
+  }
+
+  robotShopItem() {
+    const rb = this.robot;
+    let btn;
+    let info;
+    if (!rb.owned) {
+      const poor = this.money < ROBOT.price;
+      btn = `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="buy" ${poor ? 'disabled' : ''}>$${ROBOT.price}</button>`;
+      info = `Vida ${ROBOT.hp} · se repara aquí`;
+    } else {
+      const cost = rb.repairCost;
+      const poor = this.money < cost;
+      btn = cost > 0
+        ? `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="repair" ${poor ? 'disabled' : ''}>Reparar $${cost}</button>`
+        : '<button class="btn buy" disabled>Listo</button>';
+      info = rb.broken ? 'DESTRUIDO: repáralo para volver a usarlo' : `Vida ${Math.ceil(rb.hp)} / ${ROBOT.hp}`;
+    }
+    return `<div class="shop-item hot">
+      <canvas class="shop-ic" data-robot width="96" height="96"></canvas>
+      <div class="shop-txt"><b>Robot de combate</b><span>Del doble de tamaño de un gordo. Súbete (E) y camina entre la horda con tu arma en su brazo. No se cura solo: repáralo después de cada oleada.</span><small>${info}</small></div>
+      ${btn}
+    </div>`;
   }
 
   buyWeapon(id) {
@@ -1117,6 +1211,8 @@ class Game {
       if (g) return this.buyWeapon(g.dataset.gunBuy);
       const a = e.target.closest('[data-ammo]');
       if (a) return this.buyAmmo(a.dataset.ammo, Number(a.dataset.n));
+      const rbt = e.target.closest('[data-robot-act]');
+      if (rbt) return rbt.dataset.robotAct === 'buy' ? this.buyRobot() : this.repairRobot();
       const b = e.target.closest('[data-buy]');
       if (b) this.buy(b.dataset.buy);
     });
@@ -1183,6 +1279,17 @@ class Game {
     if (this.cache.low !== low) {
       this.cache.low = low;
       $('hp-bar').classList.toggle('low', low);
+    }
+    const rb = this.robot;
+    if (this.cache.rbOwned !== rb.owned) {
+      this.cache.rbOwned = rb.owned;
+      $('rb-bar').hidden = !rb.owned;
+      $('btn-robot').classList.toggle('gone', !rb.owned);
+    }
+    if (rb.owned) {
+      this.set('rbw', $('rb-fill'), 'transform', `scaleX(${Math.max(0, rb.hp / ROBOT.hp).toFixed(3)})`);
+      this.set('rbv', $('rb-val'), 'text', rb.broken ? 'ROTO' : String(Math.ceil(rb.hp)));
+      this.set('rbon', $('btn-robot'), 'text', rb.piloted ? 'Bajar' : 'Robot');
     }
     this.set('stw', $('st-fill'), 'transform', `scaleX(${(p.stamina / p.stats.maxStamina).toFixed(3)})`);
     if (this.cache.ex !== p.exhausted) {
@@ -1334,6 +1441,8 @@ class Game {
       if (this.input.consume('cycleBuild')) this.cycleBuild();
       if (this.input.consume('grenade')) this.tryGrenade();
       if (this.input.consume('molotov')) this.tryGrenade('molotov');
+      if (this.input.consume('robot')) this.toggleRobot();
+      this.robot.update(dt, p, this);
       if (this.input.consume('nextRound')) this.startNextRound();
     }
     this.structures.update(dt, this);
@@ -1425,9 +1534,11 @@ class Game {
     this.horde.draw(ctx, v, base, 'small');
     this.structures.drawFires(ctx, v, this.time);
     this.structures.drawStuck(ctx, this.time);
+    if (playing && this.robot.owned && !this.robot.piloted) this.robot.draw(ctx, p, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
-      drawSurvivor(ctx, p, this.time);
+      if (p.inRobot) this.robot.draw(ctx, p, this.time);
+      else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
     }
     this.horde.draw(ctx, v, base, 'giant');

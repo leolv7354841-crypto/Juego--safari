@@ -172,6 +172,9 @@ export const DROPS = {
   golden: { ammo: 0.5, med: 0.5 },
 };
 
+// Robot de combate (tienda): vida, tamaño (el doble de un gordo), precio y reparación.
+export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 3000, repairPerHp: 0.1, speed: 0.85, gunScale: 1.7 };
+
 // Clasificación mundial (Firebase Realtime Database, sin librerías: API REST).
 // Pega aquí la URL de tu base de datos, p. ej. 'https://mi-juego-default-rtdb.firebaseio.com'.
 // Vacía = sólo clasificación de este dispositivo (y la de Claude si se abre como Artifact).

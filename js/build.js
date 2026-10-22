@@ -218,13 +218,24 @@ export class Structures {
         r.beeped = true;
         game.sfx.rocketArm();
       }
+      // el gordo se hincha y tiembla a punto de reventar
+      if (r.kind === 'fat' && !z.dead) z.swell = r.t > r.stick ? (r.t - r.stick) / r.glow : 0;
       if (r.t < r.stick + r.glow) continue;
       this.stuck.splice(i, 1);
       if (r.kind === 'fat') {
-        // estalla en verde: revienta al gordo y manda a volar a todos
+        // revienta brutalmente: carne y sangre por todos lados y todos salen volando
+        const cx = z.x;
+        const cy = z.y;
         if (!z.dead) game.killZombie(z);
-        game.particles.acidBurst(r.x, r.y, ROCKET.fatRadius);
-        this.explode(game, r, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
+        game.particles.gore(cx, cy, ROCKET.fatRadius);
+        for (let k = 0; k < 14; k++) {
+          const a = rand(0, TAU);
+          const d = rand(20, ROCKET.fatRadius * 0.8);
+          game.decals.splat(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rand(8, 18));
+        }
+        game.sfx.gore();
+        this.explode(game, { x: cx, y: cy }, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
+        game.camera.shake(0.9);
       } else {
         // super blindado: lo revienta de un solo tiro
         if (!z.dead) {
@@ -247,9 +258,9 @@ export class Structures {
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = (0.35 + 0.5 * k) * pulse;
         const g = ctx.createRadialGradient(r.x, r.y, 2, r.x, r.y, 30 + k * 30);
-        g.addColorStop(0, 'rgba(200,255,120,1)');
-        g.addColorStop(0.5, 'rgba(110,220,60,0.6)');
-        g.addColorStop(1, 'rgba(60,160,20,0)');
+        g.addColorStop(0, 'rgba(255,250,170,1)');
+        g.addColorStop(0.5, 'rgba(255,200,40,0.65)');
+        g.addColorStop(1, 'rgba(230,140,0,0)');
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(r.x, r.y, 30 + k * 30, 0, TAU);
@@ -261,7 +272,7 @@ export class Structures {
       drawRocket(ctx, r.x - Math.cos(r.ang || 0) * 6, r.y - Math.sin(r.ang || 0) * 6, r.ang || 0, false);
       if (glowing) {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = 'rgba(170,255,90,0.8)';
+        ctx.fillStyle = 'rgba(255,230,90,0.9)';
         ctx.beginPath();
         ctx.arc(r.x, r.y, 4, 0, TAU);
         ctx.fill();
@@ -392,7 +403,9 @@ export class Structures {
     const p = game.player;
     const pd = Math.hypot(p.x - x, p.y - y);
     game.camera.shake(0.45 + 0.5 * clamp(1 - pd / 600, 0, 1));
-    game.particles.explosion(x, y, R);
+    // cohete: bola de fuego corta y luego humo; granada: explosión clásica
+    if (fling) game.particles.rocketImpact(x, y, R);
+    else game.particles.explosion(x, y, R);
     game.sfx.explosion();
     this.blasts.push({ x, y, t: 0.4 });
     this.scorches.push({ x, y, t: 0, life: 25, a: rand(0, TAU) });

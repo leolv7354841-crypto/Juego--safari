@@ -24,7 +24,21 @@ export class Bullets {
     const grid = game.horde.grid;
     for (let i = list.length - 1; i >= 0; i--) {
       const b = list[i];
-      if (b.rocket) game.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
+      if (b.rocket) {
+        // el cohete cabecea y se tambalea en el aire, sin perder del todo el rumbo
+        if (b.base === undefined) {
+          b.base = Math.atan2(b.dy, b.dx);
+          b.ph = Math.random() * 10;
+          b.drift = 0;
+          b.age = 0;
+        }
+        b.age += dt;
+        b.drift = Math.max(-0.09, Math.min(0.09, b.drift + (Math.random() - 0.5) * dt * 1.6));
+        const a = b.base + b.drift + Math.sin(b.age * 17 + b.ph) * 0.09 + Math.sin(b.age * 7.3 + b.ph * 2) * 0.05;
+        b.dx = Math.cos(a);
+        b.dy = Math.sin(a);
+        game.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
+      }
       let step = b.speed * dt;
       if (step > b.life) step = b.life;
       const x = b.x;
@@ -132,7 +146,7 @@ export class Bullets {
     ctx.lineCap = 'round';
     for (const b of this.list) {
       if (b.rocket) {
-        drawRocket(ctx, b.x, b.y, Math.atan2(b.dy, b.dx), true);
+        drawRocket(ctx, b.x, b.y, Math.atan2(b.dy, b.dx) + Math.sin((b.age || 0) * 31) * 0.12, true);
         continue;
       }
       const len = b.trail;

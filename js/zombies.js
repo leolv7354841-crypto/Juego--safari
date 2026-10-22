@@ -701,8 +701,10 @@ export class Horde {
       }
       const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
       const lift = z.air > 0 ? z.air : 0;
-      const k = s * pop * grow * (1 + lift / 140);
-      const shake = z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : 0;
+      // hinchado por el cohete clavado: crece y tiembla antes de reventar
+      const swell = z.swell > 0 ? z.swell : 0;
+      const k = s * pop * grow * (1 + lift / 140) * (1 + swell * 0.35 + (swell ? Math.sin(z.id + swell * 60) * 0.03 : 0));
+      const shake = z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : swell ? (Math.random() - 0.5) * (2 + swell * 5) : 0;
       const lx = z.x + c * z.lunge * 5 + shake;
       const ly = z.y + sn * z.lunge * 5 - lift * 0.7 + shake;
       if (lift > 0) {
@@ -718,6 +720,14 @@ export class Horde {
       if (z.type !== 'golden') ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
       ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
       ctx.drawImage(img, -half, -half, half * 2, half * 2);
+      if (swell) {
+        // brilla amarillo, cada vez más fuerte
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = swell * (0.45 + 0.35 * Math.abs(Math.sin(swell * 40)));
+        ctx.drawImage(z.spr.flash[f], -half, -half, half * 2, half * 2);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
       if (z.burn > 0) {
         // llamas sobre el cuerpo (aditivas, parpadean)
         const fl = flameSprite();

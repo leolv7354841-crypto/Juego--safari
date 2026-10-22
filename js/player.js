@@ -1,4 +1,5 @@
-import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER } from './config.js';
+import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT } from './config.js';
+import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
 
@@ -122,6 +123,11 @@ export class Player {
 
   hurt(dmg, game) {
     if (!this.alive) return;
+    // dentro del robot, el daño lo recibe el robot
+    if (this.inRobot) {
+      game.onRobotHit(dmg);
+      return;
+    }
     const real = dmg * (1 - this.stats.armor);
     this.hp -= real;
     this.damageTaken += real;
@@ -167,6 +173,12 @@ export class Player {
     let speed = PLAYER_BASE.walkSpeed * st.speedMult;
     if (this.running) speed *= PLAYER_BASE.runMult;
     if (this.exhausted) speed *= 0.85;
+    if (this.inRobot) {
+      speed *= ROBOT.speed;
+      // con el peso del robot casi nada lo empuja
+      this.kx *= 0.2;
+      this.ky *= 0.2;
+    }
     const k = Math.min(mag, 1);
     const tvx = moving ? (mv.x / mag) * speed * k : 0;
     const tvy = moving ? (mv.y / mag) * speed * k : 0;
@@ -253,11 +265,24 @@ export class Player {
     w.mag--;
     this.fireCd = 1 / (d.rate * this.stats.rateMult);
     const spread = d.spread + this.bloom + (this.running ? 0.05 : 0);
-    const ca = Math.cos(this.angle);
-    const sa = Math.sin(this.angle);
+    let ca = Math.cos(this.angle);
+    let sa = Math.sin(this.angle);
     const tip = this.gunTip;
-    const sx = this.x + ca * tip;
-    const sy = this.y + sa * tip;
+    let sx = this.x + ca * tip;
+    let sy = this.y + sa * tip;
+    let aim = this.angle;
+    if (this.inRobot) {
+      // el arma va en el brazo derecho del robot: dispara desde ahí hacia donde apuntas
+      const R = ROBOT.radius;
+      const lx = R * 0.35 + (GUN_REACH[d.id] || 30) * ROBOT.gunScale;
+      const ly = R * 0.94;
+      sx = this.x + ca * lx - sa * ly;
+      sy = this.y + sa * lx + ca * ly;
+      const t = game.input.mode === 'mouse' ? game.mouseWorld() : this.target && !this.target.dead ? this.target : null;
+      if (t && Math.hypot(t.x - sx, t.y - sy) > 40) aim = Math.atan2(t.y - sy, t.x - sx);
+      ca = Math.cos(aim);
+      sa = Math.sin(aim);
+    }
     // si el cañón atraviesa una pared, el disparo sale desde el cuerpo
     const blocked = game.world.pointBlocked(sx, sy, 0, true);
     const ox = blocked ? this.x : sx;
@@ -265,7 +290,7 @@ export class Player {
     const shot = { hit: false };
     for (let i = 0; i < d.pellets; i++) {
       const off = d.pellets > 1 ? ((i / (d.pellets - 1)) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
-      const a = this.angle + off;
+      const a = aim + off;
       game.bullets.spawn({
         x: ox,
         y: oy,
