@@ -138,6 +138,12 @@ Es un sitio estático: no hay paso de compilación.
 
 En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de inicio** para jugar a pantalla completa.
 
+## Versiones y caché
+
+`node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: cada módulo se
+pide con `?v=<hash>` mediante un *import map*, así raw.githack.com y los navegadores no sirven archivos
+viejos. Ejecútalo antes de cada commit. La versión aparece en el menú principal.
+
 ## Estructura
 
 ```
