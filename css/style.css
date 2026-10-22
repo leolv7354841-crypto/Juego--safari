@@ -561,6 +561,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   color: var(--accent-ink);
 }
 #btn-grenade { right: 144px; bottom: 88px; }
+#btn-molotov { right: 100px; bottom: 156px; }
 #btn-build { right: 34px; bottom: 176px; }
 #btn-reload { right: 4px; bottom: 112px; }
 #btn-swap { right: 74px; bottom: 96px; }

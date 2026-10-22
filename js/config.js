@@ -99,9 +99,15 @@ export const ZOMBIES = {
     xp: 2, mass: 0.8, reach: 6, frames: 6, turn: 7,
   },
   // Super blindado: un gordo con armadura militar completa. Desde la oleada 11; 50 veces la vida de un normal.
+  // Da super golpes: 30 de daño, te avienta y destroza estructuras (blockDmg por golpe).
   heavy: {
-    hp: 42 * 50, speed: [19, 25], radius: 22, damage: 18, attackRate: 0.7,
-    xp: 25, mass: 6, reach: 9, frames: 6, turn: 2.5,
+    hp: 42 * 50, speed: [19, 25], radius: 22, damage: 30, attackRate: 0.7,
+    xp: 25, mass: 6, reach: 9, frames: 6, turn: 2.5, blockDmg: 260, punch: 1000,
+  },
+  // Toro: zombi musculoso que embiste al verte (ver BULL).
+  bull: {
+    hp: 42 * 7, speed: [52, 62], radius: 17, damage: 14, attackRate: 0.8,
+    xp: 8, mass: 5, reach: 8, frames: 6, turn: 3.5,
   },
   fat: {
     hp: 130, speed: [21, 27], radius: 21, damage: 14, attackRate: 0.75,
@@ -124,7 +130,17 @@ export const ZOMBIES = {
 export const xpForLevel = (lvl) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
 
 // Dinero por cada zombi eliminado.
-export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, heavy: 25, giant: 10, golden: 0 };
+export const BOUNTY = { normal: 1, sprinter: 3, swat: 10, fat: 5, heavy: 25, bull: 15, giant: 10, golden: 0 };
+
+// Embestida del toro: te ve, escarba y carga en línea recta.
+// hit: daño al jugador · long/short: daño de la embestida larga y corta contra estructuras.
+export const BULL = { sight: 430, windup: 0.75, speed: 470, maxTime: 1.25, hit: 40, throw: 1500, long: 250, short: 40, cooldown: 2.2 };
+
+// Zombis normales heridos: se desangran (vida por segundo) y avanzan arrastrándose.
+export const WOUND = { bleed: 3, pace: 0.5 };
+
+// Molotov: charco de fuego y quemadura sobre los zombis que lo pisan.
+export const MOLOTOV = { radius: 82, life: 6.5, burn: 4, dps: 24 };
 
 // Zombi dorado: recompensa al matarlo y cuánto vive antes de desaparecer.
 export const GOLDEN = { rewardMin: 100, rewardMax: 250, life: 26, warnAt: 7, firstAfter: 12, every: [35, 65] };
@@ -139,6 +155,7 @@ export const DROPS = {
   swat: { ammo: 0.18, med: 0.06 },
   fat: { ammo: 0.3, med: 0.1 },
   heavy: { ammo: 0.6, med: 0.25 },
+  bull: { ammo: 0.4, med: 0.15 },
   golden: { ammo: 0.5, med: 0.5 },
 };
 
@@ -187,8 +204,13 @@ export const SHOP = {
     name: 'Granada', desc: 'Explosión en área que arrasa grupos enteros. Cara, úsala bien.',
     price: 90, consumable: true,
   },
+  molotov: {
+    name: 'Molotov', desc: 'Botella incendiaria: deja un charco de fuego que quema a todo zombi que lo pisa.',
+    price: 60, consumable: true,
+  },
 };
 export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'turret', 'wire', 'spikes', 'mine'];
-export const SHOP_ORDER = [...BUILD_ORDER, 'grenade'];
+export const THROWABLES = ['grenade', 'molotov'];
+export const SHOP_ORDER = [...BUILD_ORDER, ...THROWABLES];
 // Vender un arma devuelve esta fracción de su precio.
 export const SELL_RATE = 0.5;

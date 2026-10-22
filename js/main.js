@@ -1,8 +1,8 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE } from './config.js';
 import { Music } from './music.js';
 import { Accounts } from './accounts.js';
-import { Structures, ACID } from './build.js';
+import { Structures, ACID, drawBottle } from './build.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -23,6 +23,7 @@ const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2
 // de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
 const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet' };
 const ITEM_ICONS = {
+  molotov: '<svg viewBox="0 0 12 12"><ellipse cx="5" cy="7.5" rx="3.2" ry="3.4" fill="#7a9660" stroke="#141612" stroke-width=".8"/><rect x="4" y="2" width="2" height="3" fill="#7a9660" stroke="#141612" stroke-width=".6"/><circle cx="5" cy="1.6" r="1.5" fill="#ff9a30"/></svg>',
   grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
   wood: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#7a5634" stroke="#141612"/><path d="M2 2l8 8" stroke="#4a3220" stroke-width="1.5"/></svg>',
   metal: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#8a8f93" stroke="#141612"/><path d="M2 10l8-8" stroke="#c9cdd0"/></svg>',
@@ -144,7 +145,7 @@ class Game {
     this.bullets.clear();
     this.time = 0;
     this.setAcid(0);
-    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, giant: 0 };
+    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
     this.xpNeed = xpForLevel(1);
@@ -152,7 +153,7 @@ class Game {
     this.taken = {};
     this.money = 0;
     this.moneyEarned = 0;
-    this.inv = Object.fromEntries([...BUILD_ORDER, 'grenade'].map((k) => [k, 0]));
+    this.inv = Object.fromEntries([...BUILD_ORDER, ...THROWABLES].map((k) => [k, 0]));
     this.buildSel = 'wood';
     this.shopPending = false;
     this.structures.clear();
@@ -381,13 +382,19 @@ class Game {
     if (Math.random() < 0.12) this.decals.splat(hx + b.dx * 14, hy + b.dy * 14, rand(7, 12));
     // el super blindado no se frena ni retrocede con las balas: sólo las explosiones lo mueven
     const armored = z.type === 'heavy' && !b.blast;
-    if (z.type !== 'giant' && !armored) z.slow = 0.16;
-    if (!armored) {
+    // normales y velocistas: la bala no los avienta; se frenan, sangran y se arrastran
+    const flesh = (z.type === 'normal' || z.type === 'sprinter') && !b.blast;
+    if (flesh) {
+      z.slow = 0.45;
+      z.wounded = true;
+      this.decals.splat(hx + b.dx * 6, hy + b.dy * 6, rand(8, 13));
+    } else if (z.type !== 'giant' && !armored) z.slow = 0.16;
+    if (!armored && !flesh) {
       const kn = (b.knock * 3) / z.mass;
       z.kx += b.dx * kn;
       z.ky += b.dy * kn;
     }
-    const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'giant';
+    const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'bull' || z.type === 'giant';
     this.particles.hit(hx, hy, b.dx, b.dy, big);
     if (b.shot && !b.shot.hit) {
       b.shot.hit = true;
@@ -401,6 +408,7 @@ class Game {
     if (z.dead) return;
     z.dead = true;
     this.kills[z.type] = (this.kills[z.type] || 0) + 1;
+    if (z.burn > 0) z.burnt = true;
     this.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
     if (z.type === 'golden' && this.state !== 'menu') {
       // recompensa única del zombi dorado
@@ -414,7 +422,7 @@ class Game {
     }
     this.particles.death(z.x, z.y, z.r);
     // el gordo revienta en ácido y el super blindado estalla
-    if ((z.type === 'fat' || z.type === 'heavy') && this.state !== 'menu') this.structures.queueDeathBlast(z.type, z.x, z.y);
+    if (z.type === 'fat' && this.state !== 'menu') this.structures.queueDeathBlast(z.type, z.x, z.y);
     this.addXp(z.def.xp);
     if (this.state !== 'menu') {
       this.money += BOUNTY[z.type];
@@ -436,6 +444,13 @@ class Game {
       else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
       this.sfx.kill(z.type === 'fat' || z.type === 'heavy');
     }
+  }
+
+  // Super golpe del blindado (al jugador o a una estructura).
+  onSuperPunch(z, x, y) {
+    this.particles.dust(x, y, 18);
+    this.camera.shake(0.35);
+    this.sfx.punch();
   }
 
   // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.
@@ -830,7 +845,7 @@ class Game {
     const gear = SHOP_ORDER.map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
-      return `<div class="shop-item${k === 'grenade' ? ' hot' : ''}">
+      return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
         <canvas class="shop-ic" data-ic="${k}" width="96" height="96"></canvas>
         <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp > 1 ? ` · Resistencia ${it.hp}` : ''}</small></div>
         <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
@@ -839,7 +854,7 @@ class Game {
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
       <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
-      <h3 class="shop-sec">Defensas y granadas</h3>${gear.join('')}`;
+      <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
     this.$('shop-items').querySelectorAll('canvas[data-gun]').forEach((c) => {
       const g = c.getContext('2d');
@@ -887,6 +902,11 @@ class Game {
   drawShopIcon(c, k) {
     const g = c.getContext('2d');
     g.setTransform(1.6, 0, 0, 1.6, 0, 0);
+    if (k === 'molotov') {
+      g.setTransform(0, -4.2, 4.2, 0, 48, 52);
+      drawBottle(g, true);
+      return;
+    }
     if (k === 'grenade') {
       g.setTransform(4.5, 0, 0, 4.5, 0, 0);
       this.structures.drawGrenades.call({ grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] }, g);
@@ -906,7 +926,7 @@ class Game {
     if (!it || this.money < it.price) return;
     this.money -= it.price;
     this.inv[k]++;
-    if (k !== 'grenade' && this.inv[this.buildSel] <= 0) this.buildSel = k;
+    if (!THROWABLES.includes(k) && this.inv[this.buildSel] <= 0) this.buildSel = k;
     this.sfx.buy();
     this.renderShop();
   }
@@ -940,9 +960,9 @@ class Game {
     this.toast(SHOP[this.buildSel].name);
   }
 
-  tryGrenade() {
-    if (this.inv.grenade <= 0) {
-      this.toast('Sin granadas: cómpralas en la tienda');
+  tryGrenade(kind = 'grenade') {
+    if (this.inv[kind] <= 0) {
+      this.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
       return;
     }
     const p = this.player;
@@ -959,8 +979,9 @@ class Game {
       tx = p.x + Math.cos(p.angle) * 220;
       ty = p.y + Math.sin(p.angle) * 220;
     }
-    this.inv.grenade--;
-    this.structures.throwGrenade(this, tx, ty);
+    this.inv[kind]--;
+    if (kind === 'molotov') this.structures.throwMolotov(this, tx, ty);
+    else this.structures.throwGrenade(this, tx, ty);
   }
 
   /* ---------- fin de partida ---------- */
@@ -982,6 +1003,7 @@ class Game {
       ['Gordos', this.kills.fat],
       ['Dorados', this.kills.golden || 0],
       ['Super blindados', this.kills.heavy],
+      ['Toros', this.kills.bull || 0],
       ['sep'],
       ['Precisión', `${acc}%`],
       ['Daño recibido', Math.round(p.damageTaken)],
@@ -1170,11 +1192,14 @@ class Game {
     const rl = p.reloadT > 0 ? 1 - p.reloadT / p.reloadDur : 0;
     this.set('rl', $('reload-fill'), 'width', `${(rl * 100).toFixed(0)}%`);
     const inv = this.inv;
-    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + this.buildSel + '|' + this.money;
+    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + inv.molotov + '|' + this.buildSel + '|' + this.money;
     if (this.cache.inv !== isig) {
       this.cache.inv = isig;
       // granadas siempre visibles; de las estructuras sólo las que tienes (son muchas)
-      const items = [`<span class="it gren${inv.grenade ? '' : ' zero'}" title="Granadas">${ITEM_ICONS.grenade}<b>${inv.grenade}</b></span>`];
+      const items = [
+        `<span class="it gren${inv.grenade ? '' : ' zero'}" title="Granadas">${ITEM_ICONS.grenade}<b>${inv.grenade}</b></span>`,
+        `<span class="it gren${inv.molotov ? '' : ' zero'}" title="Molotovs">${ITEM_ICONS.molotov}<b>${inv.molotov}</b></span>`,
+      ];
       for (const k of BUILD_ORDER) {
         if (!inv[k]) continue;
         const cls = `it${k === this.buildSel ? ' on' : ''}`;
@@ -1186,6 +1211,8 @@ class Game {
       $('btn-build').classList.toggle('off', !BUILD_ORDER.some((k) => inv[k] > 0));
       $('gren-count').textContent = inv.grenade;
       $('btn-grenade').classList.toggle('off', inv.grenade <= 0);
+      $('molo-count').textContent = inv.molotov;
+      $('btn-molotov').classList.toggle('off', inv.molotov <= 0);
     }
     const sig = p.weapons.map((x) => x.id).join() + '|' + p.wi;
     if (this.cache.slots !== sig) {
@@ -1291,6 +1318,7 @@ class Game {
       if (this.input.consume('build')) this.tryBuild();
       if (this.input.consume('cycleBuild')) this.cycleBuild();
       if (this.input.consume('grenade')) this.tryGrenade();
+      if (this.input.consume('molotov')) this.tryGrenade('molotov');
       if (this.input.consume('nextRound')) this.startNextRound();
     }
     this.structures.update(dt, this);
@@ -1380,6 +1408,7 @@ class Game {
     this.pickups.draw(ctx, v, this.time);
     if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0) this.structures.drawGhost(ctx, this, this.buildSel, this.time);
     this.horde.draw(ctx, v, base, 'small');
+    this.structures.drawFires(ctx, v, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
       drawSurvivor(ctx, p, this.time);

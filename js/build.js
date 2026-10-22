@@ -1,16 +1,15 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP } from './config.js';
+import { SHOP, MOLOTOV } from './config.js';
 import { TAU, rand, clamp } from './util.js';
-import { OUT } from './sprites.js';
+import { OUT, flameSprite } from './sprites.js';
 
 const SNAP = 20;
 const TRAP_WIRE = { slow: 0.35, dps: 14 };
 const TRAP_SPIKES = { slow: 0.5, dps: 45 };
 const TURRET_RANGE = 340;
 const BLAST_R = 140;
-// Al morir: el gordo revienta en ácido verde y el super blindado estalla como una granada enorme.
+// Al morir, el gordo revienta en ácido verde.
 export const ACID = { radius: 105, burn: 5, dps: 2 };
-export const HEAVY_BLAST = { radius: 215, power: 760, blockDmg: 2600 };
 const near = [];
 
 export class Structures {
@@ -21,10 +20,12 @@ export class Structures {
     this.blasts = [];
     this.scorches = [];
     this.pending = [];
+    this.fires = [];
   }
 
   clear() {
     this.pending.length = 0;
+    this.fires.length = 0;
     this.blocks.length = 0;
     this.wires.length = 0;
     this.grenades.length = 0;
@@ -152,10 +153,92 @@ export class Structures {
     this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0 });
   }
 
-  // Las explosiones de muerte se encolan: así una cadena (blindado → gordos) no se pisa
-  // a sí misma y además se ve como una reacción en cadena.
+  // Los reventones de ácido se encolan: así una cadena de gordos no se pisa a sí misma.
   queueDeathBlast(kind, x, y) {
-    this.pending.push({ kind, x, y, t: kind === 'heavy' ? 0.18 : 0.06 });
+    this.pending.push({ kind, x, y, t: 0.06 });
+  }
+
+  /* ---------- molotov ---------- */
+
+  throwMolotov(game, tx, ty) {
+    this.throwGrenade(game, tx, ty);
+    const g = this.grenades[this.grenades.length - 1];
+    g.kind = 'molotov';
+    g.fuse = g.dur;
+    game.sfx.throwBottle();
+  }
+
+  ignite(game, x, y) {
+    const R = MOLOTOV.radius;
+    const flames = [];
+    for (let i = 0; i < 16; i++) {
+      const a = rand(0, TAU);
+      const d = Math.sqrt(Math.random()) * R * 0.85;
+      flames.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.85, s: rand(0.7, 1.25), ph: rand(0, 10) });
+    }
+    this.fires.push({ x, y, r: R, t: 0, life: MOLOTOV.life, tick: 0, flames });
+    if (this.fires.length > 8) this.fires.shift();
+    game.particles.shatter(x, y);
+    game.sfx.molotov();
+    game.camera.shake(0.12);
+  }
+
+  updateFires(dt, game) {
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i];
+      f.t += dt;
+      if (f.t > f.life) {
+        this.fires.splice(i, 1);
+        this.scorches.push({ x: f.x, y: f.y, t: 0, life: 25, a: rand(0, TAU) });
+        if (this.scorches.length > 20) this.scorches.shift();
+        continue;
+      }
+      f.tick -= dt;
+      if (f.tick > 0) continue;
+      f.tick = 0.1;
+      const R = f.r * Math.min(1, f.t * 4);
+      game.horde.grid.query(f.x - R - 30, f.y - R - 30, f.x + R + 30, f.y + R + 30, near);
+      for (const z of near) {
+        if (z.dead) continue;
+        const dx = z.x - f.x;
+        const dy = z.y - f.y;
+        if (dx * dx + dy * dy < (R + z.r * 0.5) ** 2) z.burn = Math.max(z.burn, MOLOTOV.burn);
+      }
+      if (Math.random() < 0.5) game.sfx.crackle();
+    }
+  }
+
+  drawFires(ctx, v, time) {
+    if (!this.fires.length) return;
+    const fl = flameSprite();
+    for (const f of this.fires) {
+      if (f.x + f.r < v.x0 || f.x - f.r > v.x1 || f.y + f.r < v.y0 || f.y - f.r > v.y1) continue;
+      const grow = Math.min(1, f.t * 4);
+      const fade = Math.min(1, (f.life - f.t) / 1.2);
+      // charco encendido en el suelo
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.35 * fade;
+      const g = ctx.createRadialGradient(f.x, f.y, 4, f.x, f.y, f.r * grow);
+      g.addColorStop(0, 'rgba(255,170,60,0.9)');
+      g.addColorStop(0.6, 'rgba(220,80,20,0.5)');
+      g.addColorStop(1, 'rgba(160,40,10,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r * grow, 0, TAU);
+      ctx.fill();
+      // lenguas de fuego que bailan
+      for (const q of f.flames) {
+        const fx = f.x + (q.x - f.x) * grow;
+        const fy = f.y + (q.y - f.y) * grow;
+        const flick = 0.8 + 0.25 * Math.sin(time * 11 + q.ph) + 0.12 * Math.sin(time * 23 + q.ph * 2);
+        const w = 20 * q.s * flick * fade;
+        const h = w * (1.5 + 0.3 * Math.sin(time * 7 + q.ph));
+        ctx.globalAlpha = 0.85 * fade;
+        ctx.drawImage(fl, fx - w / 2, fy - h * 0.85, w, h);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
   }
 
   acidBurst(game, x, y) {
@@ -170,7 +253,7 @@ export class Structures {
     if (pd < R + p.r) game.applyAcid();
   }
 
-  explode(game, g, R = BLAST_R, power = 330, opt = null) {
+  explode(game, g, R = BLAST_R, power = 330) {
     const { x, y } = g;
     game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
@@ -181,39 +264,14 @@ export class Structures {
       if (d > R + z.r) continue;
       const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      const knock = opt ? 380 + 620 * f : 120 + 260 * f;
-      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock, shot: null, blast: true }, z.x, z.y);
-      // la onda del blindado lanza a volar a los que sobreviven
-      if (opt && !z.dead) {
-        z.airV = Math.max(z.airV || 0, (180 + 320 * f) / Math.sqrt(z.mass));
-        z.air = z.air || 0.01;
-        z.spinV = rand(-9, 9);
-      }
-    }
-    if (opt) {
-      for (let i = this.blocks.length - 1; i >= 0; i--) {
-        const o = this.blocks[i];
-        const d = Math.hypot(o.x + o.w / 2 - x, o.y + o.h / 2 - y);
-        if (d < R + 30) this.damageBlock(game, o, opt.blockDmg * (0.4 + 0.6 * clamp(1 - d / R, 0, 1)));
-      }
-      for (let i = this.wires.length - 1; i >= 0; i--) {
-        const w = this.wires[i];
-        if (Math.hypot(w.x + w.w / 2 - x, w.y + w.h / 2 - y) < R * 0.7) this.wires.splice(i, 1);
-      }
+      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: 120 + 260 * f, shot: null, blast: true }, z.x, z.y);
     }
     const p = game.player;
     const pd = Math.hypot(p.x - x, p.y - y);
-    if (opt && pd < R) {
-      // la onda te empuja, pero no te hiere (como tus granadas)
-      const n = pd || 1;
-      p.kx += ((p.x - x) / n) * 420 * (1 - pd / R);
-      p.ky += ((p.y - y) / n) * 420 * (1 - pd / R);
-    }
-    game.camera.shake((opt ? 0.7 : 0.45) + 0.5 * clamp(1 - pd / 600, 0, 1));
+    game.camera.shake(0.45 + 0.5 * clamp(1 - pd / 600, 0, 1));
     game.particles.explosion(x, y, R);
-    if (opt) game.particles.explosion(x, y, R * 0.6);
-    game.sfx.explosion(!!opt);
-    this.blasts.push({ x, y, t: opt ? 0.6 : 0.4 });
+    game.sfx.explosion();
+    this.blasts.push({ x, y, t: 0.4 });
     this.scorches.push({ x, y, t: 0, life: 25, a: rand(0, TAU) });
     if (this.scorches.length > 20) this.scorches.shift();
   }
@@ -230,7 +288,8 @@ export class Structures {
       if (k < 1) g.rot += dt * 14;
       if (g.t >= g.fuse) {
         this.grenades.splice(i, 1);
-        this.explode(game, g);
+        if (g.kind === 'molotov') this.ignite(game, g.x, g.y);
+        else this.explode(game, g);
       }
     }
     for (let i = this.pending.length - 1; i >= 0; i--) {
@@ -238,9 +297,9 @@ export class Structures {
       b.t -= dt;
       if (b.t > 0) continue;
       this.pending.splice(i, 1);
-      if (b.kind === 'heavy') this.explode(game, b, HEAVY_BLAST.radius, HEAVY_BLAST.power, HEAVY_BLAST);
-      else this.acidBurst(game, b.x, b.y);
+      this.acidBurst(game, b.x, b.y);
     }
+    this.updateFires(dt, game);
     for (let i = this.blasts.length - 1; i >= 0; i--) {
       this.blasts[i].t -= dt;
       if (this.blasts[i].t <= 0) this.blasts.splice(i, 1);
@@ -344,6 +403,11 @@ export class Structures {
       ctx.translate(g.x, g.y - g.h);
       ctx.rotate(g.rot);
       ctx.scale(s, s);
+      if (g.kind === 'molotov') {
+        drawBottle(ctx);
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = '#4a5a34';
       ctx.beginPath();
       ctx.ellipse(0, 0, 6, 5, 0, 0, TAU);
@@ -639,4 +703,32 @@ function drawWire(ctx, w) {
     ctx.fillRect(x + S / 2 - 3, y + w.h - 5, 6, 5);
   }
   ctx.globalAlpha = 1;
+}
+
+// Botella de molotov con trapo encendido (dibujada en el origen, apuntando a +x).
+export function drawBottle(ctx, lit = true) {
+  ctx.fillStyle = 'rgba(120,150,90,0.9)';
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(-1, 0, 6, 4, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(200,120,40,0.8)';
+  ctx.beginPath();
+  ctx.ellipse(-2, 0.5, 4, 2.4, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(120,150,90,0.95)';
+  ctx.fillRect(4, -1.6, 4, 3.2);
+  ctx.strokeRect(4, -1.6, 4, 3.2);
+  ctx.fillStyle = '#d8ccb0';
+  ctx.fillRect(8, -1.2, 3, 2.4);
+  if (lit) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,170,60,0.9)';
+    ctx.beginPath();
+    ctx.arc(11.5, 0, 2.6 + Math.random() * 1.4, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
 }

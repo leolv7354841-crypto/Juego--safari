@@ -220,14 +220,15 @@ export class Sfx {
     this.burst({ dur: big ? 0.3 : 0.18, freq: 500 * v, sweep: 120, gain: big ? 0.45 : 0.28, delay: 0.12 });
   }
 
-  groan(intensity = 1) {
-    if (!this.ok('groan', 1.1 / Math.max(0.5, intensity))) return;
+  groan(intensity = 1, opt = null) {
+    if (!opt && !this.ok('groan', 1.1 / Math.max(0.5, intensity))) return;
     const c = this.ctx;
+    if (!c) return;
     const t = c.currentTime;
     const o = c.createOscillator();
     o.type = Math.random() < 0.5 ? 'sawtooth' : 'square';
-    const base = rand(60, 125);
-    const dur = rand(0.7, 1.4);
+    const base = opt ? rand(opt.base[0], opt.base[1]) : rand(60, 125);
+    const dur = opt ? rand(opt.dur[0], opt.dur[1]) : rand(0.7, 1.4);
     o.frequency.setValueAtTime(base * rand(1.05, 1.3), t);
     o.frequency.linearRampToValueAtTime(base * rand(0.65, 0.85), t + dur);
     const lfo = c.createOscillator();
@@ -239,11 +240,11 @@ export class Sfx {
     // formante tipo "garganta" para que suene a gemido y no a sintetizador
     const f = c.createBiquadFilter();
     f.type = 'bandpass';
-    f.frequency.setValueAtTime(rand(380, 700), t);
+    f.frequency.setValueAtTime(opt ? opt.formant : rand(380, 700), t);
     f.frequency.linearRampToValueAtTime(rand(250, 450), t + dur);
     f.Q.value = rand(3, 7);
     const g = c.createGain();
-    const vol = Math.min(0.16, 0.07 + intensity * 0.02);
+    const vol = opt ? opt.vol : Math.min(0.16, 0.07 + intensity * 0.02);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.2);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -334,15 +335,73 @@ export class Sfx {
     this.tone({ freq: 160, to: 70, dur: 0.06, gain: 0.18 });
   }
 
-  explosion(big = false) {
+  explosion() {
     if (!this.ok('explosion', 0.08, true)) return;
-    this.burst({ dur: big ? 1.8 : 1.1, freq: 1800, sweep: 60, gain: 1 });
-    this.tone({ freq: big ? 70 : 90, to: 22, dur: big ? 1.5 : 0.9, gain: 1 });
-    if (big) {
-      // estruendo extra y metralla de la armadura
-      this.tone({ freq: 45, to: 18, dur: 1.2, gain: 0.8, type: 'triangle', delay: 0.05 });
-      for (let i = 0; i < 5; i++) this.burst({ dur: 0.05, freq: rand(2500, 5000), gain: 0.15, type: 'bandpass', q: 8, delay: 0.15 + i * rand(0.05, 0.12) });
-    }
+    this.burst({ dur: 1.1, freq: 1800, sweep: 60, gain: 1 });
+    this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
+  }
+
+  // Super golpe del blindado: impacto sordo y metálico.
+  punch() {
+    if (!this.ok('punch', 0.15, true)) return;
+    this.tone({ freq: 110, to: 35, dur: 0.3, gain: 0.9 });
+    this.burst({ dur: 0.18, freq: 700, sweep: 200, gain: 0.7, q: 1.5 });
+    this.burst({ dur: 0.06, freq: 3200, gain: 0.15, type: 'bandpass', q: 6, delay: 0.02 });
+  }
+
+  /* ---------- toro ---------- */
+
+  // Resoplido y bramido grave al verte.
+  bullRoar() {
+    if (!this.ok('bullRoar', 0.5, true)) return;
+    this.burst({ dur: 0.35, freq: 900, gain: 0.25, type: 'bandpass', q: 1.2, attack: 0.05 });
+    this.groan(2, { base: [48, 62], dur: [0.8, 1.1], formant: 420, vol: 0.22 });
+  }
+
+  bullCharge() {
+    if (!this.ok('bullCharge', 0.3, true)) return;
+    for (let i = 0; i < 6; i++) this.burst({ dur: 0.09, freq: rand(180, 260), gain: 0.4, delay: i * 0.13 });
+  }
+
+  // Cornada al jugador.
+  bullHit() {
+    if (!this.ok('bullHit', 0.2, true)) return;
+    this.tone({ freq: 95, to: 30, dur: 0.4, gain: 1 });
+    this.burst({ dur: 0.3, freq: 1200, sweep: 200, gain: 0.8 });
+  }
+
+  // Embestida contra una estructura (larga: estruendo; corta: golpe seco).
+  bullSlam(long) {
+    if (!this.ok('bullSlam', 0.12, true)) return;
+    this.tone({ freq: long ? 80 : 120, to: 30, dur: long ? 0.5 : 0.22, gain: long ? 1 : 0.6 });
+    this.burst({ dur: long ? 0.6 : 0.2, freq: long ? 1400 : 900, sweep: 150, gain: long ? 0.9 : 0.5 });
+  }
+
+  /* ---------- fuego ---------- */
+
+  throwBottle() {
+    if (!this.ok('throwBottle', 0.1, true)) return;
+    this.burst({ dur: 0.25, freq: 1200, sweep: 400, gain: 0.2, type: 'bandpass', q: 1 });
+  }
+
+  // Vidrio roto y llamarada.
+  molotov() {
+    if (!this.ok('molotov', 0.08, true)) return;
+    for (let i = 0; i < 5; i++) this.burst({ dur: 0.05, freq: rand(3500, 6500), gain: 0.25, type: 'bandpass', q: 8, delay: i * 0.025 });
+    this.burst({ dur: 0.9, freq: 700, sweep: 2200, gain: 0.7, type: 'lowpass', attack: 0.05, delay: 0.04 });
+    this.tone({ freq: 70, to: 40, dur: 0.5, gain: 0.5, delay: 0.04 });
+  }
+
+  // Chisporroteo del fuego.
+  crackle() {
+    if (!this.ok('crackle', 0.12)) return;
+    for (let i = 0; i < 3; i++) this.burst({ dur: 0.02, freq: rand(1800, 4000), gain: 0.12, type: 'bandpass', q: 5, delay: rand(0, 0.15) });
+  }
+
+  // Alarido de un zombi en llamas.
+  burnScream() {
+    if (!this.ok('burnScream', 0.6)) return;
+    this.groan(2, { base: [150, 230], dur: [0.6, 1], formant: 900, vol: 0.12 });
   }
 
   // Reventón del gordo: chapoteo viscoso y siseo de ácido.

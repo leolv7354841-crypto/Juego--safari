@@ -31,19 +31,22 @@ export class Director {
     const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
     // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
     const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
+    // toros desde la oleada 3: pocos, pero embisten
+    const bulls = w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0;
     const q = [];
     for (let i = 0; i < normals - heavies; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
     for (let i = 0; i < swats; i++) q.splice(randInt(0, q.length), 0, 'swat');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
+    for (let i = 0; i < bulls; i++) q.splice(randInt(Math.floor(q.length * 0.15), q.length), 0, 'bull');
     this.queue = q;
     this.waveSize = q.length;
     this.interval = Math.max(0.3, 1.5 - w * 0.08);
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, w === 11 ? 'Llegan los super blindados' : heavies ? 'Super blindados en la horda' : w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(`Oleada ${w}`, w === 3 ? 'Llegan los toros: esquiva sus embestidas' : w === 11 ? 'Llegan los super blindados' : heavies ? 'Super blindados en la horda' : w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
     game.sfx.wave();
   }
 
@@ -129,7 +132,7 @@ export class Director {
       const cluster = Math.min(left, randInt(2, 5));
       for (let i = 0; i < cluster && this.queue.length; i++) {
         const type = this.queue[0];
-        const r = type === 'fat' || type === 'heavy' ? 24 : type === 'sprinter' ? 12 : 15;
+        const r = type === 'fat' || type === 'heavy' || type === 'bull' ? 24 : type === 'sprinter' ? 12 : 15;
         for (let t = 0; t < 6; t++) {
           const x = c.x + rand(-45, 45);
           const y = c.y + rand(-45, 45);

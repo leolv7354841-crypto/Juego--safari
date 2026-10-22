@@ -142,6 +142,27 @@ export class Particles {
     }
   }
 
+  // zombi en llamas: brasas que suben y humo negro
+  burning(x, y, r) {
+    this.add(EMBER, x + rand(-r, r) * 0.6, y + rand(-r, r) * 0.6, rand(-15, 15), rand(-70, -30), rand(0.4, 0.8), rand(1.2, 2.4), pick(['#ffb050', '#ff7a20', '#ffe08a']), 0.5);
+    if (Math.random() < 0.45) this.add(SMOKE, x + rand(-4, 4), y + rand(-4, 4), rand(-10, 10), rand(-40, -18), rand(0.8, 1.4), r * 0.35, '35,30,26', 0.6, r * 1.4);
+  }
+
+  // botella rota: vidrio y llamarada
+  shatter(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU);
+      const s = rand(80, 260);
+      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.15, 0.35), 1, pick(['#cfe8e0', '#9fc4b8', '#ffd890']), 6);
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = rand(0, TAU);
+      const s = rand(40, 160);
+      this.add(EMBER, x, y, Math.cos(a) * s, Math.sin(a) * s - 30, rand(0.4, 0.9), rand(1.5, 3), pick(['#ffb050', '#ff7a20', '#ffe08a']), 2);
+    }
+    this.add(SMOKE, x, y, 0, -20, 1.4, 14, '230,120,40', 1.5, 40);
+  }
+
   pickupFx(x, y, color) {
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * TAU;
@@ -254,7 +275,7 @@ function poolSprite(seed, dark = '#5e1411', light = 'rgba(160,40,32,0.45)') {
 }
 
 export class Decals {
-  constructor(max = 150, maxPools = 110) {
+  constructor(max = 150, maxPools = 200) {
     this.max = max;
     this.maxPools = maxPools;
     this.list = [];
@@ -276,7 +297,7 @@ export class Decals {
     const slide = variant === 0 ? rand(10, 18) : variant === 1 ? rand(4, 8) : rand(2, 5);
     const spin = variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5);
     this.list.push({
-      img: z.spr.dead, x: z.x, y: z.y, x0: z.x, y0: z.y,
+      img: z.burnt ? z.spr.burnt : z.spr.dead, x: z.x, y: z.y, x0: z.x, y0: z.y,
       x1: z.x + fx * slide * (z.r / 13), y1: z.y + fy * slide * (z.r / 13),
       a0: z.angle, a1: z.angle + spin, half: z.spr.half, t: 0, fall: variant === 2 ? 0.55 : 0.4,
       shrink: variant === 2 ? 0.82 : 0.92, life: z.type === 'heavy' || z.type === 'fat' ? 26 : 16,
@@ -288,6 +309,11 @@ export class Decals {
   splat(x, y, size) {
     if (this.pools.length >= this.maxPools) this.pools.shift();
     this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 9, delay: 0 });
+  }
+  // gota del rastro de sangre de un zombi herido
+  drip(x, y) {
+    if (this.pools.length >= this.maxPools) this.pools.shift();
+    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size: rand(2.5, 4.5), t: 0, life: 8, delay: 0 });
   }
   // charco de ácido del gordo al reventar
   acid(x, y, size) {

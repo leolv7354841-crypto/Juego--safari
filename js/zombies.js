@@ -1,6 +1,6 @@
-import { ZOMBIES, WORLD_SIZE, GOLDEN } from './config.js';
+import { ZOMBIES, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV } from './config.js';
 import { clamp, rand, randInt, angleTo, TAU } from './util.js';
-import { zombieSprites } from './sprites.js';
+import { zombieSprites, flameSprite } from './sprites.js';
 
 const CELL = 64;
 
@@ -77,6 +77,18 @@ function overtake(a, b, nx, ny, dt) {
 }
 const tmpDir = { x: 0, y: 0 };
 const near = [];
+const near3 = [];
+
+// ¿Hay vista directa entre dos puntos? (los muros y edificios tapan; coches y barricadas no)
+function clearLine(world, x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const n = Math.ceil(Math.hypot(dx, dy) / 24);
+  for (let i = 1; i < n; i++) {
+    if (world.pointBlocked(x0 + (dx * i) / n, y0 + (dy * i) / n, 0, true)) return false;
+  }
+  return true;
+}
 
 export class Horde {
   constructor() {
@@ -125,6 +137,16 @@ export class Horde {
       air: 0,
       airV: 0,
       spinV: 0,
+      tilt: 0,
+      wounded: false,
+      dripT: 0,
+      burn: 0,
+      fireFx: 0,
+      // toro: walk → windup (escarba) → charge (embiste) → recover; ram = embestidas contra una estructura
+      bs: 'walk',
+      bt: 0,
+      cd: rand(0.5, 1.5),
+      lookT: 0,
       lunge: 0,
       wob: rand(0, 100),
       dead: false,
@@ -208,6 +230,37 @@ export class Horde {
         danger += 1 - d / 650;
         if (d < 300) nearCount++;
       }
+      // en llamas: se queman, se retuercen y corren desesperados
+      if (z.burn > 0) {
+        z.burn -= dt;
+        z.hp -= MOLOTOV.dps * dt;
+        z.fireFx -= dt;
+        if (z.fireFx <= 0) {
+          z.fireFx = 0.08;
+          game.particles.burning(z.x, z.y, z.r);
+        }
+        if (Math.random() < dt * 0.6) game.sfx.burnScream();
+        if (z.hp <= 0) {
+          z.burnt = true;
+          game.killZombie(z);
+          continue;
+        }
+      }
+      // herido de bala: se desangra y deja un rastro de sangre al arrastrarse
+      if (z.wounded) {
+        z.hp -= WOUND.bleed * dt;
+        z.dripT -= dt;
+        if (z.dripT <= 0) {
+          z.dripT = rand(0.18, 0.34);
+          game.decals.drip(z.x - Math.cos(z.angle) * z.r * 0.5 + rand(-3, 3), z.y - Math.sin(z.angle) * z.r * 0.5 + rand(-3, 3));
+        }
+        if (z.hp <= 0) {
+          game.killZombie(z);
+          continue;
+        }
+      }
+      z.tilt = (z.wounded ? Math.sin(time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(time * 23 + z.wob) * 0.28 : 0);
+      if (z.type === 'bull' && this.bullThink(z, p, dx, dy, d, dt, game, world)) continue;
       let mx;
       let my;
       if (z.type === 'golden') {
@@ -318,6 +371,17 @@ export class Horde {
       let sp = z.speed * z.pace * (0.85 + 0.15 * Math.sin(time * 0.7 + z.wob)) * (z.slow > 0 ? 0.35 : 1);
       if (z.stumbleT > 0) sp *= 0.25;
       if (z.air > 0) sp = 0;
+      // arrastrándose: avanza a tirones, como si arrastrara una pierna
+      if (z.wounded) sp *= WOUND.pace * (0.4 + 1.25 * Math.max(0, Math.sin(time * 5 + z.wob)));
+      if (z.burn > 0) {
+        sp *= 1.2;
+        const wob = Math.sin(time * 6 + z.wob * 3) * 0.9;
+        const c = Math.cos(wob);
+        const sn = Math.sin(wob);
+        const nx = mx * c - my * sn;
+        my = mx * sn + my * c;
+        mx = nx;
+      }
       if (inRange) sp *= 0.15;
       // alambre de púas: frena y hiere
       const trap = game.structures.wires.length ? game.structures.trapAt(z, dt, game) : null;
@@ -352,8 +416,10 @@ export class Horde {
           z.lunge = 1;
           p.hurt(def.damage, game);
           game.onZombieHit(z);
-          p.kx += (dx / d) * 40 * Math.sqrt(z.mass);
-          p.ky += (dy / d) * 40 * Math.sqrt(z.mass);
+          const push = def.punch || 40 * Math.sqrt(z.mass);
+          p.kx += (dx / d) * push;
+          p.ky += (dy / d) * push;
+          if (def.punch) game.onSuperPunch(z, p.x, p.y);
         }
       } else {
         z.inRange = false;
@@ -383,6 +449,9 @@ export class Horde {
         overtake(z, o, dx / d0, dy / d0, dt);
         overtake(o, z, -dx / d0, -dy / d0, dt);
         if (d2 >= rr * rr) continue;
+        // el fuego se contagia a los que se rozan
+        if (z.burn > 0.6 && !(o.burn > 0) && Math.random() < dt * 2) o.burn = MOLOTOV.burn * 0.6;
+        else if (o.burn > 0.6 && !(z.burn > 0) && Math.random() < dt * 2) z.burn = MOLOTOV.burn * 0.6;
         const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
         const ov = (rr - d) * 0.8;
         const nx = dx / d;
@@ -411,7 +480,9 @@ export class Horde {
         }
       }
       world.lastBlock = null;
-      if (world.collide(z, z.r)) z.touchT = 0.5;
+      const bumped = world.collide(z, z.r);
+      if (bumped) z.touchT = 0.5;
+      if (z.type === 'bull' && !z.dead) this.bullImpact(z, bumped, world.lastBlock, game);
       // detector de atasco: si en 1,2 s casi no avanzó y no está pegado al jugador
       z.chkT = (z.chkT || 0) + dt;
       if (z.chkT > 1.2) {
@@ -430,12 +501,14 @@ export class Horde {
         z.chkY = z.y;
       }
       // golpea la barricada que le cierra el paso
-      if (world.lastBlock && !z.inRange && !z.dead) {
+      if (world.lastBlock && !z.inRange && !z.dead && z.type !== 'bull') {
         z.chew -= dt;
         if (z.chew <= 0) {
           z.chew = 1 / z.def.attackRate;
           z.lunge = 1;
-          game.structures.damageBlock(game, world.lastBlock, z.def.damage * 1.6);
+          const blk = world.lastBlock;
+          game.structures.damageBlock(game, blk, z.def.blockDmg || z.def.damage * 1.6);
+          if (z.def.punch) game.onSuperPunch(z, blk.x + blk.w / 2, blk.y + blk.h / 2);
         }
       }
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
@@ -444,6 +517,150 @@ export class Horde {
     if (p.alive) world.collide(p, p.r, true);
     grid.clear();
     for (const z of list) grid.insert(z);
+  }
+
+  /* ---------- toro ---------- */
+
+  // Devuelve true si el toro controla su propio movimiento este fotograma.
+  bullThink(z, p, dx, dy, d, dt, game, world) {
+    z.bt -= dt;
+    if (z.bs === 'walk') {
+      z.cd -= dt;
+      z.lookT -= dt;
+      if (z.cd <= 0 && z.lookT <= 0 && p.alive && d < BULL.sight && d > 70 && !(z.air > 0)) {
+        z.lookT = 0.25;
+        if (clearLine(world, z.x, z.y, p.x, p.y)) {
+          // te vio: se planta, resopla y escarba antes de embestir
+          z.bs = 'windup';
+          z.bt = BULL.windup;
+          game.sfx.bullRoar();
+        }
+      }
+      return false;
+    }
+    if (z.bs === 'windup') {
+      z.angle = angleTo(z.angle, Math.atan2(dy, dx), 9 * dt);
+      z.anim += dt * 9;
+      if (Math.random() < dt * 14) game.particles.dust(z.x - Math.cos(z.angle) * z.r, z.y - Math.sin(z.angle) * z.r, 4);
+      if (z.bt <= 0) {
+        const a = Math.atan2(dy, dx);
+        z.bs = 'charge';
+        z.bt = BULL.maxTime;
+        z.cdx = Math.cos(a);
+        z.cdy = Math.sin(a);
+        z.angle = a;
+        z.chargeId = (z.chargeId || 0) + 1;
+        game.sfx.bullCharge();
+      }
+      return true;
+    }
+    if (z.bs === 'charge' || z.bs === 'ramIn') {
+      const sp = z.bs === 'charge' ? BULL.speed : BULL.speed * 0.55;
+      z.x += z.cdx * sp * dt;
+      z.y += z.cdy * sp * dt;
+      z.anim += (sp * dt) / (z.r * 0.55);
+      if (Math.random() < dt * 20) game.particles.dust(z.x - z.cdx * z.r, z.y - z.cdy * z.r, 5);
+      // arrolla a los zombis que tiene delante
+      this.grid.query(z.x - z.r - 20, z.y - z.r - 20, z.x + z.r + 20, z.y + z.r + 20, near3);
+      for (const o of near3) {
+        if (o === z || o.dead || o.plowed === z.id * 1000 + z.chargeId) continue;
+        const ox = o.x - z.x;
+        const oy = o.y - z.y;
+        if (ox * ox + oy * oy > (z.r + o.r + 4) ** 2) continue;
+        o.plowed = z.id * 1000 + z.chargeId;
+        const side = ox * -z.cdy + oy * z.cdx >= 0 ? 1 : -1;
+        const k = 1 / Math.sqrt(o.mass);
+        o.kx += (-z.cdy * side * 320 + z.cdx * 220) * k;
+        o.ky += (z.cdx * side * 320 + z.cdy * 220) * k;
+        o.airV = Math.max(o.airV || 0, 200 * k);
+        o.air = o.air || 0.01;
+        o.spinV = rand(-8, 8);
+      }
+      if (z.bs === 'charge' && p.alive && d < z.r + p.r + 6) {
+        // cornada: te lanza por los aires y te quita 40
+        p.hurt(BULL.hit, game);
+        game.onZombieHit(z);
+        p.kx += z.cdx * BULL.throw;
+        p.ky += z.cdy * BULL.throw;
+        game.camera.shake(0.75);
+        game.particles.dust(p.x, p.y, 14);
+        game.sfx.bullHit();
+        z.bs = 'recover';
+        z.bt = 1.1;
+        return true;
+      }
+      if (z.bt <= 0) {
+        z.bs = z.bs === 'ramIn' && z.ramBlock && z.ramBlock.hp > 0 ? 'ram' : 'recover';
+        z.bt = z.bs === 'ram' ? 0.45 : 0.7;
+      }
+      return true;
+    }
+    if (z.bs === 'recover') {
+      // derrapa, sacude la cabeza y vuelve a caminar
+      const k = Math.max(0, z.bt);
+      z.x += (z.cdx || 0) * 90 * k * dt;
+      z.y += (z.cdy || 0) * 90 * k * dt;
+      if (z.bt <= 0) {
+        z.bs = 'walk';
+        z.cd = BULL.cooldown;
+      }
+      return true;
+    }
+    if (z.bs === 'ram') {
+      const b = z.ramBlock;
+      if (!b || b.hp <= 0) {
+        z.bs = 'walk';
+        z.cd = 0.6;
+        return false;
+      }
+      // retrocede un poco para tomar impulso y vuelve a embestir
+      const bx = clamp(z.x, b.x, b.x + b.w) - z.x;
+      const by = clamp(z.y, b.y, b.y + b.h) - z.y;
+      const bl = Math.hypot(bx, by) || 1;
+      z.angle = angleTo(z.angle, Math.atan2(by, bx), 10 * dt);
+      z.x -= (bx / bl) * 85 * dt;
+      z.y -= (by / bl) * 85 * dt;
+      z.anim -= dt * 6;
+      if (z.bt <= 0) {
+        z.bs = 'ramIn';
+        z.bt = 0.7;
+        z.cdx = bx / bl;
+        z.cdy = by / bl;
+        z.chargeId = (z.chargeId || 0) + 1;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Choque del toro contra estructuras o muros.
+  bullImpact(z, bumped, block, game) {
+    if (z.bs === 'walk' && block && !z.inRange) {
+      // caminando se topó con una barricada: empieza a embestirla
+      z.ramBlock = block;
+      z.bs = 'ram';
+      z.bt = 0.45;
+      return;
+    }
+    if (z.bs !== 'charge' && z.bs !== 'ramIn') return;
+    if (block) {
+      const long = z.bs === 'charge';
+      game.structures.damageBlock(game, block, long ? BULL.long : BULL.short);
+      game.particles.dust(z.x + z.cdx * z.r, z.y + z.cdy * z.r, long ? 26 : 12);
+      game.camera.shake(long ? 0.35 : 0.12);
+      game.sfx.bullSlam(long);
+      z.ramBlock = block;
+      z.bs = block.hp > 0 ? 'ram' : 'recover';
+      z.bt = block.hp > 0 ? 0.45 : 0.6;
+    } else if (bumped) {
+      // contra un muro de verdad: se aturde un momento
+      game.particles.dust(z.x + z.cdx * z.r, z.y + z.cdy * z.r, 16);
+      game.sfx.bullSlam(false);
+      z.bs = 'recover';
+      z.bt = 1.3;
+      z.cdx = 0;
+      z.cdy = 0;
+    }
   }
 
   removeDead() {
@@ -464,7 +681,7 @@ export class Horde {
       const frames = z.flash > 0 ? z.spr.flash : z.spr.frames;
       const f = ((z.anim | 0) % frames.length + frames.length) % frames.length;
       const img = frames[f];
-      const ang = z.angle + (z.hitT > 0 ? z.hitJolt * (z.hitT / 0.18) : 0);
+      const ang = z.angle + z.tilt + (z.hitT > 0 ? z.hitJolt * (z.hitT / 0.18) : 0);
       const c = Math.cos(ang);
       const sn = Math.sin(ang);
       const pop = z.hitT > 0 ? 1 + 0.08 * (z.hitT / 0.18) : 1;
@@ -485,8 +702,9 @@ export class Horde {
       const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
       const lift = z.air > 0 ? z.air : 0;
       const k = s * pop * grow * (1 + lift / 140);
-      const lx = z.x + c * z.lunge * 5;
-      const ly = z.y + sn * z.lunge * 5 - lift * 0.7;
+      const shake = z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : 0;
+      const lx = z.x + c * z.lunge * 5 + shake;
+      const ly = z.y + sn * z.lunge * 5 - lift * 0.7 + shake;
       if (lift > 0) {
         // sombra en el suelo mientras vuela
         ctx.setTransform(s, 0, 0, s, tx, ty);
@@ -500,6 +718,23 @@ export class Horde {
       if (z.type !== 'golden') ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
       ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
       ctx.drawImage(img, -half, -half, half * 2, half * 2);
+      if (z.burn > 0) {
+        // llamas sobre el cuerpo (aditivas, parpadean)
+        const fl = flameSprite();
+        ctx.setTransform(s, 0, 0, s, tx, ty);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.min(1, z.burn * 0.8);
+        for (let i = 0; i < 3; i++) {
+          const a = z.id * 2.1 + i * 2.1;
+          const fw = z.r * (0.8 + Math.random() * 0.35);
+          const fh = fw * (1.4 + Math.random() * 0.5);
+          const fx = lx + Math.cos(a) * z.r * 0.45;
+          const fy = ly + Math.sin(a) * z.r * 0.45;
+          ctx.drawImage(fl, fx - fw / 2, fy - fh * 0.8, fw, fh);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.globalAlpha = 1;
     ctx.setTransform(s, 0, 0, s, tx, ty);

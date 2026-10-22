@@ -59,6 +59,11 @@ export class Lighting {
       g.globalAlpha = Math.min(1, b.t * 3);
       g.drawImage(this.soft, b.x - 320, b.y - 320, 640, 640);
     }
+    // fuego de molotov: ilumina a su alrededor y parpadea
+    for (const f of game.structures.fires) {
+      g.globalAlpha = Math.min(1, (f.life - f.t) / 1.2, f.t * 4) * (0.8 + 0.2 * Math.sin(game.time * 13 + f.x));
+      g.drawImage(this.soft, f.x - 260, f.y - 260, 520, 520);
+    }
     if (game.muzzle > 0) {
       g.globalAlpha = game.muzzle;
       g.drawImage(this.soft, game.muzzleX - 200, game.muzzleY - 200, 400, 400);
@@ -94,6 +99,10 @@ export class Lighting {
     for (const b of game.structures.blasts) {
       ctx.globalAlpha = Math.min(1, b.t * 2.5) * 0.7;
       ctx.drawImage(this.warm, b.x - 200, b.y - 200, 400, 400);
+    }
+    for (const f of game.structures.fires) {
+      ctx.globalAlpha = Math.min(1, (f.life - f.t) / 1.2, f.t * 4) * 0.45;
+      ctx.drawImage(this.warm, f.x - 170, f.y - 170, 340, 340);
     }
     if (game.muzzle > 0) {
       ctx.globalAlpha = game.muzzle * 0.35;

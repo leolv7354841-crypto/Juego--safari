@@ -183,6 +183,12 @@ const FAT_PALETTES = [
   { skin: '#b0b287', shirt: '#4f5d6e', pants: '#4a3d2e', hair: '#6a5a45' },
   { skin: '#a3a97c', shirt: '#7b6e3c', pants: '#2f3440', hair: '#2b241d' },
 ];
+// Toros: piel bronceada (con el tono enfermizo de zombi), sin camisa.
+const BULL_PALETTES = [
+  { skin: '#b07c4c', pants: '#2f3440', hair: '#1d1a17', bone: '#d8c8a4', vein: '#7a4a2c' },
+  { skin: '#a8743f', pants: '#4a3d2e', hair: '#151311', bone: '#cdbb92', vein: '#6e3f22' },
+  { skin: '#b98a58', pants: '#38404c', hair: '#2b241d', bone: '#e0d2ae', vein: '#7d5030' },
+];
 const GIANT_PALETTES = [
   { skin: '#748262', shirt: '#3a3631', pants: '#28282a', hair: '#151311', metal: '#6d6f70' },
   { skin: '#6c7a5e', shirt: '#4a3a2c', pants: '#2b2622', hair: '#151311', metal: '#77736b' },
@@ -408,6 +414,72 @@ function drawFat(g, r, p, ph) {
   g.fill();
 }
 
+// Toro: zombi mamado y bronceado, hombros enormes, brazos con bíceps marcados y una
+// deformación ósea en la cabeza (bultos y dos cuernos de hueso que le salen del cráneo).
+function drawBull(g, r, p, ph) {
+  softShadow(g, r * 1.35, 0.42);
+  const s = Math.sin(ph);
+  const c = Math.cos(ph);
+  const stride = r * 0.42;
+  ell(g, s * stride, -r * 0.34, r * 0.38, r * 0.24, 0, p.pants);
+  ell(g, -s * stride, r * 0.34, r * 0.38, r * 0.24, 0, p.pants);
+  g.save();
+  g.rotate(s * 0.06);
+  // torso en V: espalda ancha y pectorales
+  ell(g, -r * 0.12, 0, r * 0.62, r * 1.02, 0, p.skin);
+  g.fillStyle = shade(p.skin, 0.82);
+  g.beginPath();
+  g.ellipse(r * 0.16, -r * 0.34, r * 0.3, r * 0.34, 0.2, 0, TAU);
+  g.ellipse(r * 0.16, r * 0.34, r * 0.3, r * 0.34, -0.2, 0, TAU);
+  g.fill();
+  g.strokeStyle = shade(p.skin, 0.62);
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(r * 0.12, -r * 0.62);
+  g.lineTo(r * 0.12, r * 0.62);
+  g.moveTo(-r * 0.42, -r * 0.3);
+  g.quadraticCurveTo(-r * 0.2, 0, -r * 0.42, r * 0.3);
+  g.stroke();
+  rips(g, mulberry32(p.seed), -r * 0.1, 0, r * 0.55, r * 0.9, p.vein, 4);
+  g.restore();
+  // brazos gruesos con bíceps
+  const ax = c * r * 0.12;
+  const ay = s * r * 0.12;
+  for (const k of [-1, 1]) {
+    const sx = k < 0 ? ax : -ax;
+    const sy = k < 0 ? ay : -ay;
+    limb(g, -r * 0.05, k * r * 0.86, r * 1.05 + sx, k * r * 0.62 + sy, r * 0.42, p.skin);
+    ell(g, r * 0.32 + sx * 0.4, k * r * 0.82 + sy * 0.4, r * 0.34, r * 0.25, k * 0.4, shade(p.skin, 1.06), OUT, 1.1);
+    circ(g, r * 1.12 + sx, k * r * 0.62 + sy, r * 0.22, shade(p.skin, 0.8), OUT, 1.1);
+  }
+  // cabeza deformada: cráneo con bultos y cuernos de hueso
+  const hx = r * 0.36;
+  const hy = s * r * 0.04;
+  circ(g, hx, hy, r * 0.38, p.skin);
+  ell(g, hx - r * 0.12, hy - r * 0.2, r * 0.22, r * 0.18, 0.4, shade(p.skin, 0.9), OUT, 1);
+  ell(g, hx - r * 0.18, hy + r * 0.14, r * 0.16, r * 0.13, -0.3, shade(p.skin, 0.86), OUT, 1);
+  g.fillStyle = p.hair;
+  g.beginPath();
+  g.arc(hx - r * 0.08, hy, r * 0.26, Math.PI * 0.7, Math.PI * 1.25);
+  g.fill();
+  for (const k of [-1, 1]) {
+    g.fillStyle = p.bone;
+    g.strokeStyle = OUT;
+    g.lineWidth = 1.1;
+    g.beginPath();
+    g.moveTo(hx + r * 0.05, hy + k * r * 0.22);
+    g.quadraticCurveTo(hx + r * 0.45, hy + k * r * 0.55, hx + r * 0.72, hy + k * r * 0.34);
+    g.quadraticCurveTo(hx + r * 0.4, hy + k * r * 0.3, hx + r * 0.2, hy + k * r * 0.08);
+    g.closePath();
+    g.fill();
+    g.stroke();
+  }
+  ell(g, hx + r * 0.02, hy, r * 0.1, r * 0.08, 0, p.bone, OUT, 0.8);
+  g.fillStyle = '#d23a22';
+  g.fillRect(hx + r * 0.26, hy - r * 0.15, r * 0.09, r * 0.07);
+  g.fillRect(hx + r * 0.26, hy + r * 0.08, r * 0.09, r * 0.07);
+}
+
 function drawGiant(g, r, p, ph) {
   softShadow(g, r * 1.3, 0.5);
   const s = Math.sin(ph);
@@ -473,8 +545,8 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, golden: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, golden: GOLDEN_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = { normal: drawNormal, golden: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, bull: drawBull, giant: drawGiant };
+const PALETTES = { normal: NORMAL_PALETTES, golden: GOLDEN_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, bull: BULL_PALETTES, giant: GIANT_PALETTES };
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -502,13 +574,50 @@ function buildSet(type, r, frames, pal, scale, pad) {
   dg.fillStyle = 'rgba(18,17,13,0.5)';
   dg.fillRect(0, 0, px, px);
   out.dead = d;
+  // cadáver calcinado (muerto por fuego)
+  const b = makeCanvas(px, px);
+  const bg = b.getContext('2d');
+  bg.drawImage(out.frames[0], 0, 0);
+  bg.globalCompositeOperation = 'source-atop';
+  bg.fillStyle = 'rgba(20,13,8,0.86)';
+  bg.fillRect(0, 0, px, px);
+  const rng = mulberry32(pal.seed + 3);
+  for (let i = 0; i < 9; i++) {
+    bg.fillStyle = rng() < 0.5 ? 'rgba(255,120,40,0.55)' : 'rgba(80,70,60,0.6)';
+    bg.beginPath();
+    bg.arc(half * scale + rrange(rng, -r, r) * scale * 0.7, half * scale + rrange(rng, -r, r) * scale * 0.7, rrange(rng, 0.6, 1.6) * scale, 0, TAU);
+    bg.fill();
+  }
+  out.burnt = b;
   return out;
+}
+
+// Llama para los zombis en llamas y el fuego del molotov (se dibuja en modo aditivo).
+let FLAME = null;
+export function flameSprite() {
+  if (FLAME) return FLAME;
+  const c = makeCanvas(32, 48);
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(16, 34, 2, 16, 30, 22);
+  grd.addColorStop(0, 'rgba(255,245,200,1)');
+  grd.addColorStop(0.3, 'rgba(255,190,70,0.95)');
+  grd.addColorStop(0.65, 'rgba(230,90,20,0.6)');
+  grd.addColorStop(1, 'rgba(160,30,0,0)');
+  g.fillStyle = grd;
+  g.beginPath();
+  g.moveTo(16, 2);
+  g.bezierCurveTo(26, 16, 30, 30, 26, 40);
+  g.quadraticCurveTo(16, 50, 6, 40);
+  g.bezierCurveTo(2, 30, 6, 16, 16, 2);
+  g.fill();
+  FLAME = c;
+  return c;
 }
 
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], giant: [] };
+  ZSPRITES = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], bull: [], giant: [] };
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
@@ -517,6 +626,7 @@ export function zombieSprites() {
     golden: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     swat: { r: 14, frames: 6, scale: 2.5, pad: 1.7 },
     heavy: { r: 22, frames: 6, scale: 2.4, pad: 1.45 },
+    bull: { r: 17, frames: 6, scale: 2.5, pad: 1.65 },
   };
   for (const type of Object.keys(conf)) {
     const k = conf[type];

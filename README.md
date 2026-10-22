@@ -12,11 +12,12 @@ de un cerco, no para pasear.
 
 | Zombi   | Vida | Velocidad     | Notas                                                         |
 |---------|------|---------------|---------------------------------------------------------------|
-| Normal  | 42   | media (el doble que antes) | Llega en hordas enormes (cientos por oleada)     |
+| Normal  | 42   | media (el doble que antes) | Llega en hordas enormes (cientos por oleada). Si le das y no muere, se frena, se desangra y avanza arrastrándose dejando un rastro de sangre |
 | Policía SWAT | 336 | lenta     | El 20% de los normales. Escudo al brazo; aguanta 8× más       |
-| Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más. Las balas no lo frenan y casi la mitad rebotan en la armadura. **Al morir estalla**: lanza a volar a los zombis cercanos y destroza barricadas |
+| Super blindado | 2100 | muy lenta | Desde la oleada 11, el 7% de la horda. Gordo con armadura militar; aguanta 50× más. Las balas no lo frenan y casi la mitad rebotan en la armadura. Da **super golpes**: te quita 30, te avienta y destroza barricadas |
 | Velocista | 26 | rápida        | Desde la primera oleada. Te alcanza si no corres              |
 | Gordo   | 130  | más lenta     | Más grande, aguanta unas 3× más disparos. **Al morir revienta en ácido verde**: si te salpica te quema 5 s (2 de vida por segundo) y la vista se pone verde y borrosa |
+| Toro    | 294  | rápida al embestir | Desde la oleada 3. Musculoso, bronceado y con cuernos de hueso. Al verte escarba y **embiste**: si te da te lanza y te quita 40. Si choca con una barricada la embiste una y otra vez (250 la embestida larga, 40 las cortas) hasta romperla |
 | Dorado  | 126  | rápida        | Raro (uno cada 35–65 s de ronda). No ataca: huye y desaparece a los 26 s. Si lo matas, da **$100–$250** |
 
 Cuando un zombi te golpea **pierdes dinero** ($16–$40 al azar, nunca te deja en negativo) y lo ves en un
@@ -56,6 +57,7 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Trampa de pinchos | $60 | Frena y hiere mucho más |
 | Mina terrestre | $45 | Explota al pisarla |
 | Granada | $90 | Explosión en área que lanzas tú |
+| Molotov | $60 | Charco de fuego: los zombis que lo pisan arden, se retuercen y el fuego se contagia |
 
 Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches).
 Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
@@ -103,7 +105,7 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 | `R`: recargar | Botón de recarga |
 | `1`–`8`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
-| `G`: lanzar granada | Botón **Granada** (apunta solo) |
+| `G`: lanzar granada · `T`: molotov | Botones **Granada** y **Molotov** (apuntan solos) |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
 | `Esc` / `P`: pausa | Botón de pausa |
 
