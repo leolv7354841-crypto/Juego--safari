@@ -60,7 +60,9 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Molotov | $60 | Charco de fuego: los zombis que lo pisan arden, se retuercen y el fuego se contagia |
 
 Las barricadas se colocan delante de ti y las balas pasan por encima (también por encima de los coches).
-Tú puedes atravesar tus propias estructuras; los zombis no. Los zombis las golpean hasta
+Tú puedes atravesar tus propias estructuras; los zombis no. Puedes **encimar estructuras** en el mismo lugar
+(madera sobre madera, muro sobre valla…): cada pieza aguanta lo suyo y los zombis rompen primero la de
+arriba. La torreta necesita su propio sitio. Los zombis las golpean hasta
 romperlas o buscan otro camino para rodearlas.
 
 Los zombis aparecen en grupitos por todas las orillas de la pantalla. Unos van directo por ti, otros te

@@ -1190,8 +1190,8 @@ export class World {
     this.flowCell = -1;
   }
 
-  // ¿Cabe un rectángulo sin tocar ningún obstáculo?
-  rectFree(x, y, w, h) {
+  // ¿Cabe un rectángulo sin tocar ningún obstáculo? (ignoreBlocks: las barricadas del jugador no cuentan)
+  rectFree(x, y, w, h, ignoreBlocks = false) {
     if (x < 30 || y < 30 || x + w > this.size - 30 || y + h > this.size - 30) return false;
     const n = this.obsN;
     const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
@@ -1201,6 +1201,7 @@ export class World {
     for (let j = y0; j <= y1; j++) {
       for (let i = x0; i <= x1; i++) {
         for (const o of this.obsGrid[j * n + i]) {
+          if (ignoreBlocks && o.block) continue;
           if (o.k === 0) {
             if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return false;
           } else {

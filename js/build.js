@@ -56,7 +56,9 @@ export class Structures {
     const cy = p.y + sa * dist;
     const x = Math.round((cx - w / 2) / SNAP) * SNAP;
     const y = Math.round((cy - h / 2) / SNAP) * SNAP;
-    let ok = game.world.rectFree(x, y, w, h);
+    // las estructuras se pueden encimar unas sobre otras (cada capa aguanta lo suyo);
+    // sólo la torreta necesita su propio sitio
+    let ok = game.world.rectFree(x, y, w, h, true);
     if (ok && !def.ground) {
       // no encima del jugador ni de un zombi
       const px = clamp(p.x, x, x + w);
@@ -76,15 +78,7 @@ export class Structures {
     }
     if (ok && !def.ground) {
       for (const b of this.blocks) {
-        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y) {
-          ok = false;
-          break;
-        }
-      }
-    }
-    if (ok && def.ground) {
-      for (const b of this.wires) {
-        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y) {
+        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || b.kind === 'turret')) {
           ok = false;
           break;
         }
@@ -103,13 +97,39 @@ export class Structures {
       const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0, cd: 0, ang: game.player.angle };
       this.blocks.push(o);
       game.world.addDynamic(o);
+      this.relayer();
     }
     game.particles.dust(pl.x + pl.w / 2, pl.y + pl.h / 2, 20);
     return true;
   }
 
+  // Altura visual de cada pieza: cuántas piezas anteriores tiene debajo (sólo para dibujarla).
+  relayer() {
+    const list = this.blocks;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      let n = 0;
+      for (let k = 0; k < i; k++) {
+        const b = list[k];
+        if (o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) n = Math.max(n, (b.layer || 0) + 1);
+      }
+      o.layer = Math.min(n, 6);
+    }
+  }
+
+  // La pieza de más arriba de la pila que incluye a o (los zombis rompen primero esa).
+  topOf(o) {
+    for (let i = this.blocks.length - 1; i >= 0; i--) {
+      const b = this.blocks[i];
+      if (b === o) return o;
+      if (b.kind !== 'turret' && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
+    }
+    return o;
+  }
+
   damageBlock(game, o, dmg) {
     if (o.hp <= 0) return;
+    o = this.topOf(o);
     o.hp -= dmg;
     o.hitT = 0.12;
     game.particles.impact(o.x + o.w / 2 + rand(-o.w, o.w) * 0.3, o.y + o.h / 2 + rand(-o.h, o.h) * 0.3, rand(-1, 1), rand(-1, 1));
@@ -118,6 +138,7 @@ export class Structures {
       const i = this.blocks.indexOf(o);
       if (i >= 0) this.blocks.splice(i, 1);
       game.world.removeDynamic(o);
+      this.relayer();
       game.particles.death(o.x + o.w / 2, o.y + o.h / 2, 18);
       game.sfx.blockBreak();
     }
@@ -477,7 +498,16 @@ export class Structures {
   drawBlocks(ctx, v) {
     for (const b of this.blocks) {
       if (b.x > v.x1 || b.x + b.w < v.x0 || b.y > v.y1 || b.y + b.h < v.y0) continue;
-      drawBlock(ctx, b);
+      if (b.layer) {
+        // pieza encimada: un poco más arriba, con sombra sobre la de abajo
+        const up = b.layer * 4;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(b.x + 2, b.y + 3 - up + 4, b.w, b.h);
+        ctx.save();
+        ctx.translate(0, -up);
+        drawBlock(ctx, b);
+        ctx.restore();
+      } else drawBlock(ctx, b);
     }
   }
 
@@ -532,10 +562,20 @@ export class Structures {
 
   drawBars(ctx, v) {
     for (const b of this.blocks) {
-      if (b.hp >= b.max || b.x > v.x1 || b.x + b.w < v.x0 || b.y > v.y1 || b.y + b.h < v.y0) continue;
+      if (b.x > v.x1 || b.x + b.w < v.x0 || b.y > v.y1 || b.y + b.h < v.y0) continue;
+      const up = (b.layer || 0) * 4;
+      if (b.layer && this.topOf(b) === b) {
+        // cuántas piezas hay apiladas
+        ctx.font = '700 9px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(b.x + b.w - 15, b.y - up - 1, 16, 11);
+        ctx.fillStyle = '#e6e0d2';
+        ctx.fillText(`x${b.layer + 1}`, b.x + b.w - 13, b.y - up + 8);
+      }
+      if (b.hp >= b.max) continue;
       const w = Math.max(28, b.w * 0.8);
       const x = b.x + b.w / 2 - w / 2;
-      const y = b.y - 9;
+      const y = b.y - 9 - up;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(x - 1, y - 1, w + 2, 5);
       ctx.fillStyle = '#c7a24a';

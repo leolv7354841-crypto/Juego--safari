@@ -333,6 +333,7 @@ class Game {
       this.structures.blocks.push(o);
       this.world.addDynamic(o);
     }
+    this.structures.relayer();
     for (const b of d.wires) if (SHOP[b.kind]) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
     const dir = this.director;
     dir.wave = d.wave;
