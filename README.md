@@ -30,7 +30,8 @@ Al entrar escribes un **nombre y un PIN de 4 números**: si la cuenta no existe 
 con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (oleada más alta y bajas).
 El **Salón de la fama** del menú principal (podio con los 3 mejores) y la insignia **Top #N** junto a tu nombre muestran los récords de las cuentas de ese dispositivo. Abierto como Artifact
 de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
-Para una clasificación global en GitHub Pages o Vercel haría falta un servidor (por ejemplo Firebase o Supabase).
+Para la **clasificación mundial** (todos los celulares en la misma lista) crea una Realtime Database
+gratuita en Firebase y pega su URL en `ONLINE.url` de `js/config.js` (ver «Clasificación mundial» abajo).
 
 ### Progreso guardado
 
@@ -137,6 +138,32 @@ Es un sitio estático: no hay paso de compilación.
 3. **Deploy**. Cada `git push` vuelve a publicar automáticamente.
 
 En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de inicio** para jugar a pantalla completa.
+
+## Clasificación mundial (Firebase)
+
+1. En https://console.firebase.google.com crea un proyecto (gratis, sin Analytics).
+2. *Compilación → Realtime Database → Crear base de datos* (cualquier región).
+3. En la pestaña *Reglas* pega esto y publica:
+
+```json
+{
+  "rules": {
+    "scores": {
+      ".read": true,
+      "$uid": {
+        ".write": true,
+        ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('wave').isNumber() && newData.child('wave').val() <= 999 && newData.child('kills').isNumber()"
+      }
+    }
+  }
+}
+```
+
+4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
+   `js/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
+
+Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
+no a prueba de trampas.
 
 ## Versiones y caché
 

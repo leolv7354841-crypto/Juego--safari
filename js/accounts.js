@@ -4,6 +4,7 @@
 // - Abierto como Artifact de Claude con base de datos: el progreso se copia también a
 //   la nube de tu cuenta de Claude y los récords van a una clasificación global.
 import { storage } from './util.js';
+import { ONLINE } from './config.js';
 
 const ACC_KEY = 'dz-accounts';
 const ACTIVE_KEY = 'dz-active';
@@ -21,6 +22,17 @@ function hash(text) {
   return h.toString(36);
 }
 
+const newUid = () => Array.from({ length: 16 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[(Math.random() * 32) | 0]).join('');
+
+// Limpia una fila que viene de fuera (cualquiera puede escribir en la clasificación mundial).
+function cleanRow(d, uid) {
+  if (!d || typeof d !== 'object') return null;
+  const num = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+  const name = String(d.name || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 16);
+  if (!name) return null;
+  return { uid, name, wave: num(d.wave, 999), kills: num(d.kills, 1e7), time: num(d.time, 1e6), level: num(d.level, 999) };
+}
+
 const keyOf = (name) => name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 24);
 
 // Mejor marca: primero la oleada, después las bajas.
@@ -31,6 +43,15 @@ export class Accounts {
     this.list = storage.get(ACC_KEY, {});
     this.active = storage.get(ACTIVE_KEY, null);
     if (this.active && !this.list[this.active]) this.active = null;
+    // id único de cada cuenta para la clasificación mundial (dos "Leo" en distintos celulares no chocan)
+    let changed = false;
+    for (const a of Object.values(this.list)) {
+      if (!a.uid) {
+        a.uid = newUid();
+        changed = true;
+      }
+    }
+    if (changed) storage.set(ACC_KEY, this.list);
     this.cloud = null;
     this.cloudBoard = null;
   }
@@ -64,7 +85,7 @@ export class Accounts {
       if (existing.pin !== hash(key + ':' + pin)) return 'PIN incorrecto para esa cuenta.';
     } else {
       const first = !Object.keys(this.list).length;
-      this.list[key] = { name: clean, pin: hash(key + ':' + pin), created: Date.now(), best: null };
+      this.list[key] = { name: clean, pin: hash(key + ':' + pin), created: Date.now(), best: null, uid: newUid() };
       // la partida guardada antes de existir las cuentas pasa a la primera cuenta creada
       if (first) {
         const s = storage.get(LEGACY_SAVE, null);
@@ -94,6 +115,48 @@ export class Accounts {
     this.persist();
     this.pushScore(acc);
     return true;
+  }
+
+  // ¿Hay clasificación compartida? (mundial por Firebase o la del Artifact de Claude)
+  get hasGlobal() {
+    return !!ONLINE.url || !!this.cloud;
+  }
+
+  // ¿Esta fila es de la cuenta activa?
+  isMine(row) {
+    const acc = this.current;
+    if (!acc || !row) return false;
+    return row.uid ? row.uid === acc.uid : row.name === acc.name;
+  }
+
+  /* ---------- clasificación mundial (Firebase) ---------- */
+
+  async pushOnline(acc) {
+    if (!ONLINE.url || !acc || !acc.best) return;
+    const b = acc.best;
+    try {
+      await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: acc.name.slice(0, 16), wave: b.wave, kills: b.kills, time: b.time || 0, level: b.level || 1, at: Date.now() }),
+      });
+    } catch {
+      /* sin conexión: se vuelve a intentar con el siguiente récord o al abrir el juego */
+    }
+  }
+
+  async onlineBoard() {
+    try {
+      const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores.json`);
+      if (!r.ok) return null;
+      const all = (await r.json()) || {};
+      return Object.entries(all)
+        .map(([uid, d]) => cleanRow(d, uid))
+        .filter(Boolean)
+        .sort((a, b) => b.wave - a.wave || b.kills - a.kills)
+        .slice(0, 50);
+    } catch {
+      return null;
+    }
   }
 
   localBoard() {
@@ -164,6 +227,7 @@ export class Accounts {
   }
 
   async pushScore(acc) {
+    this.pushOnline(acc);
     if (!this.cloud || !acc.best) return;
     try {
       const ref = this.cloud.db.doc(`leaderboard/${this.cloud.id}`);
@@ -177,6 +241,11 @@ export class Accounts {
   }
 
   async globalBoard() {
+    if (ONLINE.url) {
+      // si la página no puede llegar a Firebase (p. ej. dentro de Claude), usa la de Claude
+      const rows = await this.onlineBoard();
+      if (rows || !this.cloud) return rows;
+    }
     if (!this.cloud) return null;
     try {
       const snap = await this.cloud.db.collection('leaderboard').orderBy('wave', 'desc').limit(100).get();

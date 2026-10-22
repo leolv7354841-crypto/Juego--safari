@@ -106,6 +106,8 @@ class Game {
     // al entrar: crear cuenta o elegir una
     if (!this.accounts.current) this.showAccount();
     // como Artifact de Claude: progreso en la nube y clasificación global
+    // clasificación mundial: sube tu mejor marca al abrir el juego (por si antes no hubo conexión)
+    if (this.accounts.current) this.accounts.pushOnline(this.accounts.current);
     this.accounts.initCloud().then(async (ok) => {
       if (!ok) return;
       if (this.state === 'account') this.$('acct-cloud').hidden = false;
@@ -707,10 +709,10 @@ class Game {
   async showBoard() {
     this.setState('board');
     const acc = this.accounts;
-    const tab = this.boardTab || (acc.cloud ? 'global' : 'local');
+    const tab = this.boardTab || (acc.hasGlobal ? 'global' : 'local');
     this.syncBoardTabs('board', tab);
-    this.$('board-note').textContent = acc.cloud
-      ? 'Global: récords de todos los que juegan esta página de Claude. Dispositivo: cuentas guardadas en este navegador.'
+    this.$('board-note').textContent = acc.hasGlobal
+      ? 'Mundial: récords de todos los que juegan. Dispositivo: cuentas guardadas en este navegador.'
       : 'Récords de las cuentas creadas en este navegador. Para competir entre dispositivos hace falta un servidor (ver README).';
     const target = { podium: this.$('board-podium'), list: this.$('board-list'), me: null, max: 50 };
     if (tab === 'global') this.renderBoard(null, target, 'Cargando…');
@@ -720,7 +722,7 @@ class Game {
 
   syncBoardTabs(prefix, tab) {
     const g = this.$(prefix + '-tab-global');
-    g.hidden = !this.accounts.cloud;
+    g.hidden = !this.accounts.hasGlobal;
     g.classList.toggle('on', tab === 'global');
     this.$(prefix + '-tab-local').classList.toggle('on', tab === 'local');
   }
@@ -732,7 +734,7 @@ class Game {
   // Salón de la fama del menú principal + tu puesto junto al nombre.
   async refreshHall() {
     const acc = this.accounts;
-    const tab = this.boardTab || (acc.cloud ? 'global' : 'local');
+    const tab = this.boardTab || (acc.hasGlobal ? 'global' : 'local');
     this.syncBoardTabs('hall', tab);
     const target = { podium: this.$('hall-podium'), list: this.$('hall-list'), me: this.$('hall-me'), max: 8 };
     const local = acc.localBoard();
@@ -742,10 +744,10 @@ class Game {
     if (tab === 'global') this.renderBoard(rows, target, '');
     const badge = this.$('acct-rank');
     const cur = acc.current;
-    const i = cur && rows ? rows.findIndex((r) => r.name === cur.name) : -1;
+    const i = cur && rows ? rows.findIndex((r) => acc.isMine(r)) : -1;
     badge.hidden = !cur;
     badge.className = 'rank-badge' + (i === 0 ? ' r1' : i === 1 ? ' r2' : i === 2 ? ' r3' : i < 0 ? ' none' : '');
-    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' ? ' global' : ''}` : 'Sin rango';
+    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' ? ' mundial' : ''}` : 'Sin rango';
   }
 
   renderBoard(rows, t, empty) {
@@ -762,7 +764,7 @@ class Game {
     t.podium.innerHTML = '';
     for (const i of [1, 0, 2]) {
       const r = list[i];
-      const pod = el('div', `pod p${i + 1}${r ? '' : ' empty'}${r && cur && r.name === cur.name ? ' me' : ''}`);
+      const pod = el('div', `pod p${i + 1}${r ? '' : ' empty'}${r && this.accounts.isMine(r) ? ' me' : ''}`);
       if (i === 0) pod.appendChild(el('div', 'pod-crown')).innerHTML = CROWN_SVG;
       pod.appendChild(el('div', 'pod-medal', String(i + 1)));
       pod.appendChild(el('b', 'pod-name', r ? r.name : rows ? (i === 0 ? '¡Sé el primero!' : 'Libre') : '…'));
@@ -778,7 +780,7 @@ class Game {
       t.list.appendChild(el('li', 'board-empty', empty));
     }
     list.slice(3, t.max).forEach((r, k) => {
-      const li = el('li', cur && r.name === cur.name ? 'me' : '');
+      const li = el('li', this.accounts.isMine(r) ? 'me' : '');
       li.appendChild(el('b', 'rk', String(k + 4)));
       li.appendChild(el('span', 'nm', r.name));
       li.appendChild(el('span', 'st', `Oleada ${r.wave} · ${r.kills} bajas · ${fmtTime(r.time || 0)}`));
@@ -788,7 +790,7 @@ class Game {
     });
     if (t.me) {
       t.me.innerHTML = '';
-      const i = cur ? list.findIndex((r) => r.name === cur.name) : -1;
+      const i = cur ? list.findIndex((r) => this.accounts.isMine(r)) : -1;
       if (cur && i >= 0) {
         t.me.appendChild(el('span', 'me-tag', 'Tu puesto'));
         t.me.appendChild(el('b', 'me-rank', `#${i + 1}`));
