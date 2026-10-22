@@ -1019,3 +1019,4 @@ kbd {
   #screen-start .best:empty { display: none; }
 }
 .ver { margin: 10px 0 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(156, 150, 138, 0.7); }
+.hall-list .online-err { color: #e0a060; font-size: 13px; }

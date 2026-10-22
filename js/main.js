@@ -742,6 +742,14 @@ class Game {
     const rows = tab === 'global' ? await acc.globalBoard() : local;
     if (this.state !== 'menu') return;
     if (tab === 'global') this.renderBoard(rows, target, '');
+    // si la clasificación mundial falla, dilo en el salón en vez de mostrarlo vacío
+    const err = tab === 'global' && !rows ? acc.onlineError || 'No se pudo cargar la clasificación mundial.' : null;
+    if (err) {
+      const li = document.createElement('li');
+      li.className = 'board-empty online-err';
+      li.textContent = err;
+      this.$('hall-list').appendChild(li);
+    }
     const badge = this.$('acct-rank');
     const cur = acc.current;
     const i = cur && rows ? rows.findIndex((r) => acc.isMine(r)) : -1;

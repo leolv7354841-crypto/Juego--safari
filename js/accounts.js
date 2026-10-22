@@ -33,6 +33,19 @@ function cleanRow(d, uid) {
   return { uid, name, wave: num(d.wave, 999), kills: num(d.kills, 1e7), time: num(d.time, 1e6), level: num(d.level, 999) };
 }
 
+// Explica un error de Firebase en palabras simples (se muestra en el Salón de la fama).
+async function describe(r) {
+  let msg = '';
+  try {
+    msg = (await r.json()).error || '';
+  } catch {
+    /* sin cuerpo */
+  }
+  if (r.status === 401 || r.status === 403 || /permission/i.test(msg)) return 'Firebase no da permiso: revisa la pestaña Reglas de tu Realtime Database.';
+  if (r.status === 404) return 'No se encontró la base de datos de Firebase: revisa la URL.';
+  return `Error del servidor de la clasificación (${r.status}${msg ? ': ' + msg : ''}).`;
+}
+
 const keyOf = (name) => name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 24);
 
 // Mejor marca: primero la oleada, después las bajas.
@@ -135,19 +148,24 @@ export class Accounts {
     if (!ONLINE.url || !acc || !acc.best) return;
     const b = acc.best;
     try {
-      await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
+      const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
         method: 'PUT',
         body: JSON.stringify({ name: acc.name.slice(0, 16), wave: b.wave, kills: b.kills, time: b.time || 0, level: b.level || 1, at: Date.now() }),
       });
+      this.onlineError = r.ok ? null : await describe(r);
     } catch {
       /* sin conexión: se vuelve a intentar con el siguiente récord o al abrir el juego */
+      this.onlineError = 'Sin conexión con el servidor de la clasificación.';
     }
   }
 
   async onlineBoard() {
     try {
       const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores.json`);
-      if (!r.ok) return null;
+      if (!r.ok) {
+        this.onlineError = await describe(r);
+        return null;
+      }
       const all = (await r.json()) || {};
       return Object.entries(all)
         .map(([uid, d]) => cleanRow(d, uid))
@@ -155,6 +173,7 @@ export class Accounts {
         .sort((a, b) => b.wave - a.wave || b.kills - a.kills)
         .slice(0, 50);
     } catch {
+      this.onlineError = 'Sin conexión con el servidor de la clasificación.';
       return null;
     }
   }
