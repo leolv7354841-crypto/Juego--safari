@@ -1,8 +1,9 @@
 // Prueba de carga: N clientes reales (SDK de Colyseus) que mandan entradas a 60 Hz como un
 // jugador (moverse, apuntar al zombi más cercano, disparar) y consumen las fotos.
 //
-//   node tools/load.ts                      → 1 sala de 10 y luego 5 salas de 2, 60 s cada una
-//   node tools/load.ts --url ws://host:2567 --secs 30 --rooms 1x10,5x2
+//   node tools/load.ts                      → 5 salas de 4 (la capacidad prevista), 60 s
+//   node tools/load.ts --url ws://host:2567 --secs 30 --rooms 1x4,5x4
+//   node tools/load.ts --url wss://servidor.tu-dominio.com --origin https://tu-juego.com   (con ALLOWED_ORIGINS)
 //
 // Mide en los clientes: fotos/s, KB/s recibidos (WebSocket, sin cabeceras TCP/TLS), RTT de
 // aplicación y su variación; en el servidor (/health): pasos/s, duración media y máxima.
@@ -15,7 +16,10 @@ const arg = (k: string, d: string) => {
 const URL_ = arg('url', 'ws://localhost:2567');
 const HTTP = URL_.replace(/^ws/, 'http');
 const SECS = Number(arg('secs', '60'));
-const PLAN = arg('rooms', '1x10,5x2').split(',').map((s) => s.split('x').map(Number) as [number, number]);
+// el servidor real sólo deja crear salas desde las páginas de ALLOWED_ORIGINS
+const ORIGIN = arg('origin', '');
+const newClient = () => new Client(URL_, ORIGIN ? { headers: { Origin: ORIGIN } } : undefined);
+const PLAN = arg('rooms', '5x4').split(',').map((s) => s.split('x').map(Number) as [number, number]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const TAU = Math.PI * 2;
 
@@ -79,11 +83,11 @@ async function scenario(rooms: number, per: number) {
   const bots: Bot[] = [];
   const owners: any[] = [];
   for (let r = 0; r < rooms; r++) {
-    const owner = await new Client(URL_).create('dz', { name: `Bot ${r}-0` });
+    const owner = await newClient().create('dz', { name: `Bot ${r}-0` });
     owners.push(owner);
     bots.push(await bot(owner, `Bot ${r}-0`));
     for (let k = 1; k < per; k++) {
-      const g = await new Client(URL_).joinById(owner.roomId, { name: `Bot ${r}-${k}` });
+      const g = await newClient().joinById(owner.roomId, { name: `Bot ${r}-${k}` });
       bots.push(await bot(g, `Bot ${r}-${k}`));
       g.send('ready', { v: true });
     }

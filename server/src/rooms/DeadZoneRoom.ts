@@ -1,4 +1,4 @@
-// Sala privada de hasta 10 jugadores: lobby (listos, propietario), carga del mapa, partida
+// Sala privada de hasta MAX_PLAYERS jugadores (4 por defecto, como mucho 10): lobby (listos, propietario), carga del mapa, partida
 // autoritativa y resultados. La identidad de cada jugador es su sessionId de Colyseus: al
 // reconectar con su token recupera el mismo sitio y el mismo personaje.
 import { randomInt } from 'node:crypto';
@@ -12,6 +12,10 @@ import { STATS, countTick } from '../stats.ts';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 6;
 const live = new Set<string>();
+
+// Códigos de cierre propios (los de 4000 a 4010 los usa Colyseus: 4003 es «no se pudo reconectar»).
+export const KICKED = 4100; // mandaba datos no válidos
+export const IDLE = 4101; // sala cerrada por inactividad
 
 // Código de sala impredecible (crypto) y único en este servidor.
 function newCode() {
@@ -36,11 +40,18 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   loadUntil = 0;
   acc = 0;
   emptySince = 0;
+  // ¿llegó a entrar alguien? Si no, la sala se borra al caducar la reserva (ver update)
+  joined = false;
+  // última vez que hubo partida (o se creó la sala): para cerrar las salas olvidadas
+  activeAt = Date.now();
   syncT = 0;
   snapRound = 0;
   snapEvery = Math.max(1, Math.round(CONFIG.tickHz / CONFIG.snapHz));
 
   onCreate() {
+    // tope de salas a la vez: lo comprueba antes de reservar nada (no hay await, así que dos
+    // creaciones simultáneas no pueden pasar las dos con el último cupo)
+    if (live.size >= CONFIG.maxRooms) throw new ServerError(503, 'servidor-lleno');
     this.roomId = newCode();
     live.add(this.roomId);
     STATS.rooms++;
@@ -94,9 +105,10 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
 
   /* ---------- entrada a la sala ---------- */
 
-  // Se ejecuta al abrir el WebSocket (con las cabeceras de esa petición): aquí se decide
-  // de verdad quién entra. La reserva HTTP previa, si no se usa, caduca sola.
-  onAuth(_client: Client, options: any, context: AuthContext) {
+  // Se ejecuta en la petición HTTP de búsqueda de sala, antes de crearla o reservar el sitio:
+  // así una página no permitida no puede ni ocupar uno de los cupos de MAX_ROOMS. Sin esa
+  // reserva no se puede abrir el WebSocket de la sala.
+  static async onAuth(_token: string, options: any, context: AuthContext) {
     if (!originAllowed(context.headers.get('origin'))) throw new ServerError(403, 'origen');
     const name = cleanName(options && options.name);
     if (!name) throw new ServerError(400, 'nombre');
@@ -115,6 +127,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       strikes: 0,
     });
     STATS.players++;
+    this.joined = true;
     // a mitad de partida se espera en la sala: entrar sin más rompería la oleada en curso
     if (this.phase === 'loading' || this.phase === 'playing') client.send('notice', { m: 'Partida en curso: entrarás en la siguiente' });
   }
@@ -123,7 +136,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     const m = this.member(client);
     if (m) m.connected = false;
     this.sim?.setAway(client.sessionId, true);
-    this.allowReconnection(client, CONFIG.reconnectSeconds);
+    // si la sala se está cerrando (inactividad, reinicio) no hay a dónde volver
+    this.allowReconnection(client, CONFIG.reconnectSeconds).catch(() => {});
   }
 
   onReconnect(client: Client) {
@@ -150,7 +164,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   }
 
   onDispose() {
-    live.delete(this.roomId);
+    // una sala rechazada en onCreate (servidor lleno) también pasa por aquí: no cuenta
+    if (!live.delete(this.roomId)) return;
     this.setSim(null);
     STATS.rooms = Math.max(0, STATS.rooms - 1);
   }
@@ -172,7 +187,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (!l) return;
     l.strikes++;
     if (l.strikes === 1 || l.strikes % 50 === 0) console.warn(`[sala ${this.roomId}] ${c.sessionId}: ${why} (${l.strikes})`);
-    if (l.strikes > 200) c.leave(4003);
+    if (l.strikes > 200) c.leave(KICKED);
   }
 
   admin(c: Client, fn: () => void) {
@@ -294,8 +309,14 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     const anyone = [...this.state.members.values()].some((m) => m.connected);
     if (anyone) this.emptySince = 0;
     else if (!this.emptySince) this.emptySince = now;
-    else if (now - this.emptySince > CONFIG.emptyRoomSeconds * 1000) {
+    else if (now - this.emptySince > (this.joined ? CONFIG.emptyRoomSeconds : Math.min(CONFIG.emptyRoomSeconds, this.seatReservationTimeout + 2)) * 1000) {
       this.disconnect();
+      return;
+    }
+    // sin partida durante mucho rato: la sala se cierra y deja libre su cupo
+    if (this.phase === 'loading' || this.phase === 'playing') this.activeAt = now;
+    else if (now - this.activeAt > CONFIG.idleRoomMinutes * 60000) {
+      this.disconnect(IDLE);
       return;
     }
     if (this.phase === 'loading' && now >= this.loadUntil) this.go();

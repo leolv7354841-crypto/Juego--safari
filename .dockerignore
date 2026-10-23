@@ -1,0 +1,9 @@
+# Sólo hace falta package.json, js/ y server/ (ver deploy/Dockerfile)
+**/node_modules
+.git
+.vercel
+assets
+css
+docs
+test-shots
+deploy/.env

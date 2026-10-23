@@ -196,10 +196,12 @@ redes móviles bloquean la conexión directa y en ellas el cooperativo no conect
 Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
 no a prueba de trampas.
 
-## Multijugador en línea (servidor, hasta 10 jugadores)
+## Multijugador en línea (servidor, 4 por sala y 5 salas)
 
-Además del cooperativo directo de 2, el botón **En línea · hasta 10** usa un servidor propio
-(carpeta `server/`). Todos se conectan a él por WebSocket, así que funciona en cualquier red
+Además del cooperativo directo de 2, el botón **En línea · hasta 4** usa un servidor propio
+(carpeta `server/`). Capacidad: **4 jugadores por sala y 5 salas a la vez** (`MAX_PLAYERS`,
+`MAX_ROOMS`); con todas las salas ocupadas el juego avisa de que el servidor está lleno. **Cómo
+publicarlo en una máquina virtual y qué comprar: [`deploy/README.md`](deploy/README.md).** Todos se conectan a él por WebSocket, así que funciona en cualquier red
 (también donde la conexión directa entre celulares falla).
 
 **Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
@@ -223,7 +225,8 @@ recibe 20 fotos por segundo de lo que tiene cerca.
 invitación (`?sala=CÓDIGO`). Hay lista de jugadores con su estado (listo, jugando, caído,
 reconectando), botón *Estoy listo* y *Iniciar partida* sólo para el propietario (cuando los demás
 están listos). Fases: esperando → cargando → jugando → finalizada (con resultados). Si el
-propietario se va, la sala pasa al más antiguo. Una sala vacía se borra a los 30 s.
+propietario se va, la sala pasa al más antiguo. Una sala vacía se borra a los 30 s, y una sala
+sin partida (esperando o en resultados) se cierra a los 20 minutos para liberar su cupo.
 
 **Reglas del modo en línea (fase 1).** Para no romper nada, en línea por ahora **no hay tienda,
 construcciones, granadas, molotovs, robot ni mejoras de nivel** (siguen igual en solitario y en el
@@ -250,7 +253,7 @@ en el puerto 2567 de ese mismo equipo.
 ### Probar con dos navegadores
 
 1. Abre `http://localhost:8080` en Chrome y en otro navegador (o una ventana de incógnito).
-2. En el primero: **En línea · hasta 10 → Crear sala → Copiar invitación**.
+2. En el primero: **En línea · hasta 4 → Crear sala → Copiar invitación**.
 3. Pega la invitación en el segundo (o escribe el código) → **Unirse → Estoy listo**.
 4. En el primero: **Iniciar partida**.
 5. Toca el indicador de conexión (arriba a la izquierda) o pulsa **F3** para ver el diagnóstico:
@@ -268,12 +271,12 @@ navegador).
 ```bash
 npm run server:test      # salas, cupos, permisos, entradas inválidas, reconexión, limpieza, predicción
 npm run server           # en otra terminal, para la prueba de carga
-npm run server:load      # 10 clientes: 1 sala de 10 y luego 5 salas de 2 (60 s cada una)
-node server/tools/load.ts --url wss://tu-servidor.onrender.com --secs 30 --rooms 1x10
+npm run server:load      # 20 clientes: 5 salas de 4 (60 s)
+node server/tools/load.ts --url wss://servidor.tu-dominio.com --origin https://tu-juego.com --secs 60
 ```
 
-Resultados medidos **en localhost** (servidor y 10 clientes en el mismo PC con Windows; no son
-medidas de red real):
+Resultados medidos **en localhost** (servidor y clientes en el mismo PC con Windows; no son
+medidas de red real). Las filas de salas de 10 son de cuando el cupo era 10 (`MAX_PLAYERS=10`):
 
 | Prueba | Fotos/s por cliente | KB/s por cliente | Pasos/s del servidor | Paso medio · peor | CPU del servidor |
 | --- | --- | --- | --- | --- | --- |
@@ -281,6 +284,7 @@ medidas de red real):
 | 1 sala de 10, 10 fotos/s (`SNAP_HZ=10`) | 10,0 | ~15 | 60,0 (0 descartados) | 0,8 ms · 10 ms | 15 % de un núcleo |
 | 5 salas de 2 | 15,5 (las salas terminan al morir los bots) | ~17 | 60 por sala (3 descartados) | 0,9 ms · 22 ms | 34 % de un núcleo |
 | 1 sala de 10 con `COLYSEUS_LATENCY=100` | 20,0 | ~25 | 60,0 | 0,8 ms · 6 ms | 16 % de un núcleo |
+| **5 salas de 4, 20 fotos/s (capacidad actual)** | 17,0 (las salas terminan al morir los bots) | ~22 | 60,6 por sala (0 descartados) | 0,44 ms · 4,8 ms | 18 % de un núcleo (pico 51 %), 150 MB |
 
 Con 100 ms de latencia simulada el RTT medido fue de 124 ms de mediana, y en el navegador el
 personaje propio empezó a moverse en el primer fotograma (unas 10 entradas sin confirmar, 0
@@ -291,6 +295,9 @@ respuesta (que suma el retraso de dibujo y los fotogramas). Las pérdidas de paq
 WebSocket va sobre TCP, que las oculta reenviando.
 
 ### Publicar el servidor gratis en Render
+
+> Para la capacidad actual (5 salas de 4) se recomienda la máquina virtual de
+> [`deploy/README.md`](deploy/README.md): el plan gratis no da abasto ni está siempre encendido.
 
 Condiciones actuales del plan gratis de Render (revisadas en octubre de 2026,
 [documentación](https://render.com/docs/free)): 512 MB de RAM y **0,1 CPU**; se duerme tras 15
@@ -311,13 +318,16 @@ memoria).
    (por ejemplo `wss://dead-zone-server.onrender.com`), ejecuta `npm run stamp` y publica el juego.
    También se puede probar sin publicar abriendo el juego con `?servidor=wss://…`.
 
-Con 0,1 CPU, una sala de 10 a 60 pasos y 20 fotos por segundo **probablemente no da abasto** (en
+Con 0,1 CPU, una sala de 10 (o 5 de 4) a 60 pasos y 20 fotos por segundo **probablemente no da abasto** (en
 este PC usó un 26 % de un núcleo). Por eso `render.yaml` baja las fotos a 10 por segundo; aun así,
 en el plan gratis conviene probar primero con pocos jugadores y mirar el diagnóstico (pasos/s y
-CPU). Para 10 jugadores fluidos hace falta más CPU (por ejemplo el plan Starter de Render, de pago,
-o una máquina virtual). No he desplegado nada ni he creado cuentas.
+CPU). Para 5 salas de 4 fluidas hace falta más CPU: la máquina virtual de
+[`deploy/README.md`](deploy/README.md).
 
 ### Alternativa: una máquina virtual Linux (también ARM)
+
+La forma preparada (Docker + Caddy, con script de instalación) está en
+[`deploy/README.md`](deploy/README.md). A mano, sin Docker:
 
 Las dependencias son JavaScript puro (Node 22.18 o más nuevo), así que funciona igual en x86 y en
 ARM (por ejemplo una VM Ampere). Ejemplo con Ubuntu:
@@ -399,6 +409,7 @@ js/vendor/          SDK de Colyseus para el navegador (se carga sólo en línea)
 js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
 js/version.js       Versión del código (la genera tools/stamp.mjs)
 server/             Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
+deploy/             Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
 render.yaml         Despliegue del servidor en Render
 js/sprites.js       Todo el arte, generado por código
 ```

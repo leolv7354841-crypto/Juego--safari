@@ -758,7 +758,7 @@ class Game {
 
   /* ---------- cooperativo: sala ---------- */
 
-  /* ---------- en línea (servidor, hasta 10) ---------- */
+  /* ---------- en línea (servidor, hasta 4 por sala) ---------- */
 
   showOnline(keepStatus) {
     this.sfx.unlock();

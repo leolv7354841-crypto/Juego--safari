@@ -8,6 +8,9 @@ import { STATS } from './stats.ts';
 export const health = () => ({
   ok: true,
   rooms: STATS.rooms,
+  maxRooms: CONFIG.maxRooms,
+  maxPlayers: CONFIG.maxPlayers,
+  full: STATS.rooms >= CONFIG.maxRooms,
   players: STATS.players,
   simRooms: STATS.simRooms,
   tickHz: STATS.hz,

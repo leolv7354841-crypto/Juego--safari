@@ -187,7 +187,7 @@ export const ONLINE = { url: 'https://dead-zone-73dcc-default-rtdb.firebaseio.co
 // También se puede cambiar al abrir el juego con ?servidor=wss://…
 export const NET = {
   server: 'wss://dead-zone-server.onrender.com',
-  maxPlayers: 10,
+  maxPlayers: 4, // cupo de sala (el servidor manda: MAX_PLAYERS)
   tickHz: 60, // pasos de simulación por segundo (servidor y predicción)
   snapHz: 20, // fotos del estado por segundo hacia cada jugador
   interpDelay: 110, // ms de retraso para dibujar a los demás entre dos fotos

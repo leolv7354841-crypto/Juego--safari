@@ -12,6 +12,8 @@ export const CONFIG = {
   // orígenes web que pueden conectarse (separados por comas). Vacío = cualquiera (desarrollo).
   origins: (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean),
   maxPlayers: Math.min(10, num('MAX_PLAYERS', NET.maxPlayers)),
+  // salas a la vez en este proceso: con todas ocupadas, crear una más da 'servidor-lleno'
+  maxRooms: num('MAX_ROOMS', 5),
   // igual que la predicción del cliente: se cambia sólo en NET.tickHz (js/config.js)
   tickHz: NET.tickHz,
   snapHz: num('SNAP_HZ', NET.snapHz),
@@ -20,6 +22,9 @@ export const CONFIG = {
   reconnectSeconds: num('RECONNECT_SECONDS', NET.reconnectSeconds),
   // una sala sin nadie conectado se borra pasado este tiempo
   emptyRoomSeconds: num('EMPTY_ROOM_SECONDS', 30),
+  // una sala sin partida (esperando o en resultados) se cierra pasado este tiempo, para que
+  // una pestaña olvidada no ocupe uno de los cupos de MAX_ROOMS
+  idleRoomMinutes: num('IDLE_ROOM_MINUTES', 20),
   // tiempo máximo para que todos carguen el mapa antes de empezar igual
   loadSeconds: num('LOAD_SECONDS', 12),
   view: NET.view,
