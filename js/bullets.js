@@ -132,7 +132,7 @@ export class Bullets {
         b.pierce = 0;
         b.life = Math.min(b.life, 240);
       }
-      if (b.rocket && !b.exploded && (wall || b.life <= 0)) game.rocketBlast(b.x - b.dx * 4, b.y - b.dy * 4);
+      if (b.rocket && !b.exploded && (wall || b.life <= 0)) game.rocketBlast(b.x - b.dx * 4, b.y - b.dy * 4, b.owner);
       else if (wall) game.particles.impact(b.x, b.y, b.dx, b.dy);
       if (dead || b.life <= 0) {
         b.dead = true;

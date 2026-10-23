@@ -16,10 +16,13 @@ export class Pickups {
   }
 
   update(dt, game) {
-    const p = game.player;
+    // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)
+    const peer = game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const it = this.list[i];
       it.t += dt;
+      let p = game.player;
+      if (peer && (!p.alive || (peer.x - it.x) ** 2 + (peer.y - it.y) ** 2 < (p.x - it.x) ** 2 + (p.y - it.y) ** 2)) p = peer;
       const dx = p.x - it.x;
       const dy = p.y - it.y;
       const d = Math.hypot(dx, dy);
@@ -33,7 +36,7 @@ export class Pickups {
         it.y += (dy / (d || 1)) * pull;
       }
       const reach = p.r + (it.k === 'ammo' ? 26 : 16);
-      if (Math.hypot(p.x - it.x, p.y - it.y) < reach && usable && this.collect(it, game)) {
+      if (Math.hypot(p.x - it.x, p.y - it.y) < reach && usable && (p === peer ? game.coop.peerPickup(it) : this.collect(it, game))) {
         it.taken = true;
         this.list.splice(i, 1);
         continue;
@@ -43,6 +46,7 @@ export class Pickups {
   }
 
   canCollect(it, p) {
+    if (p.remote) return it.k === 'med' ? p.hp < p.stats.maxHp : it.k === 'ammo' ? !!p.needAmmo : true;
     if (it.k === 'med') return p.hp < p.stats.maxHp;
     if (it.k === 'ammo') return p.weapons.some((w) => w.reserve !== Infinity && w.reserve < p.reserveMax(w.def));
     return true;

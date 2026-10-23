@@ -73,6 +73,19 @@ atasca, se escurre de lado y recalcula su camino.
 Caminan de forma algo irregular (se desvían y tropiezan), algunos se quedan rezagados, se esquivan
 entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 
+### Cooperativo (2 jugadores)
+
+En el menú, **Cooperativo · 2 jugadores**: uno toca *Crear sala* y le pasa el código de 4 letras al
+otro, que toca *Unirse*. Juegan en el mismo mapa contra hordas **4 veces más difíciles** (el doble de
+zombis con el doble de vida); los zombis van por el jugador más cercano. No hay competitivo: cada uno
+tiene su dinero, armas, vida y mejoras, la experiencia es del equipo, y si uno cae revive con media
+vida al terminar la oleada (si caen los dos, se acaba la partida). Las mejoras y la tienda se abren
+entre oleadas. El robot es del anfitrión.
+
+Por dentro: el anfitrión simula el mundo y le manda al invitado lo que pasa ~12 veces por segundo por
+una conexión directa entre los celulares (WebRTC); Firebase sólo se usa para encontrarse con el código.
+En algunas redes móviles muy cerradas la conexión directa puede fallar: en Wi-Fi funciona mejor.
+
 ### Robot de combate
 
 En la tienda puedes comprar un **robot de combate** ($3000) del doble de tamaño de un gordo, con
@@ -162,10 +175,19 @@ En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de in
         ".write": true,
         ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('wave').isNumber() && newData.child('wave').val() <= 999 && newData.child('kills').isNumber()"
       }
+    },
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": true
+      }
     }
   }
 }
 ```
+
+`rooms` es para las salas del modo cooperativo (sólo guardan unos segundos la "dirección" de cada
+celular para conectarlos).
 
 4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
    `js/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
@@ -201,6 +223,8 @@ js/audio.js         Sonido sintetizado con Web Audio
 js/music.js         Música dinámica (calma, amenaza, horda)
 js/accounts.js      Cuentas, guardado por cuenta y clasificación
 js/robot.js         Robot de combate pilotable
+js/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
+js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
 js/sprites.js       Todo el arte, generado por código
 ```
 

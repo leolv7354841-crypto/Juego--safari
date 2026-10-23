@@ -16,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=336032a9">
+  <link rel="stylesheet" href="css/style.css?v=90a0d23b">
   <!-- version:start -->
-  <script type="importmap">{"imports":{"./js/accounts.js":"./js/accounts.js?v=336032a9","./js/audio.js":"./js/audio.js?v=336032a9","./js/build.js":"./js/build.js?v=336032a9","./js/bullets.js":"./js/bullets.js?v=336032a9","./js/config.js":"./js/config.js?v=336032a9","./js/director.js":"./js/director.js?v=336032a9","./js/input.js":"./js/input.js?v=336032a9","./js/lighting.js":"./js/lighting.js?v=336032a9","./js/main.js":"./js/main.js?v=336032a9","./js/music.js":"./js/music.js?v=336032a9","./js/particles.js":"./js/particles.js?v=336032a9","./js/pickups.js":"./js/pickups.js?v=336032a9","./js/player.js":"./js/player.js?v=336032a9","./js/robot.js":"./js/robot.js?v=336032a9","./js/sprites.js":"./js/sprites.js?v=336032a9","./js/upgrades.js":"./js/upgrades.js?v=336032a9","./js/util.js":"./js/util.js?v=336032a9","./js/world.js":"./js/world.js?v=336032a9","./js/zombies.js":"./js/zombies.js?v=336032a9"}}</script>
+  <script type="importmap">{"imports":{"./js/accounts.js":"./js/accounts.js?v=90a0d23b","./js/audio.js":"./js/audio.js?v=90a0d23b","./js/build.js":"./js/build.js?v=90a0d23b","./js/bullets.js":"./js/bullets.js?v=90a0d23b","./js/config.js":"./js/config.js?v=90a0d23b","./js/coop.js":"./js/coop.js?v=90a0d23b","./js/director.js":"./js/director.js?v=90a0d23b","./js/input.js":"./js/input.js?v=90a0d23b","./js/lighting.js":"./js/lighting.js?v=90a0d23b","./js/main.js":"./js/main.js?v=90a0d23b","./js/music.js":"./js/music.js?v=90a0d23b","./js/net.js":"./js/net.js?v=90a0d23b","./js/particles.js":"./js/particles.js?v=90a0d23b","./js/pickups.js":"./js/pickups.js?v=90a0d23b","./js/player.js":"./js/player.js?v=90a0d23b","./js/robot.js":"./js/robot.js?v=90a0d23b","./js/sprites.js":"./js/sprites.js?v=90a0d23b","./js/upgrades.js":"./js/upgrades.js?v=90a0d23b","./js/util.js":"./js/util.js?v=90a0d23b","./js/world.js":"./js/world.js?v=90a0d23b","./js/zombies.js":"./js/zombies.js?v=90a0d23b"}}</script>
   <!-- version:end -->
 </head>
 <body>
@@ -126,6 +126,7 @@
         <div class="start-actions">
           <button class="btn primary" id="btn-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-start">Jugar</button>
+          <button class="btn coop-btn" id="btn-coop">Cooperativo · 2 jugadores</button>
         </div>
         <p class="best" id="acct-best"></p>
         <div class="controls-help">
@@ -147,7 +148,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 336032a9</span></p>
+        <p class="ver"><span id="ver">Versión 90a0d23b</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -162,6 +163,28 @@
         <div class="hall-me" id="hall-me"></div>
         <button class="link-btn" id="btn-leaderboard" type="button">Ver clasificación completa</button>
       </aside>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-coop" hidden>
+      <div class="panel coop-panel">
+        <p class="kicker">Juntos contra la horda</p>
+        <h2>Cooperativo</h2>
+        <p class="acct-lead">Dos jugadores, un mismo mapa y hordas <b>4 veces más difíciles</b>. Sin competitivo: si uno cae, revive al terminar la oleada.</p>
+        <div class="coop-step" id="coop-choose">
+          <button class="btn primary" id="btn-coop-create" type="button">Crear sala</button>
+          <div class="coop-or">o únete con un código</div>
+          <form class="coop-join" id="coop-join-form" autocomplete="off">
+            <input id="coop-code-in" maxlength="4" placeholder="CÓDIGO" autocapitalize="characters" spellcheck="false" aria-label="Código de la sala">
+            <button class="btn" id="btn-coop-join" type="submit">Unirse</button>
+          </form>
+        </div>
+        <div class="coop-step" id="coop-wait" hidden>
+          <p class="coop-label">Comparte este código con tu compañero</p>
+          <div class="coop-code" id="coop-code">····</div>
+        </div>
+        <p class="coop-status" id="coop-status" aria-live="polite"></p>
+        <button class="btn ghost" id="btn-coop-back" type="button">Volver</button>
       </div>
     </section>
 
@@ -282,6 +305,6 @@
     </section>
 
   </div>
-  <script type="module" src="js/main.js?v=336032a9"></script>
+  <script type="module" src="js/main.js?v=90a0d23b"></script>
 </body>
 </html>

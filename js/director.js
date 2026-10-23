@@ -13,7 +13,8 @@ export class Director {
   }
 
   get hpMult() {
-    return 1 + Math.max(0, this.wave - 4) * 0.07;
+    // cooperativo: doble de vida (y doble de zombis, ver startWave) = 4 veces más difícil
+    return (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 2 : 1);
   }
   get speedMult() {
     return 1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02);
@@ -24,15 +25,16 @@ export class Director {
     const w = this.wave;
     // hordas masivas: 5 veces más normales y velocistas que antes
     // el 20% de los normales llega como policía SWAT
-    const normalTotal = 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
+    const m = this.coop ? 2 : 1;
+    const normalTotal = m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8)));
     const swats = Math.round(normalTotal * 0.2);
     const normals = normalTotal - swats;
-    const sprinters = 5 * (3 + Math.floor((w - 1) * 3.5));
-    const fats = w >= 2 ? Math.floor((w - 1) * 2) : 0;
+    const sprinters = m * 5 * (3 + Math.floor((w - 1) * 3.5));
+    const fats = m * (w >= 2 ? Math.floor((w - 1) * 2) : 0);
     // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
     const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
     // toros desde la oleada 3: pocos, pero embisten
-    const bulls = w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0;
+    const bulls = m * (w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
     const q = [];
     for (let i = 0; i < normals - heavies; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
@@ -84,7 +86,7 @@ export class Director {
     this.straggleT = (this.straggleT || 0) + dt;
     if (this.straggleT < 6) return;
     this.straggleT = 0;
-    const p = game.player;
+    const p = game.spawnFocus();
     const cam = game.camera;
     const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 60;
     for (const z of game.horde.list) {
@@ -105,7 +107,7 @@ export class Director {
   // Punto al azar sobre el borde de la pantalla (un poco por fuera), por cualquier lado.
   edgePoint(game, margin) {
     const cam = game.camera;
-    const p = game.player;
+    const p = game.spawnFocus();
     const hw = cam.viewW / 2 + margin;
     const hh = cam.viewH / 2 + margin;
     const per = 4 * (hw + hh);

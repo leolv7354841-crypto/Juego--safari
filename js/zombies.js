@@ -127,7 +127,7 @@ export class Horde {
       speed: rand(def.speed[0], def.speed[1]) * speedMult,
       angle: rand(0, TAU),
       anim: rand(0, def.frames),
-      spr: sets[randInt(0, sets.length - 1)],
+      si: randInt(0, sets.length - 1),
       flash: 0,
       slow: 0,
       atk: 0,
@@ -171,6 +171,7 @@ export class Horde {
       hitJolt: 0,
       life: type === 'golden' ? GOLDEN.life : 0,
     };
+    z.spr = sets[z.si];
     this.list.push(z);
     return z;
   }
@@ -195,7 +196,10 @@ export class Horde {
   }
 
   update(dt, game) {
-    const p = game.player;
+    // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
+    const p0 = game.player;
+    const peer = game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    let p = p0;
     const world = game.world;
     const time = game.time;
     const list = this.list;
@@ -206,6 +210,10 @@ export class Horde {
     for (let i = 0; i < list.length; i++) {
       const z = list[i];
       const def = z.def;
+      if (peer) {
+        const d0 = p0.alive ? (z.x - p0.x) ** 2 + (z.y - p0.y) ** 2 : Infinity;
+        p = (z.x - peer.x) ** 2 + (z.y - peer.y) ** 2 < d0 ? peer : p0;
+      }
       z.flash -= dt;
       z.slow -= dt;
       z.lunge = Math.max(0, z.lunge - dt * 4);
@@ -280,9 +288,10 @@ export class Horde {
         }
       } else {
         // ruta: hacia su punto de flanqueo mientras esté lejos; después, directo por ti
-        if (!z.planned && d > 320 && p.alive) this.planRoute(z, p, world);
         let field = world.main;
-        if (z.anchor >= 0) {
+        if (p !== p0) field = world.main2;
+        else if (!z.planned && d > 320 && p.alive) this.planRoute(z, p, world);
+        if (p === p0 && z.anchor >= 0) {
           const a = world.anchors[z.anchor];
           if (!a.ok || d < 170 || Math.hypot(a.x - z.x, a.y - z.y) < 90) z.anchor = -2;
           else field = a;
@@ -415,7 +424,7 @@ export class Horde {
           z.atk = 1 / def.attackRate;
           z.lunge = 1;
           p.hurt(def.damage, game);
-          game.onZombieHit(z);
+          game.onZombieHit(z, p);
           const push = def.punch || 40 * Math.sqrt(z.mass);
           p.kx += (dx / d) * push;
           p.ky += (dy / d) * push;
@@ -462,21 +471,26 @@ export class Horde {
         o.x += nx * ov * (z.mass / tm);
         o.y += ny * ov * (z.mass / tm);
       }
-      if (p.alive) {
-        const dx = p.x - z.x;
-        const dy = p.y - z.y;
-        const rr = z.r + p.r;
+      for (const pl of peer ? [p0, peer] : [p0]) {
+        if (!pl.alive) continue;
+        const dx = pl.x - z.x;
+        const dy = pl.y - z.y;
+        const rr = z.r + pl.r;
         const d2 = dx * dx + dy * dy;
         if (d2 < rr * rr) {
           const d = Math.sqrt(d2) || 0.01;
           const ov = rr - d;
           const nx = dx / d;
           const ny = dy / d;
-          const tm = z.mass + p.mass;
-          z.x -= nx * ov * (p.mass / tm);
-          z.y -= ny * ov * (p.mass / tm);
-          p.x += nx * ov * (z.mass / tm);
-          p.y += ny * ov * (z.mass / tm);
+          // al compañero lo mueve su propio celular: aquí sólo se aparta el zombi
+          const tm = pl === peer ? z.mass : z.mass + pl.mass;
+          const zk = pl === peer ? 1 : pl.mass / tm;
+          z.x -= nx * ov * zk;
+          z.y -= ny * ov * zk;
+          if (pl !== peer) {
+            pl.x += nx * ov * (z.mass / tm);
+            pl.y += ny * ov * (z.mass / tm);
+          }
         }
       }
       world.lastBlock = null;
@@ -514,7 +528,7 @@ export class Horde {
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
       z.y = clamp(z.y, 30, WORLD_SIZE - 30);
     }
-    if (p.alive) world.collide(p, p.r, true);
+    if (p0.alive) world.collide(p0, p0.r, true);
     grid.clear();
     for (const z of list) grid.insert(z);
   }

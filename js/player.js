@@ -123,6 +123,12 @@ export class Player {
 
   hurt(dmg, game) {
     if (!this.alive) return;
+    // compañero en cooperativo: su vida la lleva su propio celular
+    if (this.remote) {
+      this.hurtT = 0.3;
+      game.coop.send({ t: 'hurt', d: dmg });
+      return;
+    }
     // dentro del robot, el daño lo recibe el robot
     if (this.inRobot) {
       game.onRobotHit(dmg);
@@ -288,9 +294,11 @@ export class Player {
     const ox = blocked ? this.x : sx;
     const oy = blocked ? this.y : sy;
     const shot = { hit: false };
+    const fired = [];
     for (let i = 0; i < d.pellets; i++) {
       const off = d.pellets > 1 ? ((i / (d.pellets - 1)) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
       const a = aim + off;
+      fired.push(a);
       game.bullets.spawn({
         x: ox,
         y: oy,
@@ -321,6 +329,8 @@ export class Player {
     else game.particles.casing(this.x + ca * 8, this.y + sa * 8, this.angle + Math.PI / 2);
     game.particles.muzzleSmoke(sx, sy, this.angle);
     game.sfx.shot(d.id);
+    // invitado en cooperativo: el anfitrión crea las balas que de verdad hacen daño
+    if (game.coop && game.coop.isGuest) game.coop.sendShot(ox, oy, fired, d, this.stats);
     if (w.mag === 0 && w.reserve > 0) this.startReload(game);
   }
 }

@@ -2,6 +2,7 @@
 import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT } from './config.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
+import { Coop } from './coop.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
@@ -91,6 +92,7 @@ class Game {
     this.bullets = new Bullets();
     this.structures = new Structures();
     this.robot = new Robot();
+    this.coop = new Coop(this);
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
     this.ash = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), v: rand(0.004, 0.012), p: rand(0, TAU) }));
@@ -230,6 +232,7 @@ class Game {
     this.$('screen-shop').hidden = s !== 'shop';
     this.$('screen-account').hidden = s !== 'account';
     this.$('screen-board').hidden = s !== 'board';
+    this.$('screen-coop').hidden = s !== 'coop';
   }
 
   pause() {
@@ -251,6 +254,7 @@ class Game {
   // Se guarda cada pocos segundos, también a mitad de ronda (con los zombis vivos),
   // y al cerrar o minimizar la página. Al terminar una ronda se crea además un punto de control.
   saveProgress() {
+    if (this.coop.active) return;
     const p = this.player;
     const ds = this.director.state;
     if (!p || !p.alive || (ds !== 'waiting' && ds !== 'active')) return;
@@ -380,7 +384,10 @@ class Game {
   /* ---------- eventos de combate ---------- */
 
   hitZombie(z, b, hx, hy) {
-    if (z.dead) return;
+    // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
+    if (z.dead || this.coop.isGuest) return;
+    // quién lo hirió (cooperativo: las bajas del compañero le dan el dinero a él)
+    z.lastOwner = b.owner || null;
     z.hp -= b.dmg;
     z.flash = 0.08;
     // reacción breve: sacudida hacia un lado y leve agrandado (no frena su comportamiento)
@@ -419,14 +426,18 @@ class Game {
     this.kills[z.type] = (this.kills[z.type] || 0) + 1;
     if (z.burn > 0) z.burnt = true;
     this.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
+    const byPeer = z.lastOwner === 'peer' && this.coop.isHost;
     if (z.type === 'golden' && this.state !== 'menu') {
-      // recompensa única del zombi dorado
+      // recompensa única del zombi dorado (para quien lo mató)
       const reward = randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
-      this.money += reward;
-      this.moneyEarned += reward;
-      this.moneyPop(`+$${reward}`, 'gold');
-      this.sfx.gold();
-      this.toast(`¡Zombi dorado! +$${reward}`);
+      if (byPeer) this.coop.send({ t: 'earn', n: reward, gold: 1 });
+      else {
+        this.money += reward;
+        this.moneyEarned += reward;
+        this.moneyPop(`+$${reward}`, 'gold');
+        this.sfx.gold();
+        this.toast(`¡Zombi dorado! +$${reward}`);
+      }
       this.particles.pickupFx(z.x, z.y, '#f0c040');
     }
     this.particles.death(z.x, z.y, z.r);
@@ -434,11 +445,14 @@ class Game {
     if (z.type === 'fat' && this.state !== 'menu') this.structures.queueDeathBlast(z.type, z.x, z.y);
     this.addXp(z.def.xp);
     if (this.state !== 'menu') {
-      this.money += BOUNTY[z.type];
-      this.moneyEarned += BOUNTY[z.type];
+      if (byPeer) this.coop.earn(BOUNTY[z.type]);
+      else {
+        this.money += BOUNTY[z.type];
+        this.moneyEarned += BOUNTY[z.type];
+      }
     }
     const p = this.player;
-    const hasGuns = p.weapons.length > 1;
+    const hasGuns = p.weapons.length > 1 || this.coop.active;
     const r = Math.random();
     if (z.type === 'giant') {
       this.camera.shake(0.5);
@@ -459,6 +473,7 @@ class Game {
 
   // Subirse o bajarse del robot (E o el botón ROBOT).
   toggleRobot() {
+    if (this.coop.isGuest) return this.toast('En cooperativo el robot es del anfitrión');
     const rb = this.robot;
     const p = this.player;
     if (!rb.owned) return this.toast('Compra el robot de combate en la tienda');
@@ -509,12 +524,14 @@ class Game {
 
   // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
   rocketHit(z, x, y, b) {
+    if (this.coop.isGuest) return;
     if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(this, z, x, y, b);
-    else this.rocketBlast(x, y);
+    else this.rocketBlast(x, y, b.owner);
   }
 
-  rocketBlast(x, y) {
-    this.structures.explode(this, { x, y }, ROCKET.radius, ROCKET.power, 1);
+  rocketBlast(x, y, owner = null) {
+    if (this.coop.isGuest) return;
+    this.structures.explode(this, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
   }
 
   // Super golpe del blindado (al jugador o a una estructura).
@@ -586,7 +603,9 @@ class Game {
   }
 
   // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
-  onZombieHit() {
+  onZombieHit(z, target) {
+    // el golpe al compañero se lo cobra su propio celular
+    if (target && target.remote) return this.coop.send({ t: 'hit' });
     // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
     if (this.state === 'menu' || this.player.inRobot) return;
     const loss = Math.min(this.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
@@ -607,6 +626,14 @@ class Game {
     el.textContent = text;
     host.appendChild(el);
     setTimeout(() => el.remove(), 1300);
+  }
+
+  // Alrededor de quién aparecen los zombis (cooperativo: de cualquiera de los dos).
+  spawnFocus() {
+    const peer = this.coop.isHost && this.coop.peer && this.coop.peer.alive ? this.coop.peer : null;
+    if (!peer) return this.player;
+    if (!this.player.alive) return peer;
+    return Math.random() < 0.5 ? this.player : peer;
   }
 
   spawnGolden() {
@@ -645,6 +672,7 @@ class Game {
   }
 
   onPlayerDeath() {
+    if (this.coop.active) return this.coop.onLocalDeath();
     // al morir se pierde la partida: la siguiente empieza desde cero (el récord sí se guarda)
     storage.remove(this.accounts.saveKey());
     storage.remove(this.accounts.checkKey());
@@ -712,6 +740,7 @@ class Game {
   }
 
   onWaveCleared() {
+    this.coop.onWaveCleared();
     this.shopPending = true;
     this.sfx.level();
     this.saveProgress();
@@ -723,6 +752,67 @@ class Game {
     if (this.state === 'menu') return;
     if (this.accounts.recordScore({ wave: this.director.wave, kills: this.totalKills(), time: Math.round(this.time), level: this.level })) {
       this.toast('Nuevo récord de tu cuenta');
+    }
+  }
+
+  /* ---------- cooperativo: sala ---------- */
+
+  showCoop() {
+    this.sfx.unlock();
+    this.setState('coop');
+    this.$('coop-choose').hidden = false;
+    this.$('coop-wait').hidden = true;
+    this.$('coop-code-in').value = '';
+    this.coopStatus(this.coop.net.available ? '' : 'El cooperativo necesita la conexión a internet del juego (Firebase) y un navegador actual.');
+  }
+
+  coopStatus(text, bad = false) {
+    const el = this.$('coop-status');
+    el.textContent = text;
+    el.classList.toggle('bad', bad);
+  }
+
+  coopError(err) {
+    const m = String((err && err.message) || err);
+    if (m === 'cancelado') return;
+    const msg = {
+      'no-existe': 'No existe una sala con ese código (o ya caducó).',
+      llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
+      permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
+      tiempo: 'No se pudieron conectar los dos celulares. Prueben con otra red (por ejemplo, ambos en Wi-Fi).',
+    }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
+    this.coopStatus(msg, true);
+    this.$('coop-choose').hidden = false;
+    this.$('coop-wait').hidden = true;
+    this.coop.cancel();
+  }
+
+  async coopCreate() {
+    if (!this.coop.net.available) return;
+    this.$('coop-choose').hidden = true;
+    this.$('coop-wait').hidden = false;
+    this.$('coop-code').textContent = '····';
+    this.coopStatus('Creando sala…');
+    try {
+      await this.coop.create((code) => {
+        this.$('coop-code').textContent = code;
+        this.coopStatus('Esperando a tu compañero…');
+      });
+    } catch (err) {
+      this.coopError(err);
+    }
+  }
+
+  async coopJoin() {
+    const code = this.$('coop-code-in').value.trim().toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) return this.coopStatus('El código tiene 4 letras.', true);
+    if (!this.coop.net.available) return;
+    this.coopStatus('Conectando…');
+    try {
+      await this.coop.join(code);
+      this.coopStatus('¡Conectado! Esperando al anfitrión…');
+    } catch (err) {
+      this.coopError(err);
     }
   }
 
@@ -870,7 +960,8 @@ class Game {
   }
 
   startNextRound() {
-    if (this.state !== 'play' || !this.player.alive) return;
+    if (this.coop.isGuest) return this.coop.send({ t: 'next' });
+    if (this.state !== 'play' || (!this.player.alive && !this.coop.active)) return;
     this.sfx.unlock();
     if (this.director.nextRound(this)) this.updateHud(false);
   }
@@ -960,6 +1051,7 @@ class Game {
   }
 
   robotShopItem() {
+    if (this.coop.isGuest) return '<p class="shop-empty">En cooperativo el robot es del anfitrión.</p>';
     const rb = this.robot;
     let btn;
     let info;
@@ -1049,6 +1141,7 @@ class Game {
   }
 
   tryBuild() {
+    if (this.coop.isGuest) return this.coop.guestBuild();
     if (this.inv[this.buildSel] <= 0) {
       const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
       if (!next) {
@@ -1078,6 +1171,7 @@ class Game {
   }
 
   tryGrenade(kind = 'grenade') {
+    if (this.coop.isGuest) return this.coop.guestThrow(kind);
     if (this.inv[kind] <= 0) {
       this.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
       return;
@@ -1104,6 +1198,7 @@ class Game {
   /* ---------- fin de partida ---------- */
 
   gameOver() {
+    if (this.coop.isHost) this.coop.send({ t: 'over' });
     this.setState('over');
     const p = this.player;
     const total = this.totalKills();
@@ -1157,17 +1252,25 @@ class Game {
     });
     on('btn-pause', () => this.pause());
     on('btn-resume', () => this.resume());
-    on('btn-restart', () => this.start(true));
-    on('btn-again', () => this.start(true));
+    // en cooperativo reinicia el anfitrión (el invitado espera)
+    const again = () => {
+      if (this.coop.isHost) return this.coop.restart();
+      if (this.coop.isGuest) return this.toast('Espera a que el anfitrión reinicie la partida');
+      this.start(true);
+    };
+    on('btn-restart', again);
+    on('btn-again', again);
     on('btn-continue', () => {
       this.tryFullscreen();
       if (!this.loadProgress()) this.start(false);
     });
     on('btn-menu', () => {
+      this.coop.leave();
       this.newWorld();
       this.setupMenu();
     });
     on('btn-over-menu', () => {
+      this.coop.leave();
       this.newWorld();
       this.setupMenu();
     });
@@ -1179,6 +1282,16 @@ class Game {
     on('btn-shop-done', () => this.closeShop());
     on('btn-account', () => this.showAccount());
     on('btn-leaderboard', () => this.showBoard());
+    on('btn-coop', () => this.showCoop());
+    on('btn-coop-create', () => this.coopCreate());
+    on('btn-coop-back', () => {
+      this.coop.cancel();
+      this.setupMenu();
+    });
+    this.$('coop-join-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.coopJoin();
+    });
     on('btn-board-back', () => this.setupMenu());
     on('board-tab-local', () => {
       this.boardTab = 'local';
@@ -1394,7 +1507,11 @@ class Game {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     try {
-      if (this.state === 'play') this.update(dt);
+      this.coop.tick(dt);
+      if (this.state === 'play') {
+        if (this.coop.isGuest) this.coop.guestUpdate(dt);
+        else this.update(dt);
+      }
       else if (this.state === 'menu') this.updateMenu(dt);
       else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
@@ -1449,6 +1566,8 @@ class Game {
     this.flowT -= dt;
     if (this.flowT <= 0) {
       this.world.updateFlow(p.x, p.y);
+      const peer = this.coop.isHost ? this.coop.peer : null;
+      if (peer && peer.alive) this.world.computeField(this.world.main2, peer.x, peer.y);
       this.flowT = 0.2;
     }
     // un campo de flanqueo por fotograma (repartido): los zombis rodean por rutas reales
@@ -1480,17 +1599,21 @@ class Game {
     }
     this.music.setDanger(p.alive ? this.horde.danger : 0, dt);
     const look = this.input.mode === 'mouse' ? 50 : 24;
-    this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
+    // muerto en cooperativo: la cámara sigue a tu compañero hasta que revivas
+    const cp = !p.alive && this.coop.peer && this.coop.peer.alive ? this.coop.peer : p;
+    this.camera.update(dt, cp.x + Math.cos(cp.angle) * look, cp.y + Math.sin(cp.angle) * look, false);
     this.muzzle = Math.max(0, this.muzzle - dt * 14);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);
     this.updateAcid(dt);
     this.updateHud(false);
     if (!p.alive) {
+      if (this.coop.active && this.coop.peer && this.coop.peer.alive) return;
       this.deathT -= dt;
       if (this.deathT <= 0) this.gameOver();
       return;
     }
-    if (this.pendingLevels > 0) this.openLevelUp();
+    // en cooperativo las mejoras se eligen entre oleadas (el juego no se pausa para el otro)
+    if (this.pendingLevels > 0 && (!this.coop.active || this.director.state === 'waiting')) this.openLevelUp();
     else if (this.shopPending) this.openShop();
     else {
       this.saveT = (this.saveT || 0) + dt;
@@ -1540,9 +1663,11 @@ class Game {
       if (p.inRobot) this.robot.draw(ctx, p, this.time);
       else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
+      this.coop.drawPeer(ctx);
     }
     this.horde.draw(ctx, v, base, 'giant');
     this.bullets.draw(ctx);
+    this.coop.drawRemoteBullets(ctx);
     this.structures.drawGrenades(ctx);
     this.world.drawOverhead(ctx, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
     this.particles.draw(ctx, v);

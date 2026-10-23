@@ -193,7 +193,7 @@ export class Structures {
     const lx = x - z.x;
     const ly = y - z.y;
     this.stuck.push({
-      z, kind: z.type, x, y,
+      z, kind: z.type, x, y, owner: b.owner || null,
       ox: (lx * c - ly * s) * 0.7, oy: (lx * s + ly * c) * 0.7,
       a: Math.atan2(b.dy, b.dx) - z.angle,
       t: 0, stick: fat ? ROCKET.fatStick : ROCKET.heavyStick, glow: fat ? ROCKET.fatGlow : 0,
@@ -226,6 +226,7 @@ export class Structures {
         // revienta brutalmente: carne y sangre por todos lados y todos salen volando
         const cx = z.x;
         const cy = z.y;
+        z.lastOwner = r.owner;
         if (!z.dead) game.killZombie(z);
         game.particles.gore(cx, cy, ROCKET.fatRadius);
         for (let k = 0; k < 14; k++) {
@@ -234,11 +235,12 @@ export class Structures {
           game.decals.splat(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rand(8, 18));
         }
         game.sfx.gore();
-        this.explode(game, { x: cx, y: cy }, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
+        this.explode(game, { x: cx, y: cy, owner: r.owner }, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
         game.camera.shake(0.9);
       } else {
         // super blindado: lo revienta de un solo tiro
         if (!z.dead) {
+          z.lastOwner = r.owner;
           z.lastDx = Math.cos(r.ang || 0) * 3;
           z.lastDy = Math.sin(r.ang || 0) * 3;
           game.killZombie(z);
@@ -291,7 +293,7 @@ export class Structures {
     game.sfx.throwBottle();
   }
 
-  ignite(game, x, y) {
+  ignite(game, x, y, owner = null) {
     const R = MOLOTOV.radius;
     const flames = [];
     for (let i = 0; i < 16; i++) {
@@ -299,7 +301,8 @@ export class Structures {
       const d = Math.sqrt(Math.random()) * R * 0.85;
       flames.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.85, s: rand(0.7, 1.25), ph: rand(0, 10) });
     }
-    this.fires.push({ x, y, r: R, t: 0, life: MOLOTOV.life, tick: 0, flames });
+    this.fireId = (this.fireId || 0) + 1;
+    this.fires.push({ id: this.fireId, x, y, r: R, t: 0, life: MOLOTOV.life, tick: 0, flames, owner });
     if (this.fires.length > 8) this.fires.shift();
     game.particles.shatter(x, y);
     game.sfx.molotov();
@@ -325,7 +328,10 @@ export class Structures {
         if (z.dead) continue;
         const dx = z.x - f.x;
         const dy = z.y - f.y;
-        if (dx * dx + dy * dy < (R + z.r * 0.5) ** 2) z.burn = Math.max(z.burn, MOLOTOV.burn);
+        if (dx * dx + dy * dy < (R + z.r * 0.5) ** 2) {
+          z.burn = Math.max(z.burn, MOLOTOV.burn);
+          z.lastOwner = f.owner || null;
+        }
       }
       if (Math.random() < 0.5) game.sfx.crackle();
     }
@@ -374,6 +380,7 @@ export class Structures {
     const pd = Math.hypot(p.x - x, p.y - y);
     game.camera.shake(0.2 * clamp(1 - pd / 500, 0, 1));
     if (pd < R + p.r) game.applyAcid();
+    if (game.coop && game.coop.isHost) game.coop.acidAt(x, y, R);
   }
 
   // fling > 0: la onda lanza a volar a los que sobreviven (cohetes de bazuca)
@@ -388,7 +395,7 @@ export class Structures {
       if (d > R + z.r) continue;
       const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: (120 + 260 * f) * (1 + fling), shot: null, blast: true }, z.x, z.y);
+      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: (120 + 260 * f) * (1 + fling), shot: null, blast: true, owner: g.owner }, z.x, z.y);
       if (fling && !z.dead) {
         z.airV = Math.max(z.airV || 0, ((160 + 320 * f) * fling) / Math.sqrt(z.mass));
         z.air = z.air || 0.01;
@@ -424,7 +431,7 @@ export class Structures {
       if (k < 1) g.rot += dt * 14;
       if (g.t >= g.fuse) {
         this.grenades.splice(i, 1);
-        if (g.kind === 'molotov') this.ignite(game, g.x, g.y);
+        if (g.kind === 'molotov') this.ignite(game, g.x, g.y, g.owner);
         else this.explode(game, g);
       }
     }
