@@ -26,6 +26,63 @@ const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
 
 const r100 = (v) => Math.round(v * 100);
 
+// Reloj de llegada: convierte la hora del otro celular en la nuestra y calcula cuánto
+// atrasar el dibujo para tener siempre dos posiciones entre las que trazar el camino,
+// aunque los datos lleguen disparejos o en grupitos (sobre todo por Firebase).
+class Clock {
+  constructor() {
+    this.off = null;
+    this.prevTs = null;
+    this.gap = 100;
+    this.late = 20;
+  }
+  stamp(ts) {
+    const now = performance.now();
+    if (!Number.isFinite(ts)) return now;
+    const raw = now - ts;
+    if (this.off === null || raw < this.off) this.off = raw;
+    else this.off += (raw - this.off) * 0.002;
+    this.late += (raw - this.off - this.late) * 0.1;
+    if (this.prevTs !== null && ts > this.prevTs) this.gap += (Math.min(600, ts - this.prevTs) - this.gap) * 0.1;
+    this.prevTs = ts;
+    return ts + this.off;
+  }
+  get delay() {
+    return Math.max(70, Math.min(450, this.gap * 1.3 + this.late * 1.5 + 25));
+  }
+}
+
+// Guarda las últimas posiciones recibidas de algo que se mueve.
+function track(o, t, x, y) {
+  const s = o.trk || (o.trk = []);
+  if (s.length && t - s[s.length - 1][0] > 1000) s.length = 0;
+  if (s.length && t <= s[s.length - 1][0]) return;
+  s.push([t, x, y]);
+  if (s.length > 5) s.shift();
+}
+
+// Coloca o en su posición a la hora t (entre dos posiciones; un poquito hacia delante si faltan datos).
+function place(o, t) {
+  const s = o.trk;
+  if (!s || !s.length) return;
+  if (s.length === 1 || t <= s[0][0]) {
+    o.x = s[0][1];
+    o.y = s[0][2];
+    return;
+  }
+  for (let i = s.length - 1; i > 0; i--) {
+    const a = s[i - 1];
+    const b = s[i];
+    if (t >= a[0] && (t <= b[0] || i === s.length - 1)) {
+      const span = b[0] - a[0] || 1;
+      const k = Math.min((t - a[0]) / span, 1 + 150 / span);
+      o.x = a[1] + (b[1] - a[1]) * k;
+      o.y = a[2] + (b[2] - a[2]) * k;
+      return;
+    }
+  }
+}
+
 export class Coop {
   constructor(game) {
     this.game = game;
@@ -46,6 +103,7 @@ export class Coop {
     this.pendingBuild = null;
     this.lastDs = null;
     this.levelSeen = 1;
+    this.clock = new Clock();
   }
 
   get active() {
@@ -95,6 +153,7 @@ export class Coop {
     g.newWorld();
     g.resetRun();
     this.mode = 'host';
+    this.clock = new Clock();
     g.coopRun = true;
     g.director.coop = true;
     const s = g.world.spawn;
@@ -124,6 +183,7 @@ export class Coop {
     g.newWorld(m.seed);
     g.resetRun();
     this.mode = 'guest';
+    this.clock = new Clock();
     g.coopRun = true;
     this.peerName = m.name || 'Anfitrión';
     g.director.coop = true;
@@ -222,9 +282,7 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     if (!peer) return;
-    const k = 1 - Math.exp(-dt * 16);
-    peer.x += (peer.tx - peer.x) * k;
-    peer.y += (peer.ty - peer.y) * k;
+    place(peer, performance.now() - this.clock.delay);
     peer.flashT -= dt;
     peer.hurtT -= dt;
     peer.recoil = Math.max(0, peer.recoil - dt * 8);
@@ -257,7 +315,7 @@ export class Coop {
     }
     const st = g.structures;
     const s = {
-      t: 's', w: g.director.wave, ds: g.director.state, tm: Math.round(g.time), lv: g.level, xp: Math.round(g.xp), xn: g.xpNeed,
+      t: 's', ts: Math.round(performance.now()), w: g.director.wave, ds: g.director.state, tm: Math.round(g.time), lv: g.level, xp: Math.round(g.xp), xn: g.xpNeed,
       z, hp: this.packPlayer(g.player),
       pk: g.pickups.list.flatMap((it) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
       b: g.bullets.list.flatMap((b) => (b.owner !== 'peer' && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
@@ -304,6 +362,7 @@ export class Coop {
       case 'in': {
         peer.tx = Number(m.x) || peer.tx;
         peer.ty = Number(m.y) || peer.ty;
+        track(peer, this.clock.stamp(Number(m.ts)), peer.tx, peer.ty);
         peer.angle = Number(m.a) || 0;
         peer.legAngle = Number(m.la) || 0;
         peer.walkPhase = Number(m.wp) || 0;
@@ -357,6 +416,8 @@ export class Coop {
     if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
       q.x = q.tx = m.x;
       q.y = q.ty = m.y;
+      q.trk = null;
+      track(q, performance.now() - this.clock.delay, m.x, m.y);
     }
     if (Number.isFinite(m.a)) q.angle = m.a;
   }
@@ -470,9 +531,7 @@ export class Coop {
     // el anfitrión (dibujo) se mueve suave entre fotos
     const h = this.peer;
     if (h && h.tx !== undefined) {
-      const k = 1 - Math.exp(-dt * 14);
-      h.x += (h.tx - h.x) * k;
-      h.y += (h.ty - h.y) * k;
+      place(h, performance.now() - this.clock.delay);
       h.flashT -= dt;
       h.hurtT -= dt;
     }
@@ -481,7 +540,7 @@ export class Coop {
     this.inT = 1 / IN_HZ;
     const w = p.weapon;
     this.send({
-      t: 'in', x: Math.round(p.x), y: Math.round(p.y), a: r100(p.angle) / 100, la: r100(p.legAngle) / 100, wp: Math.round(p.walkPhase * 10) / 10,
+      t: 'in', ts: Math.round(performance.now()), x: Math.round(p.x), y: Math.round(p.y), a: r100(p.angle) / 100, la: r100(p.legAngle) / 100, wp: Math.round(p.walkPhase * 10) / 10,
       sp: Math.round(p.speedNow), run: p.running ? 1 : 0, al: p.alive ? 1 : 0, hp: Math.ceil(p.hp), mh: p.stats.maxHp,
       na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
       w: w.id, mag: w.mag, rl: r100(Math.max(0, p.reloadT)) / 100, rp: r100(p.reloadProg || 0) / 100,
@@ -544,8 +603,9 @@ export class Coop {
       this.levelSeen = s.lv;
     }
     if (s.kl) g.kills = s.kl;
-    this.applyZombies(s.z || []);
-    this.applyPuppet(s.hp);
+    const st0 = this.clock.stamp(Number(s.ts));
+    this.applyZombies(s.z || [], st0);
+    this.applyPuppet(s.hp, st0);
     // objetos, balas, granadas, fuego, cohetes clavados, explosiones
     const pk = s.pk || [];
     g.pickups.list = [];
@@ -602,7 +662,7 @@ export class Coop {
     } else rb.owned = false;
   }
 
-  applyPuppet(a) {
+  applyPuppet(a, t) {
     const h = this.peer;
     if (!h || !Array.isArray(a)) return;
     if (h.tx === undefined) {
@@ -611,6 +671,7 @@ export class Coop {
     }
     h.tx = a[0];
     h.ty = a[1];
+    track(h, t, a[0], a[1]);
     h.angle = a[2] / 100;
     h.legAngle = a[3] / 100;
     h.walkPhase = a[4] / 10;
@@ -630,7 +691,7 @@ export class Coop {
     h.speedNow = a[15];
   }
 
-  applyZombies(z) {
+  applyZombies(z, t) {
     const g = this.game;
     const seen = new Set();
     for (let i = 0; i + 8 < z.length; i += 9) {
@@ -650,6 +711,7 @@ export class Coop {
       }
       o.tx = z[i + 3];
       o.ty = z[i + 4];
+      track(o, t, o.tx, o.ty);
       o.ta = z[i + 5] / 100;
       const f = z[i + 6];
       o.flash = f & 1 ? 0.06 : 0;
@@ -687,8 +749,8 @@ export class Coop {
       if (g.input.consume('robot')) g.toggleRobot();
       if (g.input.consume('nextRound')) g.startNextRound();
     }
-    // zombis: se deslizan hacia la última posición recibida y caminan con su animación
-    const k = 1 - Math.exp(-dt * 14);
+    // zombis: recorren el camino entre las posiciones recibidas (un poco en diferido) y caminan con su animación
+    const rt = performance.now() - this.clock.delay;
     const grid = g.horde.grid;
     grid.clear();
     let danger = 0;
@@ -696,8 +758,7 @@ export class Coop {
     for (const z of g.horde.list) {
       const ox = z.x;
       const oy = z.y;
-      z.x += (z.tx - z.x) * k;
-      z.y += (z.ty - z.y) * k;
+      place(z, rt);
       z.angle = angleTo(z.angle, z.ta, dt * 10);
       z.anim += Math.hypot(z.x - ox, z.y - oy) / (z.r * 0.55);
       z.hitT -= dt;
