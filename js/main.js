@@ -774,7 +774,7 @@ class Game {
     this.$('coop-choose').hidden = false;
     this.$('coop-wait').hidden = true;
     this.$('coop-code-in').value = '';
-    this.coopStatus(this.coop.net.available ? '' : 'El cooperativo necesita la conexión a internet del juego (Firebase) y un navegador actual.');
+    this.coopStatus(this.coop.net.available ? '' : 'El cooperativo necesita internet y un navegador con conexión directa (WebRTC).');
   }
 
   coopStatus(text, bad = false) {
@@ -791,6 +791,7 @@ class Game {
       llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
       permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
       tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
+      directa: 'No se pudo conectar directo entre los celulares. Prueben los dos en la misma red Wi‑Fi o con otra red (algunas redes móviles lo bloquean).',
     }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
     this.coopStatus(msg, true);
     this.$('coop-choose').hidden = false;

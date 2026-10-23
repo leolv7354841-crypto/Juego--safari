@@ -976,7 +976,7 @@ export class Coop {
     this.statT = 0;
     this.frames = 0;
     this.rx = 0;
-    const via = this.net.direct ? 'Directa' : 'Firebase';
+    const via = 'Directa';
     const lag = Math.round(this.clock.delay);
     return this.isGuest ? `${via} · ${lag} ms · ${per} act/s · ${fps} FPS` : `${via} · ${lag} ms · ${fps} FPS`;
   }

@@ -6,8 +6,9 @@
 // Ejecutar antes de cada commit:  node tools/stamp.mjs
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const mods = readdirSync(root + 'js').filter((f) => f.endsWith('.js')).sort();
 const h = createHash('sha1');
 for (const f of mods) if (f !== 'version.js') h.update(readFileSync(root + 'js/' + f));

@@ -187,7 +187,8 @@ En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de in
 ```
 
 `rooms` es para las salas del modo cooperativo (sólo guardan unos segundos la "dirección" de cada
-celular para conectarlos).
+celular para conectarlos). La partida en sí va directo entre los dos celulares (WebRTC, P2P); algunas
+redes móviles bloquean la conexión directa y en ellas el cooperativo no conecta.
 
 4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
    `js/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
