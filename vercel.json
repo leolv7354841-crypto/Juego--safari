@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
   "redirects": [
     { "source": "/", "destination": "/deadzone/", "permanent": false },
     { "source": "/deadzone", "destination": "/deadzone/", "permanent": false }
