@@ -1620,10 +1620,12 @@ class Game {
       this.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
     }
     this.music.setDanger(p.alive ? this.horde.danger : 0, dt);
-    const look = this.input.mode === 'mouse' ? 50 : 24;
-    // muerto en cooperativo: la cámara sigue a tu compañero hasta que revivas
-    const cp = !p.alive && this.coop.peer && this.coop.peer.alive ? this.coop.peer : p;
-    this.camera.update(dt, cp.x + Math.cos(cp.angle) * look, cp.y + Math.sin(cp.angle) * look, false);
+    // muerto en cooperativo: la cámara sigue suave a tu compañero hasta que revivas
+    if (!p.alive && this.coop.peer && this.coop.peer.alive) this.camera.update(dt, this.coop.peer.x, this.coop.peer.y, false);
+    else {
+      const look = this.input.mode === 'mouse' ? 50 : 24;
+      this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
+    }
     this.muzzle = Math.max(0, this.muzzle - dt * 14);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);
     this.updateAcid(dt);

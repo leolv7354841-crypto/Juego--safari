@@ -1,4 +1,4 @@
-// Modo cooperativo para 2 jugadores (sin competitivo), 4 veces más difícil.
+// Modo cooperativo para 2 jugadores (sin competitivo), 2 veces más difícil.
 //
 // El anfitrión simula todo el mundo (zombis, oleadas, estructuras, explosiones) y le manda
 // al invitado ~12 veces por segundo una "foto" de lo que hay cerca de él, más los efectos
@@ -167,7 +167,7 @@ export class Coop {
     g.input.setRun(false);
     g.setState('play');
     g.updateHud(true);
-    g.toast('¡Cooperativo! Hordas 4 veces más difíciles');
+    g.toast('¡Cooperativo! Hordas 2 veces más difíciles');
   }
 
   // El anfitrión vuelve a empezar con el mismo compañero (después de perder).
@@ -203,7 +203,7 @@ export class Coop {
     g.input.setRun(false);
     g.setState('play');
     g.updateHud(true);
-    g.toast('¡Conectado! Hordas 4 veces más difíciles');
+    g.toast('¡Conectado! Hordas 2 veces más difíciles');
   }
 
   /* ---------- efectos grabados (anfitrión) ---------- */
@@ -283,6 +283,7 @@ export class Coop {
     const peer = this.peer;
     if (!peer) return;
     place(peer, performance.now() - this.clock.delay);
+    this.turn(peer, dt);
     peer.flashT -= dt;
     peer.hurtT -= dt;
     peer.recoil = Math.max(0, peer.recoil - dt * 8);
@@ -341,6 +342,16 @@ export class Coop {
       r100(Math.max(0, p.reloadT)), r100(p.reloadProg || 0), p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.inRobot ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow)];
   }
 
+  // La mira y las piernas del compañero giran suave hacia lo último recibido.
+  turn(q, dt) {
+    if (q.ta !== undefined) q.angle = angleTo(q.angle, q.ta, dt * 14);
+    if (q.tla !== undefined) q.legAngle = angleTo(q.legAngle, q.tla, dt * 10);
+    // el paso de las piernas sale del movimiento que se ve, así no salta
+    if (q.lx !== undefined) q.walkPhase += Math.hypot(q.x - q.lx, q.y - q.ly) * 0.11;
+    q.lx = q.x;
+    q.ly = q.y;
+  }
+
   /* ---------- mensajes ---------- */
 
   onMessage(m) {
@@ -363,9 +374,8 @@ export class Coop {
         peer.tx = Number(m.x) || peer.tx;
         peer.ty = Number(m.y) || peer.ty;
         track(peer, this.clock.stamp(Number(m.ts)), peer.tx, peer.ty);
-        peer.angle = Number(m.a) || 0;
-        peer.legAngle = Number(m.la) || 0;
-        peer.walkPhase = Number(m.wp) || 0;
+        peer.ta = Number(m.a) || 0;
+        peer.tla = Number(m.la) || 0;
         peer.speedNow = Number(m.sp) || 0;
         peer.running = !!m.run;
         peer.alive = !!m.al;
@@ -419,7 +429,7 @@ export class Coop {
       q.trk = null;
       track(q, performance.now() - this.clock.delay, m.x, m.y);
     }
-    if (Number.isFinite(m.a)) q.angle = m.a;
+    if (Number.isFinite(m.a)) q.angle = q.ta = m.a;
   }
 
   peerShot(m) {
@@ -532,6 +542,7 @@ export class Coop {
     const h = this.peer;
     if (h && h.tx !== undefined) {
       place(h, performance.now() - this.clock.delay);
+      this.turn(h, dt);
       h.flashT -= dt;
       h.hurtT -= dt;
     }
@@ -672,9 +683,8 @@ export class Coop {
     h.tx = a[0];
     h.ty = a[1];
     track(h, t, a[0], a[1]);
-    h.angle = a[2] / 100;
-    h.legAngle = a[3] / 100;
-    h.walkPhase = a[4] / 10;
+    h.ta = a[2] / 100;
+    h.tla = a[3] / 100;
     h.running = !!a[5];
     if (WEAPONS[a[6]] && (!h.weapons[0] || h.weapons[0].id !== a[6])) {
       h.weapons = [h.makeWeapon(a[6])];
@@ -797,9 +807,12 @@ export class Coop {
       g.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
     }
     g.music.setDanger(p.alive ? danger : 0, dt);
-    const look = g.input.mode === 'mouse' ? 50 : 24;
-    const cp = !p.alive && this.peer && this.peer.alive ? this.peer : p;
-    g.camera.update(dt, cp.x + Math.cos(cp.angle) * look, cp.y + Math.sin(cp.angle) * look, false);
+    // muerto: la cámara sigue suave a tu compañero (sin adelantarse hacia donde apunta)
+    if (!p.alive && this.peer && this.peer.alive) g.camera.update(dt, this.peer.x, this.peer.y, false);
+    else {
+      const look = g.input.mode === 'mouse' ? 50 : 24;
+      g.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
+    }
     g.muzzle = Math.max(0, g.muzzle - dt * 14);
     g.hurtFlash = Math.max(0, g.hurtFlash - dt * 1.4);
     g.updateAcid(dt);
