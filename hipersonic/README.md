@@ -56,3 +56,9 @@ Todo el arte se pinta por código al arrancar y se empaqueta en un atlas de text
 (`js/atlas.js`). Para ver el atlas abre `dev/atlas.html`; para ver los personajes de cerca,
 `dev/chars.html`. Cualquier sprite se puede sustituir por un PNG pintado a mano: ver
 `assets/README.md`.
+
+## Versiones y caché
+
+Antes de cada commit ejecuta `node hipersonic/tools/stamp.mjs`: sella `index.html` con un
+hash del código para que el navegador y raw.githack.com no sirvan archivos viejos. La
+versión aparece en el menú principal.
