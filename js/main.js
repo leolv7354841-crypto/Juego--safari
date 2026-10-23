@@ -150,6 +150,8 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
+    // partida del cooperativo: nunca toca el guardado de tu partida normal
+    this.coopRun = false;
     this.robot.reset();
     this.setAcid(0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
@@ -254,7 +256,7 @@ class Game {
   // Se guarda cada pocos segundos, también a mitad de ronda (con los zombis vivos),
   // y al cerrar o minimizar la página. Al terminar una ronda se crea además un punto de control.
   saveProgress() {
-    if (this.coop.active) return;
+    if (this.coop.active || this.coopRun) return;
     const p = this.player;
     const ds = this.director.state;
     if (!p || !p.alive || (ds !== 'waiting' && ds !== 'active')) return;
@@ -673,6 +675,14 @@ class Game {
 
   onPlayerDeath() {
     if (this.coop.active) return this.coop.onLocalDeath();
+    // la partida venía del cooperativo (tu compañero se fue): se pierde sólo esa
+    if (this.coopRun) {
+      this.recordScore();
+      this.deathT = 1.6;
+      this.input.reset();
+      this.camera.shake(0.6);
+      return;
+    }
     // al morir se pierde la partida: la siguiente empieza desde cero (el récord sí se guarda)
     storage.remove(this.accounts.saveKey());
     storage.remove(this.accounts.checkKey());
@@ -1263,6 +1273,11 @@ class Game {
     const again = () => {
       if (this.coop.isHost) return this.coop.restart();
       if (this.coop.isGuest) return this.toast('Espera a que el anfitrión reinicie la partida');
+      // venías del cooperativo: al menú, donde sigue tu partida normal
+      if (this.coopRun) {
+        this.newWorld();
+        return this.setupMenu();
+      }
       this.start(true);
     };
     on('btn-restart', again);

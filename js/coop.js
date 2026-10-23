@@ -95,6 +95,7 @@ export class Coop {
     g.newWorld();
     g.resetRun();
     this.mode = 'host';
+    g.coopRun = true;
     g.director.coop = true;
     const s = g.world.spawn;
     this.peer = new Player(s.x + 46, s.y + 10);
@@ -123,6 +124,7 @@ export class Coop {
     g.newWorld(m.seed);
     g.resetRun();
     this.mode = 'guest';
+    g.coopRun = true;
     this.peerName = m.name || 'Anfitrión';
     g.director.coop = true;
     g.director.state = 'waiting';
