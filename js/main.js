@@ -1492,7 +1492,8 @@ class Game {
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // calidad automática: en celulares lentos se dibuja con menos píxeles (ver adaptQuality)
+    this.dpr = Math.max(0.6, Math.min(window.devicePixelRatio || 1, 2) * (this.quality || 1));
     this.canvas.width = Math.round(w * this.dpr);
     this.canvas.height = Math.round(h * this.dpr);
     this.cssW = w;
@@ -1510,6 +1511,33 @@ class Game {
       this.world.maxChunks = this.maxChunks;
     }
     this.redVignette = this.makeVignette('150,20,15', 0.85);
+  }
+
+  // Si el juego va lento (pocos FPS) baja la resolución de dibujo un paso; si va sobrado, la sube.
+  adaptQuality(dt) {
+    if (this.state !== 'play') return;
+    const q = (this.qStat = this.qStat || { t: 0, n: 0, good: 0 });
+    q.t += dt;
+    q.n++;
+    if (q.t < 2) return;
+    const fps = q.n / q.t;
+    q.t = 0;
+    q.n = 0;
+    const steps = [1, 0.85, 0.7, 0.55];
+    const i = Math.max(0, steps.indexOf(this.quality || 1));
+    if (fps < 40 && i < steps.length - 1) {
+      // muy lento: baja dos pasos de golpe
+      this.quality = steps[Math.min(steps.length - 1, i + (fps < 25 ? 2 : 1))];
+      q.good = 0;
+      this.resize();
+    } else if (fps > 57 && i > 0) {
+      // sólo vuelve a subir tras un buen rato fluido, para no estar cambiando
+      if (++q.good >= 5) {
+        this.quality = steps[i - 1];
+        q.good = 0;
+        this.resize();
+      }
+    } else q.good = 0;
   }
 
   makeVignette(rgb, a) {
@@ -1530,6 +1558,7 @@ class Game {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     try {
+      this.adaptQuality(dt);
       this.coop.tick(dt);
       // indicador de conexión del cooperativo (se actualiza una vez por segundo)
       const ns = this.$('net-stat');
