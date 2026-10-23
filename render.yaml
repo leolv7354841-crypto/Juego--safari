@@ -14,9 +14,9 @@ services:
       # Node 22.18 o más nuevo (ejecuta TypeScript sin compilar)
       - key: NODE_VERSION
         value: "24"
-      # páginas que pueden usar el servidor, separadas por comas (sin barra final)
+      # páginas que pueden usar el servidor, separadas por comas (sin barra final; '*' = un trozo del nombre)
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "https://yeyo.games,https://*.yeyo.games,https://deadzone*.vercel.app,https://raw.githack.com"
       # en el plan gratis (0,1 CPU) conviene mandar menos fotos por segundo; ver README
       - key: SNAP_HZ
         value: "10"

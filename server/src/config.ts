@@ -29,5 +29,9 @@ export const CONFIG = {
 export function originAllowed(origin: string | null | undefined): boolean {
   if (!CONFIG.origins.length) return true;
   if (!origin) return false;
-  return CONFIG.origins.includes(origin.replace(/\/$/, ''));
+  const o = origin.replace(/\/$/, '');
+  // '*' vale por cualquier trozo sin puntos ni barras (p. ej. https://deadzone-*.vercel.app)
+  return CONFIG.origins.some((p) => p === o || (p.includes('*') && glob(p).test(o)));
 }
+
+const glob = (p: string) => new RegExp('^' + p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^./]*') + '$');
