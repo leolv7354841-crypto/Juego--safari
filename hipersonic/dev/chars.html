@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>HIPERSONIC · personajes</title>
+<style>body{margin:0;background:#3a3d40}canvas{display:block}</style></head>
+<body><canvas id="c" width="1500" height="900"></canvas>
+<script type="module">
+import { Atlas } from '../js/atlas.js';
+import { bakeCharacter, civilianStyles, enemyStyles, HERO_STYLE, paintBat, paintPipe } from '../js/art/characters.js';
+import { drawStanding, drawRagdoll } from '../js/pose.js';
+const atlas = new Atlas();
+const props = { bat: atlas.add('bat', 26, 8, paintBat, { ax: 2 }), pipe: atlas.add('pipe', 26, 8, paintPipe, { ax: 2 }) };
+const hero = bakeCharacter(atlas, 'hero', HERO_STYLE, 12.5);
+const civ = civilianStyles(12).map((s, i) => bakeCharacter(atlas, 'civ' + i, s, 12));
+const en = enemyStyles().map((s, i) => bakeCharacter(atlas, 'en' + i, s, 12 * (s.build > 1.15 ? 1.1 : 1)));
+const g = document.getElementById('c').getContext('2d');
+g.fillStyle = '#4a4d50'; g.fillRect(0, 0, 1500, 900);
+g.scale(3, 3);
+const poses = [
+  { amp: 0, phase: 0 }, { amp: 1, phase: 0.8 }, { amp: 1, phase: 2.4, run: 1 }, { amp: 1, phase: 1, hyper: 1 }, { amp: 0.3, phase: 0, punch: 0.5, punchSide: 1 },
+];
+poses.forEach((p, i) => drawStanding(g, hero, { x: 30 + i * 45, y: 30, face: -0.4, legAng: -0.4, look: -0.1, ...p }));
+civ.forEach((k, i) => drawStanding(g, k, { x: 30 + (i % 10) * 45, y: 85 + Math.floor(i / 10) * 50, face: 0.3 * i, legAng: 0.3 * i, look: 0.3 * i, amp: i % 2, phase: i }));
+en.forEach((k, i) => drawStanding(g, k, { x: 30 + i * 45, y: 200, face: 1.57, legAng: 1.57, amp: 0.6, phase: i, prop: k.st.prop, swing: i % 2 ? 0 : 0.6 }, null, props));
+const rag = (cx, cy) => [{x:cx,y:cy,z:0},{x:cx+12,y:cy-2,z:0},{x:cx+22,y:cy-1,z:0},{x:cx+12,y:cy-16,z:0},{x:cx+4,y:cy+14,z:0},{x:cx-14,y:cy-6,z:0},{x:cx-13,y:cy+7,z:0}];
+drawRagdoll(g, hero, rag(260, 30));
+drawRagdoll(g, civ[0], rag(320, 30));
+drawRagdoll(g, en[0], rag(380, 30), 'flash');
+drawStanding(g, civ[3], { x: 440, y: 30, face: 0, legAng: 0, amp: 0 }, 'ghost');
+</script></body></html>

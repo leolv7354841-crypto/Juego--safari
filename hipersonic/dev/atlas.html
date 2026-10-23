@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>HIPERSONIC · atlas</title>
+<style>
+body{margin:0;background:#1a1d22;color:#dde;font:13px system-ui,sans-serif;padding:16px}
+h2{font-size:15px;margin:18px 0 8px}
+.page{background:repeating-conic-gradient(#2a2e35 0 25%,#23262c 0 50%) 0 0/24px 24px;max-width:100%;border:1px solid #444}
+table{border-collapse:collapse;margin-top:12px}td{padding:2px 10px;border-bottom:1px solid #333}
+</style></head>
+<body>
+<h1>Atlas de texturas</h1>
+<p>Cada hoja mide 2048 px. Los nombres sirven para sustituir sprites con <code>assets/manifest.json</code>.</p>
+<div id="pages"></div>
+<table id="list"><tr><th>Nombre</th><th>Tamaño (mundo)</th><th>Hoja</th></tr></table>
+<script type="module">
+import { Atlas } from '../js/atlas.js';
+import { bakeCharacter, civilianStyles, enemyStyles, HERO_STYLE, paintBat, paintPipe } from '../js/art/characters.js';
+import { bakeVehicle, MODELS, CAR_COLORS } from '../js/art/vehicles.js';
+import { World } from '../js/world.js';
+import { buildFx } from '../js/art/fx.js';
+const atlas = new Atlas();
+atlas.add('bat', 26, 8, paintBat, { ax: 2 });
+atlas.add('pipe', 26, 8, paintPipe, { ax: 2 });
+bakeCharacter(atlas, 'hero', HERO_STYLE, 12.5);
+civilianStyles(26).forEach((s, i) => bakeCharacter(atlas, 'civ' + i, s, 12));
+enemyStyles().forEach((s, i) => bakeCharacter(atlas, 'en' + i, s, s.build > 1.15 ? 13.2 : 12.2));
+for (const m of Object.keys(MODELS)) bakeVehicle(atlas, m, MODELS[m].color || CAR_COLORS[0], 1);
+const w = new World(atlas);
+w.fx = buildFx();
+const box = document.getElementById('pages');
+atlas.pages.forEach((p, i) => {
+  const h = document.createElement('h2');
+  h.textContent = 'Hoja ' + (i + 1);
+  box.append(h);
+  p.canvas.className = 'page';
+  p.canvas.style.width = '1024px';
+  box.append(p.canvas);
+});
+const list = document.getElementById('list');
+for (const s of atlas.sprites.values()) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${s.name}</td><td>${s.w.toFixed(0)} × ${s.h.toFixed(0)}</td><td>${atlas.pages.findIndex((p) => p.canvas === s.img) + 1}</td>`;
+  list.append(tr);
+}
+</script></body></html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>HIPERSONIC</title>
+  <meta name="description" content="HIPERSONIC: supervelocidad y destrucción en 2D cenital. Juega en el navegador.">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Saira+Condensed:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game" class="state-menu">
+    <canvas id="view" aria-label="Zona de juego"></canvas>
+
+    <div id="hud">
+      <div class="hud-left panel">
+        <div class="who">
+          <svg viewBox="0 0 24 24" class="bolt" aria-hidden="true"><path d="M14 2 4 14h7l-2 8 11-13h-7z"/></svg>
+          <b>HIPERSONIC</b>
+        </div>
+        <div class="bar hp"><div class="fill" id="hp-fill"></div><span class="lbl">Vida</span><span class="val" id="hp-val">100</span></div>
+        <div class="bar en"><div class="fill" id="en-fill"></div><span class="lbl">Energía sónica</span><span class="val key">Espacio</span></div>
+        <div class="speedo">
+          <div class="mach"><b id="mach">0.00</b><small>Mach</small></div>
+          <div class="spd-track"><div class="spd-fill" id="spd-fill"></div><i class="sound-barrier"></i></div>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="stat panel"><small>Tiempo</small><b id="time">00:00</b></div>
+        <div class="stat panel"><small>Derribos</small><b id="kos">0</b></div>
+        <div class="stat panel wide"><small>Destrucción</small><b id="dmg">$0</b></div>
+        <button class="icon-btn panel" id="btn-pause" aria-label="Pausa">
+          <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        </button>
+      </div>
+      <div id="sonic-banner"><b>SONIC TIME</b><span>El mundo está detenido. Golpea y suelta con Espacio.</span></div>
+      <div id="hint" class="panel">
+        <span><kbd>WASD</kbd> moverse</span>
+        <span><kbd>Shift</kbd> hipervelocidad</span>
+        <span><kbd>Clic</kbd>/<kbd>J</kbd> golpe</span>
+        <span><kbd>Espacio</kbd> Sonic Time</span>
+      </div>
+      <div id="toast"></div>
+    </div>
+
+    <div id="touch">
+      <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+      <div class="tbtns">
+        <button class="tbtn" id="btn-sonic" aria-label="Sonic Time">SONIC</button>
+        <button class="tbtn big" id="btn-boost" aria-label="Hipervelocidad">HIPER</button>
+        <button class="tbtn" id="btn-punch" aria-label="Golpe">GOLPE</button>
+      </div>
+    </div>
+
+    <div class="screen" id="menu">
+      <div class="card title-card">
+        <h1><span>HIPER</span>SONIC</h1>
+        <p class="tag">Supervelocidad y destrucción</p>
+        <button class="btn primary" id="btn-play">Jugar</button>
+        <ul class="controls">
+          <li><kbd>WASD</kbd> / flechas — moverse</li>
+          <li><kbd>Shift</kbd> (mantener) — cargar la hipervelocidad</li>
+          <li><kbd>Clic</kbd> / <kbd>J</kbd> — golpe</li>
+          <li><kbd>Espacio</kbd> / clic derecho — Sonic Time</li>
+          <li><kbd>Esc</kbd> — pausa</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="screen" id="pause">
+      <div class="card">
+        <h2>Pausa</h2>
+        <button class="btn primary" id="btn-resume">Continuar</button>
+        <button class="btn" id="btn-restart">Reiniciar</button>
+        <button class="btn" id="btn-sound">Sonido: sí</button>
+      </div>
+    </div>
+
+    <div class="screen" id="over">
+      <div class="card">
+        <h2>Derribado</h2>
+        <div class="stats">
+          <div><small>Tiempo</small><b id="o-time">00:00</b></div>
+          <div><small>Derribos</small><b id="o-kos">0</b></div>
+          <div><small>Mach máximo</small><b id="o-mach">0</b></div>
+          <div><small>Destrucción</small><b id="o-dmg">$0</b></div>
+        </div>
+        <button class="btn primary" id="btn-again">Otra vez</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
