@@ -1053,3 +1053,16 @@ kbd {
 .coop-code { font-family: var(--display); font-size: 84px; line-height: 0.9; letter-spacing: 0.25em; color: #cfe6ff; text-shadow: 0 0 22px rgba(120, 180, 255, 0.5); padding-left: 0.25em; }
 .coop-status { min-height: 1.3em; margin: 10px 0; font-size: 15px; color: #cfc8b8; }
 .coop-status.bad { color: #e0a060; }
+
+#net-stat {
+  align-self: flex-start;
+  padding: 2px 7px 1px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #9fd0ff;
+  background: rgba(10, 11, 9, 0.6);
+  border: 1px solid rgba(159, 208, 255, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+}

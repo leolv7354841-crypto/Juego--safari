@@ -1530,6 +1530,13 @@ class Game {
     this.last = now;
     try {
       this.coop.tick(dt);
+      // indicador de conexión del cooperativo (se actualiza una vez por segundo)
+      const ns = this.$('net-stat');
+      if (this.coop.active && this.state !== 'menu') {
+        const txt = this.coop.stats(dt);
+        if (txt) ns.textContent = txt;
+        ns.hidden = false;
+      } else ns.hidden = true;
       if (this.state === 'play') {
         if (this.coop.isGuest) this.coop.guestUpdate(dt);
         else this.update(dt);

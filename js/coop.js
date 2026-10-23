@@ -222,7 +222,9 @@ export class Coop {
         if (typeof f !== 'function') continue;
         this.orig.push([obj, n]);
         obj[n] = function (...args) {
-          if (self.rec && self.depth === 0 && self.fx.length < FX_MAX) self.fx.push([tag, n, tag === 'd' && n === 'corpse' ? self.packCorpse(args) : args]);
+          if (self.rec && self.depth === 0 && self.fx.length < FX_MAX && self.nearPeer(tag, n, args)) {
+            self.fx.push([tag, n, tag === 'd' && n === 'corpse' ? self.packCorpse(args) : args]);
+          }
           self.depth++;
           try {
             return f.apply(this, args);
@@ -246,6 +248,17 @@ export class Coop {
     this.orig = [];
     this.rec = false;
     this.fx = [];
+  }
+
+  // Los efectos visuales lejos del compañero no se mandan (no los vería y gastan conexión).
+  nearPeer(tag, n, args) {
+    const q = this.peer;
+    if (!q || (tag !== 'p' && tag !== 'd')) return true;
+    const o = n === 'corpse' ? args[0] : null;
+    const x = o ? o.x : args[0];
+    const y = o ? o.y : args[1];
+    if (typeof x !== 'number' || typeof y !== 'number') return true;
+    return Math.abs(x - q.x) < VIEW && Math.abs(y - q.y) < VIEW;
   }
 
   packCorpse([z, dx, dy]) {
@@ -633,6 +646,7 @@ export class Coop {
     if (s.kl) g.kills = s.kl;
     // una foto vieja que llegó tarde no deshace una más nueva
     if (Number(s.q) <= (this.lastSeq || 0)) return;
+    this.rx = (this.rx || 0) + 1;
     this.lastSeq = Number(s.q);
     const st0 = this.clock.stamp(Number(s.ts));
     this.applyZombies(s.z || [], st0, s.o || [0, 0], s.zx || []);
@@ -900,6 +914,23 @@ export class Coop {
   acidAt(x, y, R) {
     const q = this.peer;
     if (q && q.alive && Math.hypot(q.x - x, q.y - y) < R + q.r) this.send({ t: 'acid' });
+  }
+
+  /* ---------- indicador de conexión ---------- */
+
+  // Texto corto para la pantalla: tipo de conexión, retraso, fotos por segundo y FPS.
+  stats(dt) {
+    this.statT = (this.statT || 0) + dt;
+    this.frames = (this.frames || 0) + 1;
+    if (this.statT < 1) return null;
+    const fps = Math.round(this.frames / this.statT);
+    const per = this.isGuest ? Math.round((this.rx || 0) / this.statT) : null;
+    this.statT = 0;
+    this.frames = 0;
+    this.rx = 0;
+    const via = this.net.direct ? 'Directa' : 'Firebase';
+    const lag = Math.round(this.clock.delay);
+    return this.isGuest ? `${via} · ${lag} ms · ${per} act/s · ${fps} FPS` : `${via} · ${lag} ms · ${fps} FPS`;
   }
 
   /* ---------- dibujo ---------- */
