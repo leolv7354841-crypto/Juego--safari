@@ -60,6 +60,14 @@ export function buildFx() {
     g.closePath();
     g.fill();
     F.cone = c;
+    // versión cálida para el brillo aditivo
+    const w = makeCanvas(W, H);
+    const wg = w.getContext('2d');
+    wg.drawImage(c, 0, 0);
+    wg.globalCompositeOperation = 'source-atop';
+    wg.fillStyle = 'rgb(255,226,170)';
+    wg.fillRect(0, 0, W, H);
+    F.coneWarm = w;
   }
   // destello de impacto (estrella de cuatro puntas)
   {

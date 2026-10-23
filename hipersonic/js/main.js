@@ -175,7 +175,7 @@ class Game {
     this.canvas.height = Math.round(h * this.dpr);
     this.cssW = w;
     this.cssH = h;
-    this.camera.zoom = clamp(Math.sqrt(w * h) / 640, 0.85, 1.7);
+    this.camera.zoom = clamp(Math.sqrt(w * h) / 640, 1.1, 1.7);
     this.lighting.resize(this.canvas.width, this.canvas.height);
     this.post.width = this.canvas.width;
     this.post.height = this.canvas.height;
@@ -217,7 +217,8 @@ class Game {
   /* ---------- bucle ---------- */
 
   loop(now) {
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    // la marca de tiempo del primer fotograma puede ser anterior a la del arranque
+    const dt = clamp((now - this.last) / 1000, 0, 0.05);
     this.last = now;
     try {
       if (this.state === 'play' || this.state === 'over') this.update(dt);
@@ -238,6 +239,7 @@ class Game {
     h.look = h.face + Math.sin(this.time * 0.7) * 0.8;
     this.population(dt);
     for (const n of this.npcs) n.update(dt, this);
+    this.npcs = this.npcs.filter((n) => !n.dead);
     this.traffic.update(dt, this);
     this.fx.update(dt, dt);
     this.updatePigeons(dt);

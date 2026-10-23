@@ -275,7 +275,7 @@ h2 { margin: 0 0 16px; font: 700 34px 'Chakra Petch', sans-serif; letter-spacing
 .stats small { display: block; font: 600 11px 'Chakra Petch', sans-serif; letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; }
 .stats b { font: 700 24px 'Chakra Petch', sans-serif; }
 
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 500px) {
   .hud-left { width: 190px; padding: 8px; }
   .who { display: none; }
   .mach b { font-size: 24px; }
@@ -285,4 +285,13 @@ h2 { margin: 0 0 16px; font: 700 34px 'Chakra Petch', sans-serif; letter-spacing
   .icon-btn { width: 40px; }
   #sonic-banner b { font-size: 22px; }
   #sonic-banner span { display: none; }
+}
+.touch .bar .val.key { display: none; }
+@media (max-height: 500px) {
+  .hud-left { left: calc(8px + var(--safe-l)); top: calc(8px + var(--safe-t)); }
+  .hud-right { right: calc(8px + var(--safe-r)); top: calc(8px + var(--safe-t)); }
+  .bar { height: 15px; margin-bottom: 4px; }
+  .bar .lbl, .bar .val { font-size: 10px; line-height: 15px; }
+  .tbtn { width: 62px; height: 62px; font-size: 11px; }
+  .tbtn.big { width: 80px; height: 80px; }
 }

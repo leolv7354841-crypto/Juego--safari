@@ -109,11 +109,11 @@ export class Lighting {
       const si = Math.sin(c.ang);
       if (c.state !== 'parked' && c.hp > 0) {
         // faros
-        g.globalAlpha = 0.18;
+        g.globalAlpha = 0.07;
         g.save();
         g.translate(c.x + co * c.L * 0.45, c.y + si * c.L * 0.45);
         g.rotate(c.ang);
-        g.drawImage(S.cone, 0, -c.W * 1.4, 220, c.W * 2.8);
+        g.drawImage(S.coneWarm, 0, -c.W * 1.4, 220, c.W * 2.8);
         g.restore();
         g.globalAlpha = 0.9;
         for (const sd of [-1, 1]) {
