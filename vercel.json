@@ -6,7 +6,8 @@
     { "source": "/deadzone", "destination": "/deadzone/", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/deadzone/:path*", "destination": "/:path*" }
+    { "source": "/deadzone/", "destination": "/index.html" },
+    { "source": "/deadzone/:path+", "destination": "/:path+" }
   ],
   "headers": [
     {
