@@ -888,11 +888,12 @@ class Game {
     const target = { podium: this.$('hall-podium'), list: this.$('hall-list'), me: this.$('hall-me'), max: 8 };
     const local = acc.localBoard();
     this.renderBoard(tab === 'local' ? local : null, target, tab === 'global' ? 'Cargando…' : '');
-    const rows = tab === 'global' ? await acc.globalBoard() : local;
+    const online = tab === 'global' ? await acc.globalBoard() : local;
     if (this.state !== 'menu') return;
-    if (tab === 'global') this.renderBoard(rows, target, '');
-    // si la clasificación mundial falla, dilo en el salón en vez de mostrarlo vacío
-    const err = tab === 'global' && !rows ? acc.onlineError || 'No se pudo cargar la clasificación mundial.' : null;
+    // si la mundial falla, muestra la de este dispositivo y avisa por qué
+    const rows = online || local;
+    if (tab === 'global') this.renderBoard(rows, target, 'Todavía no hay récords. ¡Termina una oleada!');
+    const err = tab === 'global' && !online ? acc.onlineError || 'No se pudo cargar la clasificación mundial.' : null;
     if (err) {
       const li = document.createElement('li');
       li.className = 'board-empty online-err';
@@ -904,7 +905,7 @@ class Game {
     const i = cur && rows ? rows.findIndex((r) => acc.isMine(r)) : -1;
     badge.hidden = !cur;
     badge.className = 'rank-badge' + (i === 0 ? ' r1' : i === 1 ? ' r2' : i === 2 ? ' r3' : i < 0 ? ' none' : '');
-    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' ? ' mundial' : ''}` : 'Sin rango';
+    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' && online ? ' mundial' : ''}` : 'Sin rango';
   }
 
   renderBoard(rows, t, empty) {

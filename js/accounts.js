@@ -144,8 +144,14 @@ export class Accounts {
 
   /* ---------- clasificación mundial (Firebase) ---------- */
 
-  async pushOnline(acc) {
-    if (!ONLINE.url || !acc || !acc.best) return;
+  pushOnline(acc) {
+    if (!ONLINE.url || !acc || !acc.best) return Promise.resolve();
+    // la lista se pide después de subir tu récord, para que salgas en ella
+    this.pushing = this.sendOnline(acc);
+    return this.pushing;
+  }
+
+  async sendOnline(acc) {
     const b = acc.best;
     try {
       const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
@@ -160,6 +166,7 @@ export class Accounts {
   }
 
   async onlineBoard() {
+    if (this.pushing) await this.pushing;
     try {
       const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores.json`);
       if (!r.ok) {
@@ -167,11 +174,11 @@ export class Accounts {
         return null;
       }
       const all = (await r.json()) || {};
-      return Object.entries(all)
-        .map(([uid, d]) => cleanRow(d, uid))
-        .filter(Boolean)
-        .sort((a, b) => b.wave - a.wave || b.kills - a.kills)
-        .slice(0, 50);
+      const rows = Object.entries(all).map(([uid, d]) => cleanRow(d, uid)).filter(Boolean);
+      // tu mejor marca siempre aparece, aunque todavía no haya llegado al servidor
+      const acc = this.current;
+      if (acc && acc.best && !rows.some((r) => r.uid === acc.uid)) rows.push(cleanRow({ name: acc.name, ...acc.best }, acc.uid));
+      return rows.sort((a, b) => b.wave - a.wave || b.kills - a.kills).slice(0, 50);
     } catch {
       this.onlineError = 'Sin conexión con el servidor de la clasificación.';
       return null;
