@@ -54,35 +54,55 @@ class Clock {
   }
 }
 
-// Guarda las últimas posiciones recibidas de algo que se mueve.
+// Predicción de movimiento ("dead reckoning"): con cada posición recibida se estima la
+// velocidad, y entre una y otra se sigue moviendo solo a esa velocidad. Lo que llega por la
+// red sólo corrige el rumbo poco a poco. Así se ve fluido aunque los datos lleguen tarde,
+// a tirones o en grupitos.
+const MAX_V = 0.65; // px por ms (más que el toro embistiendo)
+const HORIZON = 900; // ms máximos que se predice sin datos nuevos
+
 function track(o, t, x, y) {
-  const s = o.trk || (o.trk = []);
-  if (s.length && t - s[s.length - 1][0] > 1000) s.length = 0;
-  if (s.length && t <= s[s.length - 1][0]) return;
-  s.push([t, x, y]);
-  if (s.length > 5) s.shift();
+  if (o.st !== undefined && t > o.st && t - o.st < 1000) {
+    let vx = (x - o.sx) / (t - o.st);
+    let vy = (y - o.sy) / (t - o.st);
+    const v = Math.hypot(vx, vy);
+    if (v > MAX_V) {
+      vx *= MAX_V / v;
+      vy *= MAX_V / v;
+    }
+    o.vx = (o.vx || 0) * 0.35 + vx * 0.65;
+    o.vy = (o.vy || 0) * 0.35 + vy * 0.65;
+  } else if (o.st === undefined || t - o.st >= 1000) {
+    o.vx = 0;
+    o.vy = 0;
+  }
+  if (o.st !== undefined && t <= o.st) return;
+  o.st = t;
+  o.sx = x;
+  o.sy = y;
 }
 
-// Coloca o en su posición a la hora t (entre dos posiciones; un poquito hacia delante si faltan datos).
-function place(o, t) {
-  const s = o.trk;
-  if (!s || !s.length) return;
-  if (s.length === 1 || t <= s[0][0]) {
-    o.x = s[0][1];
-    o.y = s[0][2];
+// Coloca o donde debería estar ahora: avanza con su velocidad y corrige suave hacia la predicción.
+function place(o, now, dt) {
+  if (o.st === undefined) return;
+  const ahead = Math.min(Math.max(0, now - o.st), HORIZON);
+  const px = o.sx + (o.vx || 0) * ahead;
+  const py = o.sy + (o.vy || 0) * ahead;
+  if (o.rendered === undefined || Math.hypot(px - o.x, py - o.y) > 140) {
+    // primera vez o salto grande (empujón, explosión): directo a su sitio
+    o.x = px;
+    o.y = py;
+    o.rendered = true;
     return;
   }
-  for (let i = s.length - 1; i > 0; i--) {
-    const a = s[i - 1];
-    const b = s[i];
-    if (t >= a[0] && (t <= b[0] || i === s.length - 1)) {
-      const span = b[0] - a[0] || 1;
-      const k = Math.min((t - a[0]) / span, 1 + 150 / span);
-      o.x = a[1] + (b[1] - a[1]) * k;
-      o.y = a[2] + (b[2] - a[2]) * k;
-      return;
-    }
+  const stillPredicting = now - o.st < HORIZON;
+  if (stillPredicting) {
+    o.x += (o.vx || 0) * dt * 1000;
+    o.y += (o.vy || 0) * dt * 1000;
   }
+  const k = Math.min(1, dt * 7);
+  o.x += (px - o.x) * k;
+  o.y += (py - o.y) * k;
 }
 
 export class Coop {
@@ -300,7 +320,7 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     if (!peer) return;
-    place(peer, performance.now() - this.clock.delay);
+    place(peer, performance.now(), dt);
     this.turn(peer, dt);
     peer.flashT -= dt;
     peer.hurtT -= dt;
@@ -456,8 +476,10 @@ export class Coop {
     if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
       q.x = q.tx = m.x;
       q.y = q.ty = m.y;
-      q.trk = null;
-      track(q, performance.now() - this.clock.delay, m.x, m.y);
+      q.st = undefined;
+      q.vx = 0;
+      q.vy = 0;
+      track(q, performance.now(), m.x, m.y);
     }
     if (Number.isFinite(m.a)) q.angle = q.ta = m.a;
   }
@@ -580,7 +602,7 @@ export class Coop {
     // el anfitrión (dibujo) se mueve suave entre fotos
     const h = this.peer;
     if (h && h.tx !== undefined) {
-      place(h, performance.now() - this.clock.delay);
+      place(h, performance.now(), dt);
       this.turn(h, dt);
       h.flashT -= dt;
       h.hurtT -= dt;
@@ -809,7 +831,7 @@ export class Coop {
       if (g.input.consume('nextRound')) g.startNextRound();
     }
     // zombis: recorren el camino entre las posiciones recibidas (un poco en diferido) y caminan con su animación
-    const rt = performance.now() - this.clock.delay;
+    const now = performance.now();
     const grid = g.horde.grid;
     grid.clear();
     let danger = 0;
@@ -817,7 +839,7 @@ export class Coop {
     for (const z of g.horde.list) {
       const ox = z.x;
       const oy = z.y;
-      place(z, rt);
+      place(z, now, dt);
       z.angle = angleTo(z.angle, z.ta, dt * 10);
       z.anim += Math.hypot(z.x - ox, z.y - oy) / (z.r * 0.55);
       z.hitT -= dt;
