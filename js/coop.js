@@ -17,7 +17,9 @@ const TYPES = ['normal', 'swat', 'sprinter', 'fat', 'heavy', 'golden', 'bull', '
 const PICKS = ['ammo', 'med', 'crate'];
 const SNAP_HZ = 12;
 const IN_HZ = 20;
-const VIEW = 1300;
+const VIEW = 1000;
+// fotos del mundo sin confirmar que se permiten "en camino" hacia el invitado
+const WINDOW = 6;
 const FX_MAX = 500;
 // efectos que el invitado genera por su cuenta (no hace falta mandarlos)
 const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
@@ -154,6 +156,8 @@ export class Coop {
     g.resetRun();
     this.mode = 'host';
     this.clock = new Clock();
+    this.snapSeq = 0;
+    this.peerAck = 0;
     g.coopRun = true;
     g.director.coop = true;
     const s = g.world.spawn;
@@ -184,6 +188,7 @@ export class Coop {
     g.resetRun();
     this.mode = 'guest';
     this.clock = new Clock();
+    this.lastSeq = 0;
     g.coopRun = true;
     this.peerName = m.name || 'Anfitrión';
     g.director.coop = true;
@@ -296,27 +301,38 @@ export class Coop {
       peer.kx = 0;
       peer.ky = 0;
     }
+    // control de flujo: si el celular del compañero va atrasado, se espera a que confirme
+    // (si no, las fotos se amontonan y su juego se queda cada vez más atrás)
+    if (this.snapSeq - (this.peerAck || 0) > WINDOW && performance.now() - (this.lastSnapAt || 0) < 1500) return;
     if (this.fx.length) {
       this.send({ t: 'fx', e: this.fx });
       this.fx = [];
     }
-    if (g.state !== 'menu') this.send(this.snapshot(), true);
+    if (g.state !== 'menu') {
+      this.send(this.snapshot(), true);
+      this.lastSnapAt = performance.now();
+    }
   }
 
   snapshot() {
     const g = this.game;
     const peer = this.peer;
     const near = (x, y, m = VIEW) => Math.abs(x - peer.x) < m && Math.abs(y - peer.y) < m;
+    const ox = Math.round(peer.x);
+    const oy = Math.round(peer.y);
     const z = [];
+    const zx = [];
     for (const o of g.horde.list) {
       if (o.dead || !near(o.x, o.y)) continue;
       const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
         | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
-      z.push(o.id, TYPES.indexOf(o.type), o.si | 0, Math.round(o.x), Math.round(o.y), r100(o.angle), flags, Math.round(o.air || 0), r100(o.swell || 0));
+      // compacto: posición relativa al compañero y ángulo en 64 pasos
+      z.push(o.id, TYPES.indexOf(o.type), Math.round(o.x - ox), Math.round(o.y - oy), Math.round((o.angle / TAU) * 64) & 63, flags);
+      if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
     }
     const st = g.structures;
     const s = {
-      t: 's', ts: Math.round(performance.now()), w: g.director.wave, ds: g.director.state, tm: Math.round(g.time), lv: g.level, xp: Math.round(g.xp), xn: g.xpNeed,
+      t: 's', q: ++this.snapSeq, ts: Math.round(performance.now()), o: [ox, oy], zx, w: g.director.wave, ds: g.director.state, tm: Math.round(g.time), lv: g.level, xp: Math.round(g.xp), xn: g.xpNeed,
       z, hp: this.packPlayer(g.player),
       pk: g.pickups.list.flatMap((it) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
       b: g.bullets.list.flatMap((b) => (b.owner !== 'peer' && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
@@ -371,6 +387,7 @@ export class Coop {
         this.peerName = String(m.name || '').slice(0, 16);
         break;
       case 'in': {
+        if (Number(m.ak) > (this.peerAck || 0)) this.peerAck = Number(m.ak);
         peer.tx = Number(m.x) || peer.tx;
         peer.ty = Number(m.y) || peer.ty;
         track(peer, this.clock.stamp(Number(m.ts)), peer.tx, peer.ty);
@@ -551,7 +568,7 @@ export class Coop {
     this.inT = 1 / IN_HZ;
     const w = p.weapon;
     this.send({
-      t: 'in', ts: Math.round(performance.now()), x: Math.round(p.x), y: Math.round(p.y), a: r100(p.angle) / 100, la: r100(p.legAngle) / 100, wp: Math.round(p.walkPhase * 10) / 10,
+      t: 'in', ak: this.lastSeq || 0, ts: Math.round(performance.now()), x: Math.round(p.x), y: Math.round(p.y), a: r100(p.angle) / 100, la: r100(p.legAngle) / 100, wp: Math.round(p.walkPhase * 10) / 10,
       sp: Math.round(p.speedNow), run: p.running ? 1 : 0, al: p.alive ? 1 : 0, hp: Math.ceil(p.hp), mh: p.stats.maxHp,
       na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
       w: w.id, mag: w.mag, rl: r100(Math.max(0, p.reloadT)) / 100, rp: r100(p.reloadProg || 0) / 100,
@@ -614,8 +631,11 @@ export class Coop {
       this.levelSeen = s.lv;
     }
     if (s.kl) g.kills = s.kl;
+    // una foto vieja que llegó tarde no deshace una más nueva
+    if (Number(s.q) <= (this.lastSeq || 0)) return;
+    this.lastSeq = Number(s.q);
     const st0 = this.clock.stamp(Number(s.ts));
-    this.applyZombies(s.z || [], st0);
+    this.applyZombies(s.z || [], st0, s.o || [0, 0], s.zx || []);
     this.applyPuppet(s.hp, st0);
     // objetos, balas, granadas, fuego, cohetes clavados, explosiones
     const pk = s.pk || [];
@@ -701,11 +721,16 @@ export class Coop {
     h.speedNow = a[15];
   }
 
-  applyZombies(z, t) {
+  applyZombies(z, t, org, zx) {
     const g = this.game;
     const seen = new Set();
-    for (let i = 0; i + 8 < z.length; i += 9) {
+    const extra = new Map();
+    for (let i = 0; i + 2 < zx.length; i += 3) extra.set(zx[i], [zx[i + 1], zx[i + 2] / 100]);
+    for (let i = 0; i + 5 < z.length; i += 6) {
       const id = z[i];
+      const x = org[0] + z[i + 2];
+      const y = org[1] + z[i + 3];
+      const ang = (z[i + 4] / 64) * TAU;
       seen.add(id);
       let o = this.zmap.get(id);
       if (!o) {
@@ -713,17 +738,17 @@ export class Coop {
         const def = ZOMBIES[type];
         const sets = zombieSprites()[type];
         o = {
-          id, type, def, r: def.radius, mass: def.mass, si: z[i + 2], spr: sets[z[i + 2]] || sets[0], x: z[i + 3], y: z[i + 4],
-          angle: z[i + 5] / 100, anim: 0, flash: 0, hitT: 0, hitJolt: 0, lunge: 0, spawnT: 0, tilt: 0, air: 0, swell: 0, burn: 0,
+          id, type, def, r: def.radius, mass: def.mass, si: id % sets.length, spr: sets[id % sets.length] || sets[0], x, y,
+          angle: ang, anim: 0, flash: 0, hitT: 0, hitJolt: 0, lunge: 0, spawnT: 0, tilt: 0, air: 0, swell: 0, burn: 0,
           bs: 'walk', life: 99, dead: false, wob: rand(0, 100), fireFx: 0,
         };
         this.zmap.set(id, o);
       }
-      o.tx = z[i + 3];
-      o.ty = z[i + 4];
-      track(o, t, o.tx, o.ty);
-      o.ta = z[i + 5] / 100;
-      const f = z[i + 6];
+      o.tx = x;
+      o.ty = y;
+      track(o, t, x, y);
+      o.ta = ang;
+      const f = z[i + 5];
       o.flash = f & 1 ? 0.06 : 0;
       o.burn = f & 2 ? 1 : 0;
       o.wounded = !!(f & 4);
@@ -734,8 +759,9 @@ export class Coop {
       }
       o.life = f & 32 ? 1 : 99;
       o.lunge = f & 64 ? 1 : o.lunge;
-      o.air = z[i + 7];
-      o.swell = z[i + 8] / 100;
+      const ex = extra.get(id);
+      o.air = ex ? ex[0] : 0;
+      o.swell = ex ? ex[1] : 0;
     }
     for (const [id, o] of this.zmap) {
       if (seen.has(id)) continue;

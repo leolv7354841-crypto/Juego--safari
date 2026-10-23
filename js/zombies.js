@@ -1,5 +1,5 @@
 import { ZOMBIES, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV } from './config.js';
-import { clamp, rand, randInt, angleTo, TAU } from './util.js';
+import { clamp, rand, angleTo, TAU } from './util.js';
 import { zombieSprites, flameSprite } from './sprites.js';
 
 const CELL = 64;
@@ -127,7 +127,8 @@ export class Horde {
       speed: rand(def.speed[0], def.speed[1]) * speedMult,
       angle: rand(0, TAU),
       anim: rand(0, def.frames),
-      si: randInt(0, sets.length - 1),
+      // variante de dibujo según el id (así el cooperativo no necesita mandarla)
+      si: nextId % sets.length,
       flash: 0,
       slow: 0,
       atk: 0,
