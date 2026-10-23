@@ -50,6 +50,22 @@ npx http-server -c-1 -p 8080 .   # desde la raíz del repositorio
   mueve con normalidad; cada golpe queda marcado con un destello y una retícula, y al
   soltar el poder los golpes acumulados se ejecutan en cascada.
 
+## Mach 1: destrucción total
+
+Al pasar la barrera del sonido (Mach 1 en el velocímetro):
+
+- **Personas**: si las atropellas o golpeas a Mach 1 quedan hechas pedazos: cabeza, torso,
+  brazos, piernas, sesos, corazón, intestinos, huesos y ojos salen disparados, rebotan y
+  dejan sangre en el suelo (las manchas se quedan pintadas). Un auto lanzado que golpea a
+  alguien también lo despedaza.
+- **Autos**: al embestirlos o golpearlos a Mach 1 salen disparados dando vueltas y explotan
+  (bola de fuego, onda de choque, chatarra y vidrios); quedan calcinados y ardiendo. Las
+  explosiones lanzan a los autos cercanos y pueden encadenarse.
+- **Onda expansiva**: al romper la barrera del sonido lanza a todos los que están cerca y
+  vuelca los autos (se ve la panza del chasis cuando quedan de cabeza).
+- **Sonic Time**: cada persona golpeada sale disparada con todo al volver el tiempo y se
+  despedaza en el aire; los autos golpeados salen volando y explotan.
+
 ## Recursos gráficos
 
 Todo el arte se pinta por código al arrancar y se empaqueta en un atlas de texturas

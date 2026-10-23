@@ -2,7 +2,7 @@
 // ante obstáculos. Al recibir un golpe fuerte se vuelven cuerpos libres: derrapan, giran,
 // chocan entre sí, se abollan y echan humo.
 import { TAU, clamp, rand, pick, segDist } from './util.js';
-import { MODELS, CAR_COLORS, TRAFFIC_MIX, bakeVehicle } from './art/vehicles.js';
+import { MODELS, CAR_COLORS, TRAFFIC_MIX, bakeVehicle, bakeUnderside, bakeBurnt } from './art/vehicles.js';
 import { drawSprite } from './atlas.js';
 import { LANE, ROAD, SIZE, NB, roadC, CELL, SUN } from './world.js';
 
@@ -35,6 +35,32 @@ export class Vehicle {
     this.lastHit = -10;
     this.flash = 0;
     this.siren = model === 'police' && Math.random() < 0.6;
+    this.atlas = atlas;
+    // altura, vuelco (giro sobre el eje largo), explosión
+    this.z = 0;
+    this.vz = 0;
+    this.roll = 0;
+    this.vroll = 0;
+    this.fuse = 0;
+    this.fire = 0;
+    this.exploded = false;
+  }
+
+  // Explota: queda calcinado y ardiendo un rato.
+  burn() {
+    this.exploded = true;
+    this.spr = bakeBurnt(this.atlas, this.spr);
+    this.hp = Math.min(this.hp, -1);
+    this.fire = rand(8, 14);
+    this.glass = 3;
+    this.siren = false;
+  }
+
+  // Sale volando y da vueltas.
+  launch(vz, vroll) {
+    if (this.state !== 'wreck') this.impulse(0, 0, this.x, this.y, 0);
+    this.vz = Math.max(this.vz, 0) + vz / Math.sqrt(this.m.weight);
+    this.vroll += vroll / Math.sqrt(this.m.weight);
   }
 
   get L() {
@@ -162,6 +188,12 @@ export class Traffic {
       v.flash = Math.max(0, v.flash - dt);
       if (v.state === 'drive') this.drive(v, dt, game);
       else if (v.state === 'wreck') this.wreck(v, dt, game);
+      if (v.fire > 0) {
+        v.fire -= dt;
+        if (Math.random() < dt * 30) game.fx.fire(v.x + rand(-v.L / 3, v.L / 3), v.y + rand(-v.W / 3, v.W / 3) - v.z * 0.42, rand(10, 18));
+        if (Math.random() < dt * 8) game.fx.smoke(v.x + rand(-8, 8), v.y + rand(-8, 8), 16, 1);
+        if (Math.random() < dt * 6) game.fx.light(v.x, v.y, 160, 0.25);
+      }
       if (v.hp < 60 * v.m.weight && Math.random() < dt * 6) game.fx.smoke(v.x + rand(-6, 6), v.y + rand(-6, 6), 10, v.hp < 0 ? 1 : 0);
       if (v.hp < 0 && Math.random() < dt * 10) game.fx.add({ k: 'flash', x: v.x + rand(-v.L / 3, v.L / 3), y: v.y + rand(-8, 8), vx: 0, vy: 0, life: 0.25, size: 14, color: 'warm' });
     }
@@ -227,10 +259,36 @@ export class Traffic {
   }
 
   wreck(v, dt, game) {
-    const k = Math.exp(-dt * 1.5);
+    const air = v.z > 0 || v.vz > 0;
+    if (air) {
+      v.vz -= 1100 * dt;
+      v.z += v.vz * dt;
+      if (v.z <= 0) {
+        v.z = 0;
+        if (v.vz < -220) {
+          game.onCarCrash(v, v.x, v.y, -v.vz * 1.2, null);
+          game.fx.dust(v.x, v.y, 10, 18, '150,145,135', 160);
+          v.vz *= -0.28;
+          v.vroll *= 0.55;
+          v.vx *= 0.75;
+          v.vy *= 0.75;
+        } else v.vz = 0;
+      }
+    } else {
+      // en el suelo el vuelco termina sobre las ruedas o sobre el techo
+      const target = Math.round(v.roll / Math.PI) * Math.PI;
+      v.vroll *= Math.exp(-dt * 8);
+      v.roll += (target - v.roll) * (1 - Math.exp(-dt * 10));
+    }
+    v.roll += v.vroll * dt;
+    if (v.fuse > 0) {
+      v.fuse -= dt;
+      if (v.fuse <= 0) game.explodeCar(v);
+    }
+    const k = Math.exp(-dt * (air ? 0.15 : Math.cos(v.roll) < 0 ? 3.2 : 1.5));
     v.vx *= k;
     v.vy *= k;
-    v.va *= Math.exp(-dt * 2.2);
+    v.va *= Math.exp(-dt * (air ? 0.3 : 2.2));
     const sp = Math.hypot(v.vx, v.vy);
     // derrape: marcas en el suelo
     if (sp > 160 && Math.random() < dt * 30) game.fx.decal({ k: 'scorch', x: v.x, y: v.y, ang: Math.atan2(v.vy, v.vx), len: 12, life: 6 });
@@ -314,7 +372,7 @@ export class Traffic {
         }
       }
       // peatones atropellados por coches sueltos
-      if (aMoving) {
+      if (aMoving && a.z < 30) {
         const sp = Math.hypot(a.vx, a.vy);
         for (const n of game.npcs) {
           if (n.state === 'rag' || Math.abs(n.x - a.x) > a.L || Math.abs(n.y - a.y) > a.L) continue;
@@ -333,11 +391,11 @@ export class Traffic {
       if (c.x < v.x0 - 150 || c.x > v.x1 + 150 || c.y < v.y0 - 150 || c.y > v.y1 + 150) continue;
       const L = c.L / (1 - px * 2);
       const W = c.W / (1 - py * 2);
-      const h = c.m.kind === 'bus' || c.m.kind === 'truck' ? 22 : 11;
+      const h = (c.m.kind === 'bus' || c.m.kind === 'truck' ? 22 : 11) + c.z * 0.6;
       g.save();
       g.translate(c.x + h * SUN.x, c.y + h * SUN.y);
       g.rotate(c.ang);
-      g.globalAlpha = 0.85;
+      g.globalAlpha = 0.85 * Math.max(0.3, 1 - c.z / 400);
       g.drawImage(S.shadowRect, -L / 2, -W / 2, L, W);
       g.restore();
     }
@@ -348,8 +406,16 @@ export class Traffic {
     for (const c of this.list) {
       if (c.x < v.x0 - 130 || c.x > v.x1 + 130 || c.y < v.y0 - 130 || c.y > v.y1 + 130) continue;
       g.save();
-      g.translate(c.x, c.y);
+      g.translate(c.x, c.y - c.z * 0.42);
       g.rotate(c.ang);
+      const zk = 1 + c.z / 260;
+      const cr = Math.cos(c.roll);
+      g.scale(zk, zk * Math.max(0.14, Math.abs(cr)));
+      if (cr < 0) {
+        drawSprite(g, c.under || (c.under = bakeUnderside(c.atlas, c.model)), 0, 0);
+        g.restore();
+        continue;
+      }
       drawSprite(g, c.spr, 0, 0);
       // abolladuras y cristales rotos
       for (const d of c.dents) {

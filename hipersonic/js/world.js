@@ -454,7 +454,7 @@ export class World {
     const c1 = Math.floor(x1 / 128);
     const r0 = Math.floor(y0 / 128);
     const r1 = Math.floor(y1 / 128);
-    const stamp = (this.stamp = (this.stamp || 0) + 1);
+    const stamp = (this.qid = (this.qid || 0) + 1);
     for (let cy = r0; cy <= r1; cy++)
       for (let cx = c0; cx <= c1; cx++) {
         const a = this.grid.get(cy * 4096 + cx);
@@ -645,6 +645,21 @@ export class World {
       const old = [...this.chunks.entries()].sort((a, b) => a[1].used - b[1].used);
       for (let i = 0; i < old.length - this.maxChunks; i++) this.chunks.delete(old[i][0]);
     }
+  }
+
+  // Pinta algo (sangre, quemaduras) directamente sobre los trozos de suelo ya guardados.
+  stamp(x, y, r, fn) {
+    const s = this.chunkScale;
+    for (let cy = Math.floor((y - r) / CHUNK); cy <= Math.floor((y + r) / CHUNK); cy++)
+      for (let cx = Math.floor((x - r) / CHUNK); cx <= Math.floor((x + r) / CHUNK); cx++) {
+        const ch = this.chunks.get(cy * 1000 + cx);
+        if (!ch) continue;
+        const g = ch.canvas.getContext('2d');
+        g.save();
+        g.setTransform(s, 0, 0, s, -cx * CHUNK * s, -cy * CHUNK * s);
+        fn(g);
+        g.restore();
+      }
   }
 
   paintChunk(cx, cy) {

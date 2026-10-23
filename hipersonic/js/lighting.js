@@ -107,7 +107,7 @@ export class Lighting {
       if (!vis(c.x, c.y, 260)) continue;
       const co = Math.cos(c.ang);
       const si = Math.sin(c.ang);
-      if (c.state !== 'parked' && c.hp > 0) {
+      if (c.state !== 'parked' && c.hp > 0 && Math.cos(c.roll) > 0) {
         // faros
         g.globalAlpha = 0.07;
         g.save();
@@ -123,7 +123,7 @@ export class Lighting {
         }
       }
       // luces traseras (más fuertes al frenar)
-      const ra = c.state === 'parked' ? 0 : c.brake ? 0.95 : 0.4;
+      const ra = c.state === 'parked' || c.exploded || Math.cos(c.roll) < 0 ? 0 : c.brake ? 0.95 : 0.4;
       if (ra > 0) {
         g.globalAlpha = ra;
         for (const sd of [-1, 1]) {

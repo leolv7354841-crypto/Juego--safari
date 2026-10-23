@@ -5,6 +5,8 @@ import { TAU, rand, pick } from './util.js';
 import { OUT } from './art/characters.js';
 
 const MAX = 1400;
+// marcas que se pintan directamente sobre el suelo (persisten sin costo por fotograma)
+const STAMPED = new Set(['blood', 'drop', 'smear', 'burn', 'crater', 'crack']);
 
 export class Fx {
   constructor(sprites) {
@@ -71,6 +73,31 @@ export class Fx {
       this.add({ k: 'debris', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rand(120, 360), life: rand(0.8, 1.6), size: rand(1.6, 3.6) * (kind === 'glass' ? 0.8 : 1), color: pick(cols), rot: rand(0, TAU), vr: rand(-14, 14), drag: 0.8 });
     }
   }
+  // Gotas de sangre: vuelan, caen y manchan el suelo donde aterrizan.
+  blood(x, y, ux, uy, n, speed = 300, burst = false, z0 = 10) {
+    const a0 = Math.atan2(uy, ux);
+    for (let i = 0; i < n; i++) {
+      const a = burst ? a0 + rand(-1.2, 1.2) * (i % 3 ? 0.6 : 1.6) : rand(0, TAU);
+      const s = speed * rand(0.2, 1.1);
+      this.add({ k: 'blood', x: x + rand(-3, 3), y: y + rand(-3, 3), vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: z0, vz: rand(60, 380), life: 3, size: rand(0.8, 2.2) });
+    }
+  }
+  // Salpicadura en el suelo (alargada en la dirección del golpe).
+  splat(x, y, r, dx = 0, dy = 0) {
+    const ang = Math.atan2(dy, dx);
+    const pts = [];
+    const n = 10 + ((r / 2) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = ang + rand(-1, 1) * (i % 3 ? 0.5 : Math.PI);
+      const d = rand(0.2, 1.8) * r;
+      pts.push([Math.cos(a) * d, Math.sin(a) * d, rand(0.05, 0.16) * r + 0.6]);
+    }
+    this.decal({ k: 'blood', x, y, r, pts, life: 70, shade: rand(0, 1) });
+  }
+  fire(x, y, size = 14, real = false) {
+    this.add({ k: 'fire', x: x + rand(-4, 4), y: y + rand(-4, 4), vx: rand(-20, 20), vy: rand(-40, -10), life: rand(0.35, 0.8), size, real, drag: 1 });
+  }
+
   flash(x, y, size = 60, real = false, color = 'white') {
     this.add({ k: 'flash', x, y, vx: 0, vy: 0, life: 0.18, size, real, color });
     this.light(x, y, size * 3, 0.16, real);
@@ -91,7 +118,11 @@ export class Fx {
   }
 
   decal(d) {
-    if (this.decals.length > 220) this.decals.shift();
+    if (this.stamper && STAMPED.has(d.k)) {
+      this.stamper(d.x, d.y, (d.r || d.len || 20) * 1.8 + 10, (g) => drawDecal(g, d, 1));
+      return;
+    }
+    if (this.decals.length > 300) this.decals.shift();
     d.t = 0;
     this.decals.push(d);
   }
@@ -133,6 +164,14 @@ export class Fx {
           p.vy *= d;
           p.x += p.vx * dt;
           p.y += p.vy * dt;
+          if (p.k === 'blood') {
+            p.vz -= 1000 * dt;
+            p.z += p.vz * dt;
+            if (p.z <= 0) {
+              p.t = p.life;
+              if (Math.random() < 0.6) this.decal({ k: 'drop', x: p.x, y: p.y, r: p.size * rand(0.6, 1.2), life: 60 });
+            }
+          }
           if (p.k === 'debris') {
             p.vz -= 900 * dt;
             p.z += p.vz * dt;
@@ -165,47 +204,7 @@ export class Fx {
   drawDecals(g, v) {
     for (const d of this.decals) {
       if (d.x < v.x0 - 120 || d.x > v.x1 + 120 || d.y < v.y0 - 120 || d.y > v.y1 + 120) continue;
-      const a = Math.min(1, (d.life - d.t) / 1.2);
-      if (d.k === 'scorch') {
-        g.save();
-        g.translate(d.x, d.y);
-        g.rotate(d.ang);
-        g.globalAlpha = a * 0.28;
-        g.fillStyle = '#0c0e14';
-        g.fillRect(-d.len, -1.3, d.len, 2.6);
-        g.globalCompositeOperation = 'lighter';
-        g.globalAlpha = a * Math.max(0, 1 - d.t * 1.6) * 0.7;
-        g.fillStyle = '#3ad8ff';
-        g.fillRect(-d.len, -0.7, d.len, 1.4);
-        g.restore();
-      } else if (d.k === 'crater') {
-        g.globalAlpha = a;
-        g.fillStyle = 'rgba(10,10,12,0.55)';
-        g.beginPath();
-        g.arc(d.x, d.y, d.r, 0, TAU);
-        g.fill();
-        g.strokeStyle = 'rgba(10,10,12,0.8)';
-        g.lineWidth = 1.4;
-        g.beginPath();
-        for (const [ang, l] of d.pts) {
-          g.moveTo(d.x + Math.cos(ang) * d.r * 0.6, d.y + Math.sin(ang) * d.r * 0.6);
-          g.lineTo(d.x + Math.cos(ang) * l, d.y + Math.sin(ang) * l);
-        }
-        g.stroke();
-        g.globalAlpha = 1;
-      } else if (d.k === 'crack') {
-        g.globalAlpha = a;
-        g.strokeStyle = 'rgba(12,12,14,0.85)';
-        g.lineWidth = 1.5;
-        g.beginPath();
-        for (const [x1, y1, x2, y2] of d.pts) {
-          g.moveTo(d.x, d.y);
-          g.lineTo(d.x + x1, d.y + y1);
-          g.lineTo(d.x + x2, d.y + y2);
-        }
-        g.stroke();
-        g.globalAlpha = 1;
-      }
+      drawDecal(g, d, Math.min(1, (d.life - d.t) / 1.2));
     }
     g.globalAlpha = 1;
   }
@@ -221,6 +220,12 @@ export class Fx {
         g.fillStyle = `rgb(${p.color})`;
         g.beginPath();
         g.arc(p.x, p.y, s, 0, TAU);
+        g.fill();
+      } else if (p.k === 'blood') {
+        g.globalAlpha = 1;
+        g.fillStyle = '#8a121b';
+        g.beginPath();
+        g.arc(p.x, p.y - p.z * 0.42, p.size * (1 + p.z / 300), 0, TAU);
         g.fill();
       } else if (p.k === 'debris') {
         g.globalAlpha = Math.min(1, (1 - u) * 3);
@@ -270,10 +275,14 @@ export class Fx {
           for (let i = 0; i < p.pts.length; i += 2) g.lineTo(p.x + p.pts[i], p.y + p.pts[i + 1]);
           g.stroke();
         }
+      } else if (p.k === 'fire') {
+        const s = p.size * (0.6 + u * 0.9);
+        g.globalAlpha = (1 - u) * 0.9;
+        g.drawImage(this.S.orange, p.x - s, p.y - s, s * 2, s * 2);
       } else if (p.k === 'flash') {
         const s = p.size * (0.6 + u * 0.8);
         g.globalAlpha = 1 - u;
-        g.drawImage(p.color === 'warm' ? this.S.orange : this.S.star, p.x - s, p.y - s, s * 2, s * 2);
+        g.drawImage(p.color === 'warm' ? this.S.orange : p.color === 'red' ? this.S.red : this.S.star, p.x - s, p.y - s, s * 2, s * 2);
         g.globalAlpha = 1;
       } else if (p.k === 'ring') {
         const r = p.r0 + (p.r1 - p.r0) * (1 - (1 - u) * (1 - u));
@@ -303,5 +312,90 @@ export class Fx {
       }
     }
     g.globalCompositeOperation = 'source-over';
+  }
+}
+
+// Dibuja una marca en el suelo con opacidad a.
+function drawDecal(g, d, a) {
+  if (d.k === 'scorch') {
+    g.save();
+    g.translate(d.x, d.y);
+    g.rotate(d.ang);
+    g.globalAlpha = a * 0.28;
+    g.fillStyle = '#0c0e14';
+    g.fillRect(-d.len, -1.3, d.len, 2.6);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = a * Math.max(0, 1 - d.t * 1.6) * 0.7;
+    g.fillStyle = '#3ad8ff';
+    g.fillRect(-d.len, -0.7, d.len, 1.4);
+    g.restore();
+  } else if (d.k === 'crater') {
+    g.globalAlpha = a;
+    g.fillStyle = 'rgba(10,10,12,0.55)';
+    g.beginPath();
+    g.arc(d.x, d.y, d.r, 0, TAU);
+    g.fill();
+    g.strokeStyle = 'rgba(10,10,12,0.8)';
+    g.lineWidth = 1.4;
+    g.beginPath();
+    for (const [ang, l] of d.pts) {
+      g.moveTo(d.x + Math.cos(ang) * d.r * 0.6, d.y + Math.sin(ang) * d.r * 0.6);
+      g.lineTo(d.x + Math.cos(ang) * l, d.y + Math.sin(ang) * l);
+    }
+    g.stroke();
+    g.globalAlpha = 1;
+  } else if (d.k === 'blood') {
+    g.globalAlpha = a;
+    g.fillStyle = d.shade < 0.5 ? '#6e0d12' : '#82111a';
+    g.beginPath();
+    g.ellipse(d.x, d.y, d.r * 0.42, d.r * 0.3, Math.atan2(d.pts[0][1], d.pts[0][0]), 0, TAU);
+    for (const [px, py, r] of d.pts) {
+      g.moveTo(d.x + px + r, d.y + py);
+      g.arc(d.x + px, d.y + py, r, 0, TAU);
+    }
+    g.fill();
+    g.fillStyle = 'rgba(255,120,120,0.12)';
+    g.beginPath();
+    g.arc(d.x - d.r * 0.15, d.y - d.r * 0.15, d.r * 0.25, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+  } else if (d.k === 'drop') {
+    g.globalAlpha = a * 0.9;
+    g.fillStyle = '#760e15';
+    g.beginPath();
+    g.arc(d.x, d.y, d.r, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+  } else if (d.k === 'smear') {
+    g.save();
+    g.translate(d.x, d.y);
+    g.rotate(d.ang);
+    g.globalAlpha = a * 0.75;
+    g.fillStyle = '#6a0c12';
+    g.fillRect(-d.len, -d.w / 2, d.len, d.w);
+    g.restore();
+  } else if (d.k === 'burn') {
+    g.globalAlpha = a * 0.75;
+    const gr = g.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+    gr.addColorStop(0, 'rgba(8,8,8,0.95)');
+    gr.addColorStop(0.6, 'rgba(15,12,10,0.6)');
+    gr.addColorStop(1, 'rgba(15,12,10,0)');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.arc(d.x, d.y, d.r, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+  } else if (d.k === 'crack') {
+    g.globalAlpha = a;
+    g.strokeStyle = 'rgba(12,12,14,0.85)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    for (const [x1, y1, x2, y2] of d.pts) {
+      g.moveTo(d.x, d.y);
+      g.lineTo(d.x + x1, d.y + y1);
+      g.lineTo(d.x + x2, d.y + y2);
+    }
+    g.stroke();
+    g.globalAlpha = 1;
   }
 }

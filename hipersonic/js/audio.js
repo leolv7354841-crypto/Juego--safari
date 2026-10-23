@@ -131,6 +131,21 @@ export class Sfx {
     this.tone('sine', 80, 30, 0.35, Math.min(1, f));
     this.burst('lowpass', 1200, 80, 0.4, 0.6 * Math.min(1, f));
   }
+  explosion(x, y) {
+    const v = this.vol(x, y);
+    if (v < 0.03 || !this.ok('explosion', 0.12)) return;
+    this.tone('sine', 90, 25, 1.2, 1 * v);
+    this.burst('lowpass', 1800, 50, 1.3, 1 * v, 0.8);
+    this.burst('bandpass', 3000, 400, 0.5, 0.5 * v, 1);
+    this.burst('highpass', 6000, 2000, 0.3, 0.25 * v, 1, 0.05);
+  }
+  splat(x, y) {
+    const v = this.vol(x, y);
+    if (v < 0.05 || !this.ok('splat', 0.05)) return;
+    this.burst('lowpass', 900, 120, 0.35, 0.9 * v, 2);
+    this.tone('sine', 160, 45, 0.25, 0.7 * v);
+    this.burst('bandpass', 2200, 600, 0.18, 0.35 * v, 4, 0.04);
+  }
   boom() {
     if (!this.ok('boom', 0.3)) return;
     this.tone('sine', 70, 22, 0.9, 1);

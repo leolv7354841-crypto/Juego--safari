@@ -458,3 +458,60 @@ export function bakeVehicle(atlas, model, color, seed) {
     else PAINTERS[m.kind](g, m, color, seed);
   }, { scale: 2.5 });
 }
+
+// Panza del vehículo (se ve cuando vuelca): chasis, ejes, ruedas y escape.
+export function bakeUnderside(atlas, model) {
+  const name = `veh.${model}.under`;
+  const have = atlas.get(name);
+  if (have) return have;
+  const m = MODELS[model];
+  const { L, W } = m;
+  return atlas.add(name, L + 10, W + 14, (g) => {
+    roundRect(g, -L / 2, -W / 2, L, W, 8);
+    g.fillStyle = '#2b2d31';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = OUT;
+    g.stroke();
+    roundRect(g, -L / 2 + 6, -W * 0.18, L - 12, W * 0.36, 3);
+    g.fillStyle = '#3c3f44';
+    g.fill();
+    g.lineWidth = 1;
+    g.stroke();
+    const xs = m.kind === 'truck' ? [L / 2 - 20, -L / 2 + 22, -L / 2 + 40] : m.kind === 'bus' ? [L / 2 - 34, -L / 2 + 44] : [L * 0.3, -L * 0.3];
+    for (const x of xs) {
+      g.strokeStyle = '#55595f';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(x, -W / 2 + 4);
+      g.lineTo(x, W / 2 - 4);
+      g.stroke();
+      for (const s of [-1, 1]) {
+        roundRect(g, x - 8, s * W / 2 - (s > 0 ? 8 : 0), 16, 8, 3);
+        g.fillStyle = '#141518';
+        g.fill();
+        g.lineWidth = 1.2;
+        g.strokeStyle = OUT;
+        g.stroke();
+        g.fillStyle = '#7d8288';
+        g.beginPath();
+        g.arc(x, s * (W / 2 - 4), 2.2, 0, TAU);
+        g.fill();
+      }
+    }
+    // escape
+    g.strokeStyle = '#6d6a64';
+    g.lineWidth = 2.4;
+    g.beginPath();
+    g.moveTo(L * 0.2, W * 0.28);
+    g.lineTo(-L / 2 + 2, W * 0.28);
+    g.stroke();
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    for (let i = 0; i < 12; i++) g.fillRect(-L / 2 + Math.random() * L, -W / 2 + Math.random() * W, 2, 2);
+  }, { scale: 2.5 });
+}
+
+// Carrocería calcinada tras la explosión.
+export function bakeBurnt(atlas, spr) {
+  return atlas.get(spr.name + '.burnt') || atlas.tinted(spr.name + '.burnt', spr, '#17120e', 0.8);
+}

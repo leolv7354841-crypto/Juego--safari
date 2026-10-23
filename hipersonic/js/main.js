@@ -10,12 +10,15 @@ import { Traffic } from './traffic.js';
 import { Npc } from './npc.js';
 import { Hero, HYPER } from './hero.js';
 import { Fx } from './fx.js';
+import { Gore } from './gore.js';
 import { Lighting } from './lighting.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
 
 const SONIC_DRAIN = 20;
 const SONIC_MIN = 12;
+// velocidad a la que se rompe la barrera del sonido (Mach 1 en el velocímetro)
+const MACH1 = HYPER * 0.84;
 
 class Camera {
   constructor() {
@@ -61,6 +64,8 @@ class Game {
     this.world.fx = this.S;
     this.traffic = new Traffic(this.atlas, this.world);
     this.fx = new Fx(this.S);
+    this.gore = new Gore(this.atlas, this.fx);
+    this.fx.stamper = (x, y, r, fn) => this.world.stamp(x, y, r, fn);
     this.lighting = new Lighting(this.S);
     this.camera = new Camera();
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
@@ -101,6 +106,7 @@ class Game {
     this.npcs = [];
     this.pigeons = [];
     this.fx && (this.fx.list.length = 0);
+    this.gore && (this.gore.list.length = 0);
     this.sonic = { on: false, k: 0, wipe: 0, queue: [], release: [], clock: 0, dir: 0 };
     this.kos = 0;
     this.damage = 0;
@@ -298,7 +304,17 @@ class Game {
     for (const n of this.npcs) n.update(wdt, this);
     if (wdt > 0) this.separate();
     this.dominoes();
+    for (const n of this.npcs) {
+      if (n.gibT > 0 && wdt > 0) {
+        n.gibT -= wdt;
+        if (n.gibT <= 0) {
+          const v = n.rag ? n.rag.velocity() : { x: n.gibVx, y: n.gibVy };
+          this.gibNpc(n, v.x, v.y, 1.3);
+        }
+      }
+    }
     this.npcs = this.npcs.filter((n) => !n.dead);
+    this.gore.update(wdt, this.world);
     this.traffic.update(wdt, this);
     this.fx.update(wdt, dt);
     this.updatePigeons(wdt);
@@ -358,10 +374,19 @@ class Game {
     while (S.release.length && S.release[0].at <= S.clock) {
       const q = S.release.shift();
       if (q.npc) {
-        q.npc.applyHit(this, q.vx, q.vy, q.vz, q.dmg, rand(-10, 10));
-        if (q.npc.hp <= 0 && q.npc.state !== 'rag') q.npc.launch(q.vx, q.vy, q.vz + 200, rand(-10, 10));
+        // sale disparado con todo y se despedaza en el aire
+        const n = q.npc;
+        if (n.dead) continue;
+        const k = 1.7 + q.n * 0.25;
+        n.hp = Math.min(n.hp, 0);
+        n.launch(q.vx * k, q.vy * k, q.vz + 380, rand(-14, 14));
+        n.gibT = rand(0.08, 0.2);
+        n.gibVx = q.vx * k;
+        n.gibVy = q.vy * k;
       } else if (q.car) {
-        q.car.impulse(q.vx, q.vy, q.x, q.y, q.dmg);
+        q.car.impulse(q.vx * 1.8, q.vy * 1.8, q.x, q.y, q.dmg);
+        q.car.launch(rand(380, 560), rand(-11, 11));
+        if (!q.car.exploded) q.car.fuse = rand(0.15, 0.45);
         this.addDamage(q.dmg * 40);
         this.sfx.crash(q.x, q.y, 1);
         this.sfx.glass(q.x, q.y);
@@ -400,10 +425,15 @@ class Game {
 
   /* ---------- impactos ---------- */
 
-  hitNpc(n, vx, vy, power, dmg, src) {
-    if (!n.standing && n.state !== 'rag' && n.state !== 'ko') return;
+  hitNpc(n, vx, vy, power, dmg, src, gib) {
+    if (n.dead || (!n.standing && n.state !== 'rag' && n.state !== 'ko')) return;
     const vz = power > 220 ? power * rand(0.35, 0.55) : 0;
     if (src === 'hero' && this.queueOrHit(n, vx, vy, vz, dmg, n.px, n.py, false)) return;
+    // a Mach 1, arrollado por un auto lanzado o junto a una explosión: queda hecho pedazos
+    if (gib || (src === 'car' && power > 380)) {
+      this.gibNpc(n, vx, vy, Math.min(1.6, power / 700));
+      return;
+    }
     n.applyHit(this, vx, vy, vz, dmg, rand(-9, 9));
     if (power > 220) {
       this.fx.dust(n.x, n.y, 4, 9);
@@ -431,7 +461,7 @@ class Game {
         // sale despedido hacia delante y hacia el lado en que lo tocó
         const side = (-uy * dx + ux * dy) / d;
         const p = sp * 0.95;
-        this.hitNpc(n, ux * p - uy * side * p * 0.45, uy * p + ux * side * p * 0.45, p, sp * 0.06, 'hero');
+        this.hitNpc(n, ux * p - uy * side * p * 0.45, uy * p + ux * side * p * 0.45, p, sp * 0.06, 'hero', sp >= MACH1 * 0.95);
         this.fx.flash(n.px, n.py, 40, true);
         this.sfx.punch(sp > 600);
         this.camera.shake(0.08 + h.hyper * 0.1);
@@ -455,7 +485,8 @@ class Game {
       const vn = -(h.vx * q.nx + h.vy * q.ny);
       if (vn > 380 && now - c.lastHit > 0.35) {
         c.lastHit = now;
-        const k = 0.95;
+        const mach = sp >= MACH1 * 0.92;
+        const k = mach ? 2.6 : 0.95;
         const ix = h.vx * k;
         const iy = h.vy * k;
         const dmg = vn * 0.09;
@@ -464,6 +495,14 @@ class Game {
         if (!this.queueOrHit(c, ix, iy, 0, dmg, hx, hy, true)) {
           c.impulse(ix, iy, hx, hy, dmg);
           this.onCarCrash(c, hx, hy, vn, null, true);
+          if (mach) {
+            // sale disparado dando vueltas y explota
+            c.launch(rand(420, 620), rand(-12, 12));
+            if (!c.exploded) c.fuse = rand(0.12, 0.4);
+            this.fx.wave(hx, hy, 900, 0.4, 0.05, true);
+            this.camera.shake(0.4);
+            this.hitstop = 0.07;
+          }
         }
         const loss = Math.max(0.2, 1 - c.m.weight * 0.13);
         h.vx *= loss;
@@ -508,7 +547,7 @@ class Game {
       if (d > reach + n.r || Math.abs(angleDiff(h.face, Math.atan2(dy, dx))) > 1.1) continue;
       any = true;
       const power = n.kind === 'enemy' ? 360 + sp * 0.8 : 130 + sp * 0.6;
-      this.hitNpc(n, (dx / (d || 1)) * power, (dy / (d || 1)) * power, power, n.kind === 'enemy' ? 18 : 4, 'hero');
+      this.hitNpc(n, (dx / (d || 1)) * power, (dy / (d || 1)) * power, power, n.kind === 'enemy' ? 18 : 4, 'hero', sp >= MACH1 * 0.85);
     }
     for (const c of this.traffic.list) {
       if (Math.abs(c.x - h.x) > c.L || Math.abs(c.y - h.y) > c.L) continue;
@@ -519,6 +558,11 @@ class Game {
       if (!this.queueOrHit(c, fx * imp, fy * imp, 0, 34, q.cx, q.cy, true)) {
         c.impulse(fx * imp, fy * imp, q.cx, q.cy, 34);
         this.onCarCrash(c, q.cx, q.cy, imp, null, true);
+        if (sp >= MACH1 * 0.85) {
+          c.impulse(fx * imp * 1.5, fy * imp * 1.5, q.cx, q.cy, 0);
+          c.launch(rand(420, 620), rand(-12, 12));
+          if (!c.exploded) c.fuse = rand(0.12, 0.4);
+        }
       }
     }
     if (any) {
@@ -549,23 +593,30 @@ class Game {
     this.camera.shake(0.45);
     this.camera.kick = 0.1;
     this.flashA = 0.35;
-    // la onda empuja a los que están cerca y rompe cristales
+    // la onda lanza a todos los que están cerca, rompe cristales y vuelca los autos
+    const R = 340;
     for (const n of this.npcs) {
       const dx = n.px - h.x;
       const dy = n.py - h.y;
       const d = Math.hypot(dx, dy);
-      if (d > 170 || d < 1) continue;
-      const p = 380 * (1 - d / 170) + 120;
-      this.hitNpc(n, (dx / d) * p, (dy / d) * p, p, 6, 'boom');
+      if (d > R || d < 1) continue;
+      const p = 900 * (1 - d / R) + 260;
+      this.hitNpc(n, (dx / d) * p, (dy / d) * p, p, 60, 'boom', d < 70);
     }
     for (const c of this.traffic.list) {
-      const d = Math.hypot(c.x - h.x, c.y - h.y);
-      if (d < 200 && c.glass < 3) {
-        c.glass++;
-        this.fx.debris(c.x, c.y, c.x - h.x, c.y - h.y, 8, 'glass', 260);
-        this.sfx.glass(c.x, c.y);
+      const dx = c.x - h.x;
+      const dy = c.y - h.y;
+      const d = Math.hypot(dx, dy);
+      if (d > R + 60 || d < 1) continue;
+      const f = 1 - d / (R + 60);
+      c.impulse((dx / d) * 1500 * f, (dy / d) * 1500 * f, c.x - (dx / d) * c.W * 0.5, c.y - (dy / d) * c.W * 0.5, 40 * f);
+      c.launch(260 + 380 * f, (Math.random() < 0.5 ? -1 : 1) * (6 + 8 * f));
+      if (c.glass < 3) {
+        c.glass = 3;
+        this.fx.debris(c.x, c.y, dx, dy, 10, 'glass', 320);
       }
     }
+    this.sfx.glass(h.x, h.y);
     this.toast('¡BARRERA DEL SONIDO!');
   }
 
@@ -596,6 +647,7 @@ class Game {
   }
 
   onCarCrash(c, x, y, f, hit, byHero) {
+    if (c.hp <= 0 && !c.exploded && !c.fuse && f > 300) c.fuse = rand(0.2, 0.6);
     const k = Math.min(1, f / 900);
     this.sfx.crash(x, y, 0.4 + k);
     if (k > 0.4) this.sfx.glass(x, y);
@@ -608,6 +660,78 @@ class Game {
     if (hit && f > 300) this.fx.wallCrack(x, y, hit.nx, hit.ny);
     // los peatones cercanos se asustan
     for (const n of this.npcs) if (n.kind === 'civ' && n.standing && n.state !== 'flee' && Math.hypot(n.x - x, n.y - y) < 260) n.flee(this, rand(3, 5));
+  }
+
+  // Despedaza a un personaje: restos, órganos y sangre en la dirección del impacto.
+  gibNpc(n, vx, vy, power = 1) {
+    if (n.dead) return;
+    n.dead = true;
+    if (n.stars) n.stars.life = 0;
+    const x = n.px;
+    const y = n.py;
+    this.gore.explode(n.kit, x, y, n.rag ? n.rag.face : n.face, vx, vy, power);
+    this.sfx.splat(x, y);
+    this.camera.shake(0.12);
+    if (n.kind === 'enemy' && !n.counted) {
+      n.counted = true;
+      this.onKo(n);
+    }
+    // los civiles de alrededor salen corriendo
+    for (const o of this.npcs) if (o.kind === 'civ' && o.standing && o.state !== 'flee' && Math.hypot(o.x - x, o.y - y) < 300) o.flee(this, rand(4, 6));
+  }
+
+  explodeCar(c) {
+    if (c.exploded) return;
+    c.burn();
+    const x = c.x;
+    const y = c.y;
+    this.sfx.explosion(x, y);
+    this.fx.flash(x, y, 160, false, 'warm');
+    this.fx.flash(x, y, 90);
+    this.fx.ring(x, y, 10, 220, 0.5, '255,190,110', 10);
+    this.fx.wave(x, y, 900, 0.5, 0.07, true);
+    this.fx.light(x, y, 420, 0.6);
+    for (let i = 0; i < 30; i++) {
+      const a = rand(0, TAU);
+      const r = rand(0, 40);
+      this.fx.add({ k: 'fire', x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * rand(60, 260), vy: Math.sin(a) * rand(60, 260), life: rand(0.5, 1.1), size: rand(18, 34), drag: 2.5 });
+    }
+    for (let i = 0; i < 12; i++) this.fx.smoke(x + rand(-30, 30), y + rand(-20, 20), rand(18, 30), 1);
+    this.fx.debris(x, y, 0, 0, 26, 'metal', 520);
+    this.fx.debris(x, y, 0, 0, 14, 'glass', 420);
+    this.fx.sparks(x, y, 1, 0, 30, '255,200,110', 700);
+    this.fx.decal({ k: 'burn', x, y, r: c.L * 0.7, life: 120 });
+    const d = Math.hypot(x - this.hero.x, y - this.hero.y);
+    this.camera.shake(0.7 * Math.max(0, 1 - d / 900));
+    if (d < 500) this.flashA = Math.max(this.flashA, 0.25 * (1 - d / 500));
+    this.addDamage(2500 * c.m.weight);
+    c.launch(rand(200, 340), rand(-6, 6));
+    // la explosión lanza o despedaza a quien esté cerca y empuja a otros autos
+    for (const n of this.npcs) {
+      const dx = n.px - x;
+      const dy = n.py - y;
+      const dd = Math.hypot(dx, dy) || 1;
+      if (dd > 220) continue;
+      const p = 1100 * (1 - dd / 220) + 200;
+      this.hitNpc(n, (dx / dd) * p, (dy / dd) * p, p, 80, 'blast', dd < 90);
+    }
+    for (const o of this.traffic.list) {
+      if (o === c) continue;
+      const dx = o.x - x;
+      const dy = o.y - y;
+      const dd = Math.hypot(dx, dy) || 1;
+      if (dd > 200) continue;
+      const f = 1 - dd / 200;
+      o.impulse((dx / dd) * 1100 * f, (dy / dd) * 1100 * f, o.x - (dx / dd) * 10, o.y - (dy / dd) * 10, 70 * f);
+      o.launch(200 * f + 80, rand(-6, 6) * f);
+      // reacción en cadena
+      if (o.hp <= 0 && !o.exploded && !o.fuse) o.fuse = rand(0.3, 0.8);
+    }
+    const h = this.hero;
+    if (d < 150 && h.alive) {
+      h.kx += ((h.x - x) / (d || 1)) * 500;
+      h.ky += ((h.y - y) / (d || 1)) * 500;
+    }
   }
 
   onKo(n) {
@@ -846,6 +970,7 @@ class Game {
     const vis = this.npcs.filter(onScreen);
     for (const n of vis) n.drawShadow(ctx, S, lamps);
     h.drawShadow(ctx, S);
+    this.gore.drawShadows(ctx, S, v);
     for (const p of this.pigeons) {
       if (p.z > 0) {
         ctx.globalAlpha = 0.3 * Math.max(0, 1 - p.z / 160);
@@ -867,9 +992,11 @@ class Game {
     // los noqueados, debajo; los de pie, encima
     low.sort((a, b) => (a.standing ? 1 : 0) - (b.standing ? 1 : 0));
     for (const n of low) n.draw(ctx, this.props);
+    this.gore.draw(ctx, v, false);
     this.fx.drawNormal(ctx, v);
     this.world.drawOverhead(ctx, v, this.worldTime, h.alive ? h : null);
     for (const n of high) n.draw(ctx, this.props);
+    this.gore.draw(ctx, v, true);
 
     // iluminación
     this.lighting.render(this, b, v);
