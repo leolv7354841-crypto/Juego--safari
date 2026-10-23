@@ -76,8 +76,8 @@ entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 ### Cooperativo (2 jugadores)
 
 En el menú, **Cooperativo · 2 jugadores**: uno toca *Crear sala* y le pasa el código de 4 letras al
-otro, que toca *Unirse*. Juegan en el mismo mapa contra hordas **2 veces más difíciles** (1,4 veces más
-zombis con 1,4 veces más vida); los zombis van por el jugador más cercano. No hay competitivo: cada uno
+otro, que toca *Unirse*. Juegan en el mismo mapa contra hordas con **la mitad de zombis** que en solitario
+(pero con 1,4 veces más vida); los zombis van por el jugador más cercano. No hay competitivo: cada uno
 tiene su dinero, armas, vida y mejoras, la experiencia es del equipo, y si uno cae revive con media
 vida al terminar la oleada (si caen los dos, se acaba la partida). Las mejoras y la tienda se abren
 entre oleadas. El robot es del anfitrión.

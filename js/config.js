@@ -7,6 +7,8 @@ export const ROAD_HALF = 110;
 export const SIDEWALK = 44;
 export const NAV_CELL = 40;
 export const MAX_ALIVE = 600;
+// en cooperativo hay menos zombis vivos a la vez
+export const COOP_MAX_ALIVE = 220;
 
 export const PLAYER_BASE = {
   radius: 14,

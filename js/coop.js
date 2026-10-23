@@ -1,4 +1,4 @@
-// Modo cooperativo para 2 jugadores (sin competitivo), 2 veces más difícil.
+// Modo cooperativo para 2 jugadores (sin competitivo), con la mitad de zombis.
 //
 // El anfitrión simula todo el mundo (zombis, oleadas, estructuras, explosiones) y le manda
 // al invitado ~12 veces por segundo una "foto" de lo que hay cerca de él, más los efectos
@@ -191,7 +191,7 @@ export class Coop {
     g.input.setRun(false);
     g.setState('play');
     g.updateHud(true);
-    g.toast('¡Cooperativo! Hordas 2 veces más difíciles');
+    g.toast('¡Cooperativo! Mitad de zombis, más duros');
   }
 
   // El anfitrión vuelve a empezar con el mismo compañero (después de perder).
@@ -228,7 +228,7 @@ export class Coop {
     g.input.setRun(false);
     g.setState('play');
     g.updateHud(true);
-    g.toast('¡Conectado! Hordas 2 veces más difíciles');
+    g.toast('¡Conectado! Mitad de zombis, más duros');
   }
 
   /* ---------- efectos grabados (anfitrión) ---------- */

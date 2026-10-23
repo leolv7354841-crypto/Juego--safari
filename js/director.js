@@ -1,5 +1,5 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { MAX_ALIVE, WORLD_SIZE } from './config.js';
+import { MAX_ALIVE, COOP_MAX_ALIVE, WORLD_SIZE } from './config.js';
 import { rand, randInt, TAU } from './util.js';
 
 export class Director {
@@ -13,7 +13,7 @@ export class Director {
   }
 
   get hpMult() {
-    // cooperativo: 1,4 veces la vida (y 1,4 veces los zombis, ver startWave) ≈ 2 veces más difícil
+    // cooperativo: 1,4 veces la vida, pero la mitad de zombis (ver startWave)
     return (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 1.4 : 1);
   }
   get speedMult() {
@@ -25,7 +25,8 @@ export class Director {
     const w = this.wave;
     // hordas masivas: 5 veces más normales y velocistas que antes
     // el 20% de los normales llega como policía SWAT
-    const m = this.coop ? 1.4 : 1;
+    // cooperativo: la mitad de zombis que en solitario (eran demasiados)
+    const m = this.coop ? 0.5 : 1;
     const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
     const swats = Math.round(normalTotal * 0.2);
     const normals = normalTotal - swats;
@@ -68,7 +69,7 @@ export class Director {
     }
     const alive = game.horde.list.length;
     this.spawnT -= dt;
-    if (this.queue.length && this.spawnT <= 0 && alive < MAX_ALIVE) {
+    if (this.queue.length && this.spawnT <= 0 && alive < (this.coop ? COOP_MAX_ALIVE : MAX_ALIVE)) {
       this.spawnGroup(game);
       this.spawnT = this.interval * rand(0.7, 1.3);
     }
