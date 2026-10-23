@@ -492,12 +492,21 @@ export class Coop {
       case 'fx':
         if (Array.isArray(m.e)) for (const e of m.e) this.replay(e);
         break;
-      case 'k':
-        if (p.alive) {
-          p.kx += Number(m.x) || 0;
-          p.ky += Number(m.y) || 0;
+      case 'k': {
+        // empujones sumados de varios golpes: se limitan para que no den tirones bruscos
+        if (!p.alive) break;
+        let kx = Number(m.x) || 0;
+        let ky = Number(m.y) || 0;
+        const kl = Math.hypot(kx, ky);
+        const cap = kl > 900 ? 1500 : 260;
+        if (kl > cap) {
+          kx *= cap / kl;
+          ky *= cap / kl;
         }
+        p.kx += kx;
+        p.ky += ky;
         break;
+      }
       case 'hurt':
         p.hurt(Number(m.d) || 0, g);
         break;
@@ -827,6 +836,23 @@ export class Coop {
         danger += 1 - d / 650;
         if (d < 300) nc++;
       }
+    }
+    // choque local con los zombis que ves: no los atraviesas (en el anfitrión sólo se aparta el zombi)
+    if (p.alive) {
+      const q = [];
+      grid.query(p.x - p.r - 30, p.y - p.r - 30, p.x + p.r + 30, p.y + p.r + 30, q);
+      for (const z of q) {
+        const dx = p.x - z.x;
+        const dy = p.y - z.y;
+        const rr = z.r + p.r;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= rr * rr) continue;
+        const d = Math.sqrt(d2) || 0.01;
+        const k = (rr - d) * (z.mass / (z.mass + p.mass)) * 0.6;
+        p.x += (dx / d) * k;
+        p.y += (dy / d) * k;
+      }
+      g.world.collide(p, p.r, true);
     }
     for (const b of this.remoteBullets) {
       b.x += b.dx * (b.rocket ? 640 : 1000) * dt;

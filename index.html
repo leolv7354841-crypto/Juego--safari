@@ -16,9 +16,29 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=335fe0b1">
+  <link rel="stylesheet" href="css/style.css?v=0e6578e4">
   <!-- version:start -->
-  <script type="importmap">{"imports":{"./js/accounts.js":"./js/accounts.js?v=335fe0b1","./js/audio.js":"./js/audio.js?v=335fe0b1","./js/build.js":"./js/build.js?v=335fe0b1","./js/bullets.js":"./js/bullets.js?v=335fe0b1","./js/config.js":"./js/config.js?v=335fe0b1","./js/coop.js":"./js/coop.js?v=335fe0b1","./js/director.js":"./js/director.js?v=335fe0b1","./js/input.js":"./js/input.js?v=335fe0b1","./js/lighting.js":"./js/lighting.js?v=335fe0b1","./js/main.js":"./js/main.js?v=335fe0b1","./js/music.js":"./js/music.js?v=335fe0b1","./js/net.js":"./js/net.js?v=335fe0b1","./js/particles.js":"./js/particles.js?v=335fe0b1","./js/pickups.js":"./js/pickups.js?v=335fe0b1","./js/player.js":"./js/player.js?v=335fe0b1","./js/robot.js":"./js/robot.js?v=335fe0b1","./js/sprites.js":"./js/sprites.js?v=335fe0b1","./js/upgrades.js":"./js/upgrades.js?v=335fe0b1","./js/util.js":"./js/util.js?v=335fe0b1","./js/world.js":"./js/world.js?v=335fe0b1","./js/zombies.js":"./js/zombies.js?v=335fe0b1"}}</script>
+  <script id="dz-loader">
+    (function () {
+      var v = '0e6578e4';
+      var b = '';
+      try {
+        b = new URLSearchParams(location.search).get('b') || '';
+      } catch (e) {}
+      var q = '?v=' + v + (b ? '&b=' + encodeURIComponent(b) : '');
+      var mods = ["accounts.js","audio.js","build.js","bullets.js","config.js","coop.js","director.js","input.js","lighting.js","main.js","music.js","net.js","particles.js","pickups.js","player.js","robot.js","sprites.js","upgrades.js","util.js","version.js","world.js","zombies.js"];
+      var map = { imports: {} };
+      mods.forEach(function (f) {
+        map.imports['./js/' + f] = './js/' + f + q;
+      });
+      var im = document.createElement('script');
+      im.type = 'importmap';
+      im.textContent = JSON.stringify(map);
+      document.currentScript.after(im);
+      window.DZ_VERSION = v;
+      window.DZ_QUERY = q;
+    })();
+  </script>
   <!-- version:end -->
 </head>
 <body>
@@ -149,7 +169,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 335fe0b1</span></p>
+        <p class="ver"><span id="ver">Versión 0e6578e4</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -306,6 +326,13 @@
     </section>
 
   </div>
-  <script type="module" src="js/main.js?v=335fe0b1"></script>
+  <script id="dz-main">
+    (function () {
+      var s = document.createElement('script');
+      s.type = 'module';
+      s.src = 'js/main.js' + (window.DZ_QUERY || '');
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

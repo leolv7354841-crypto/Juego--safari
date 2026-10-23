@@ -3,6 +3,7 @@ import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS,
 import { Music } from './music.js';
 import { Robot } from './robot.js';
 import { Coop } from './coop.js';
+import { VERSION } from './version.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
@@ -1848,7 +1849,29 @@ class Game {
   }
 }
 
+// Si algún CDN entregó archivos de una versión vieja, se recarga pidiendo todo de nuevo (hasta 3 veces).
+function staleReload() {
+  const want = window.DZ_VERSION;
+  if (!want) return false;
+  try {
+    if (VERSION === want) {
+      window.sessionStorage.removeItem('dz-reload');
+      return false;
+    }
+    const n = Number(window.sessionStorage.getItem('dz-reload') || 0);
+    if (n >= 3) return false;
+    window.sessionStorage.setItem('dz-reload', String(n + 1));
+    const u = new window.URL(window.location.href);
+    u.searchParams.set('b', Date.now().toString(36));
+    window.location.replace(u.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function boot() {
+  if (staleReload()) return;
   try {
     new Game();
   } catch (err) {

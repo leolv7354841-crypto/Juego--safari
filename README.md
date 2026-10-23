@@ -197,9 +197,10 @@ no a prueba de trampas.
 
 ## Versiones y caché
 
-`node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: cada módulo se
-pide con `?v=<hash>` mediante un *import map*, así raw.githack.com y los navegadores no sirven archivos
-viejos. Ejecútalo antes de cada commit. La versión aparece en el menú principal.
+`node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: un pequeño
+cargador arma un *import map* para pedir cada módulo con `?v=<hash>`, y `js/version.js` guarda el
+mismo hash. Si un CDN (como raw.githack.com) entrega un archivo viejo, el juego lo detecta al abrir y se
+recarga solo pidiendo todo de nuevo. Ejecútalo antes de cada commit. La versión aparece en el menú.
 
 ## Estructura
 
@@ -225,6 +226,7 @@ js/accounts.js      Cuentas, guardado por cuenta y clasificación
 js/robot.js         Robot de combate pilotable
 js/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
 js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
+js/version.js       Versión del código (la genera tools/stamp.mjs)
 js/sprites.js       Todo el arte, generado por código
 ```
 
