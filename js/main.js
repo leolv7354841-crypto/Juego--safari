@@ -779,7 +779,7 @@ class Game {
       'no-existe': 'No existe una sala con ese código (o ya caducó).',
       llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
       permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
-      tiempo: 'No se pudieron conectar los dos celulares. Prueben con otra red (por ejemplo, ambos en Wi-Fi).',
+      tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
     }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
     this.coopStatus(msg, true);
     this.$('coop-choose').hidden = false;
@@ -811,6 +811,12 @@ class Game {
     try {
       await this.coop.join(code);
       this.coopStatus('¡Conectado! Esperando al anfitrión…');
+      // si el anfitrión no arranca en un rato, algo falló
+      const t0 = performance.now();
+      while (!this.coop.active && this.state === 'coop') {
+        if (performance.now() - t0 > 20000) throw new Error('tiempo');
+        await new Promise((r) => setTimeout(r, 250));
+      }
     } catch (err) {
       this.coopError(err);
     }

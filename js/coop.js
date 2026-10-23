@@ -211,6 +211,7 @@ export class Coop {
 
   tick(dt) {
     if (!this.mode) return;
+    this.net.check();
     if (this.isHost) this.hostTick(dt);
     else this.guestTick(dt);
   }
@@ -324,12 +325,14 @@ export class Coop {
         break;
       case 'build': {
         const kind = m.kind;
+        this.syncPeer(m);
         const ok = !!SHOP[kind] && !SHOP[kind].consumable && this.quiet(() => this.withPlayer(peer, () => g.structures.place(g, kind)));
         this.send({ t: 'built', kind, ok });
         break;
       }
       case 'throw': {
         const kind = m.kind === 'molotov' ? 'molotov' : 'grenade';
+        this.syncPeer(m);
         this.quiet(() => this.withPlayer(peer, () => (kind === 'molotov' ? g.structures.throwMolotov(g, m.tx, m.ty) : g.structures.throwGrenade(g, m.tx, m.ty))));
         const q = g.structures.grenades[g.structures.grenades.length - 1];
         if (q) q.owner = 'peer';
@@ -344,6 +347,16 @@ export class Coop {
         if (g.state === 'play') g.startNextRound();
         break;
     }
+  }
+
+  // Las acciones traen la posición y la mira exactas del invitado en ese instante.
+  syncPeer(m) {
+    const q = this.peer;
+    if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
+      q.x = q.tx = m.x;
+      q.y = q.ty = m.y;
+    }
+    if (Number.isFinite(m.a)) q.angle = m.a;
   }
 
   peerShot(m) {
@@ -487,7 +500,8 @@ export class Coop {
     }
     if (!g.structures.placement(g, g.buildSel).ok) return g.toast('No cabe ahí');
     this.pendingBuild = g.buildSel;
-    this.send({ t: 'build', kind: g.buildSel });
+    const p = g.player;
+    this.send({ t: 'build', kind: g.buildSel, x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
   }
 
   guestThrow(kind) {
@@ -505,7 +519,7 @@ export class Coop {
       ty = p.target.y;
     }
     g.inv[kind]--;
-    this.send({ t: 'throw', kind, tx: Math.round(tx), ty: Math.round(ty) });
+    this.send({ t: 'throw', kind, tx: Math.round(tx), ty: Math.round(ty), x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
   }
 
   applySnapshot(s) {

@@ -82,9 +82,9 @@ tiene su dinero, armas, vida y mejoras, la experiencia es del equipo, y si uno c
 vida al terminar la oleada (si caen los dos, se acaba la partida). Las mejoras y la tienda se abren
 entre oleadas. El robot es del anfitrión.
 
-Por dentro: el anfitrión simula el mundo y le manda al invitado lo que pasa ~12 veces por segundo por
-una conexión directa entre los celulares (WebRTC); Firebase sólo se usa para encontrarse con el código.
-En algunas redes móviles muy cerradas la conexión directa puede fallar: en Wi-Fi funciona mejor.
+Por dentro: el anfitrión simula el mundo y le manda al invitado lo que pasa ~8–12 veces por segundo.
+Primero intenta una conexión directa entre los celulares (WebRTC); como en muchas redes móviles no se
+logra, mientras tanto todo viaja por la sala de Firebase (en tiempo real), que siempre funciona.
 
 ### Robot de combate
 
