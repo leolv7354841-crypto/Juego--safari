@@ -17,12 +17,28 @@ export class Pickups {
 
   update(dt, game) {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)
-    const peer = game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    // en línea (servidor): recoge el jugador vivo más cercano de game.targets
+    const targets = game.targets || null;
+    const peer = !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const it = this.list[i];
       it.t += dt;
       let p = game.player;
-      if (peer && (!p.alive || (peer.x - it.x) ** 2 + (peer.y - it.y) ** 2 < (p.x - it.x) ** 2 + (p.y - it.y) ** 2)) p = peer;
+      if (targets) {
+        p = null;
+        let bd = Infinity;
+        for (const q of targets) {
+          const d2 = (q.x - it.x) ** 2 + (q.y - it.y) ** 2;
+          if (q.alive && d2 < bd) {
+            bd = d2;
+            p = q;
+          }
+        }
+        if (!p) {
+          if (it.t > LIFE) this.list.splice(i, 1);
+          continue;
+        }
+      } else if (peer && (!p.alive || (peer.x - it.x) ** 2 + (peer.y - it.y) ** 2 < (p.x - it.x) ** 2 + (p.y - it.y) ** 2)) p = peer;
       const dx = p.x - it.x;
       const dy = p.y - it.y;
       const d = Math.hypot(dx, dy);
@@ -36,7 +52,7 @@ export class Pickups {
         it.y += (dy / (d || 1)) * pull;
       }
       const reach = p.r + (it.k === 'ammo' ? 26 : 16);
-      if (Math.hypot(p.x - it.x, p.y - it.y) < reach && usable && (p === peer ? game.coop.peerPickup(it) : this.collect(it, game))) {
+      if (Math.hypot(p.x - it.x, p.y - it.y) < reach && usable && (targets ? game.collectFor(p, it) : p === peer ? game.coop.peerPickup(it) : this.collect(it, game))) {
         it.taken = true;
         this.list.splice(i, 1);
         continue;

@@ -1,0 +1,27 @@
+{
+  "name": "dead-zone-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor autoritativo multijugador de Dead Zone (Colyseus sobre WebSocket).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/index.ts",
+    "dev": "node --watch src/index.ts",
+    "build": "tsc --noEmit -p .",
+    "test": "node --test --test-concurrency=1 --test-timeout=30000 test/*.test.ts",
+    "load": "node tools/load.ts"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.18.23",
+    "@colyseus/schema": "^5.0.42",
+    "@colyseus/ws-transport": "^0.18.4"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "^0.18.6",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}

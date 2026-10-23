@@ -182,6 +182,24 @@ export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 3000, repairPerHp
 // Vacía = sólo clasificación de este dispositivo (y la de Claude si se abre como Artifact).
 export const ONLINE = { url: 'https://dead-zone-73dcc-default-rtdb.firebaseio.com' };
 
+// Multijugador en línea con servidor autoritativo (carpeta server/).
+// server: dirección del servidor (wss://…). Vacía: en localhost se usa ws://<equipo>:2567.
+// También se puede cambiar al abrir el juego con ?servidor=wss://…
+export const NET = {
+  server: '',
+  maxPlayers: 10,
+  tickHz: 60, // pasos de simulación por segundo (servidor y predicción)
+  snapHz: 20, // fotos del estado por segundo hacia cada jugador
+  interpDelay: 110, // ms de retraso para dibujar a los demás entre dos fotos
+  maxExtrapolate: 100, // ms máximos que se adelanta algo sin foto nueva
+  pendingMax: 120, // entradas sin confirmar que guarda el cliente (2 s)
+  snapDist: 150, // corrección mayor que esto (px): se salta directo, sin suavizar
+  smooth: 12, // rapidez con que se borra una corrección pequeña
+  reconnectSeconds: 20,
+  view: 1000, // mitad del cuadro alrededor de cada jugador que se le manda
+  crowd: [0.5, 0.15], // zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra
+};
+
 // Umbrales de la música dinámica (peligro = suma de cercanía de zombis).
 export const MUSIC = { threatOn: 4, threatOff: 2, hordeOn: 14, hordeOff: 8, minHold: 4 };
 

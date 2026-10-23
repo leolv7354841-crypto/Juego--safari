@@ -1028,7 +1028,7 @@ kbd {
 
 /* ---------- Cooperativo ---------- */
 
-#btn-coop { width: min(300px, 100%); font-size: 20px; padding: 10px 18px 7px; border-color: rgba(159, 208, 255, 0.45); color: #cfe6ff; }
+#btn-coop, #btn-online { width: min(300px, 100%); font-size: 20px; padding: 10px 18px 7px; border-color: rgba(159, 208, 255, 0.45); color: #cfe6ff; }
 .panel.coop-panel { width: min(460px, 100%); }
 .coop-step { display: grid; gap: 12px; margin: 6px 0 4px; }
 .coop-or { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
@@ -1063,6 +1063,35 @@ kbd {
   color: #9fd0ff;
   background: rgba(10, 11, 9, 0.6);
   border: 1px solid rgba(159, 208, 255, 0.25);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   white-space: nowrap;
 }
+
+/* en línea: panel de diagnóstico (tocar el indicador o F3) */
+#net-diag {
+  align-self: flex-start;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  max-width: min(520px, calc(100vw - 32px));
+  font: 700 10px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  color: #cfe6ff;
+  background: rgba(10, 11, 9, 0.78);
+  border: 1px solid rgba(159, 208, 255, 0.25);
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
+/* sala en línea */
+.ol-name { margin: 0; }
+.ol-code { font-size: 56px; letter-spacing: 0.18em; }
+.ol-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 34vh; overflow-y: auto; text-align: left; }
+.ol-member { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px 5px; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); font-size: 15px; }
+.ol-member.me { border-color: rgba(159, 208, 255, 0.45); }
+.ol-member.off { opacity: 0.55; }
+.ol-member .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-member .tg { flex: none; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.ol-results { padding: 8px 10px; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); text-align: left; font-size: 14px; }
+.ol-res-head { margin: 0 0 6px; color: #cfe6ff; font-weight: 700; }
+.ol-res-row { color: #cfc8b8; }
+#btn-ol-start:disabled { opacity: 0.55; cursor: default; }

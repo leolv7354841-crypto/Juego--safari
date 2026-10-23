@@ -26,7 +26,8 @@ export class Director {
     // hordas masivas: 5 veces más normales y velocistas que antes
     // el 20% de los normales llega como policía SWAT
     // cooperativo: la mitad de zombis que en solitario (eran demasiados)
-    const m = this.coop ? 0.5 : 1;
+    // en línea: crowd crece con el número de jugadores (ver NET.crowd)
+    const m = this.coop ? this.crowd || 0.5 : 1;
     const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
     const swats = Math.round(normalTotal * 0.2);
     const normals = normalTotal - swats;

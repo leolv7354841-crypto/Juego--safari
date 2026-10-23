@@ -150,14 +150,22 @@ export class Player {
 
   update(dt, game) {
     const input = game.input;
-    const st = this.stats;
     const mv = input.move();
+    this.move(dt, mv.x, mv.y, input.run, game);
+    this.act(dt, game, mv);
+  }
+
+  // Estamina y movimiento con choques. Sólo depende de la entrada y del mundo, así que el
+  // servidor y la predicción del cliente en línea dan exactamente el mismo resultado.
+  move(dt, mx, my, run, game) {
+    const st = this.stats;
+    const mv = { x: mx, y: my };
     const mag = Math.hypot(mv.x, mv.y);
     const moving = mag > 0.12;
 
     // --- estamina ---
     this.sinceRun += dt;
-    const wantRun = input.run && moving;
+    const wantRun = run && moving;
     if (wantRun && !this.exhausted && this.stamina > 0) {
       this.running = true;
       this.sinceRun = 0;
@@ -205,6 +213,13 @@ export class Player {
     this.speedNow = moved / Math.max(dt, 1e-4);
     this.walkPhase += moved * 0.11;
     if (moving) this.legAngle = angleTo(this.legAngle, Math.atan2(mv.y, mv.x), dt * 12);
+  }
+
+  // Apuntado, recarga y disparo (mv = dirección de movimiento de este fotograma).
+  act(dt, game, mv) {
+    const input = game.input;
+    const mag = Math.hypot(mv.x, mv.y);
+    const moving = mag > 0.12;
 
     // --- apuntado ---
     const range = this.weapon.def.range;

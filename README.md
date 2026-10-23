@@ -196,6 +196,172 @@ redes móviles bloquean la conexión directa y en ellas el cooperativo no conect
 Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
 no a prueba de trampas.
 
+## Multijugador en línea (servidor, hasta 10 jugadores)
+
+Además del cooperativo directo de 2, el botón **En línea · hasta 10** usa un servidor propio
+(carpeta `server/`). Todos se conectan a él por WebSocket, así que funciona en cualquier red
+(también donde la conexión directa entre celulares falla).
+
+**Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
+partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/world.js`,
+`js/zombies.js`, `js/player.js`, `js/bullets.js`, `js/director.js`): decide movimiento, choques,
+disparos, impactos, vida, muertes, oleadas y bajas. El navegador sólo manda lo que quiere hacer
+(dirección, correr, disparar, ángulo de la mira, recargar, arma) con un número de secuencia, y
+recibe 20 fotos por segundo de lo que tiene cerca.
+
+- **Tu personaje** responde al instante: el movimiento se predice en el navegador con las mismas
+  reglas (`Player.move`) y, al llegar el estado confirmado, se restaura y se vuelven a aplicar las
+  entradas pendientes (`js/netcode.js`). Las correcciones pequeñas se borran suavemente; las grandes
+  (más de 150 px) se aplican de golpe.
+- **Los demás y los zombis** se dibujan 110 ms en diferido, interpolando entre fotos con el reloj
+  del servidor; como mucho se adelantan 100 ms si falta una foto, y una foto vieja nunca los hace
+  retroceder.
+- **Disparos:** tu fogonazo y tus balas se ven al instante pero son de adorno; el daño lo calcula
+  el servidor con sus propias balas.
+
+**Salas.** Crear sala da un código de 6 caracteres (generado con `crypto`) y un enlace de
+invitación (`?sala=CÓDIGO`). Hay lista de jugadores con su estado (listo, jugando, caído,
+reconectando), botón *Estoy listo* y *Iniciar partida* sólo para el propietario (cuando los demás
+están listos). Fases: esperando → cargando → jugando → finalizada (con resultados). Si el
+propietario se va, la sala pasa al más antiguo. Una sala vacía se borra a los 30 s.
+
+**Reglas del modo en línea (fase 1).** Para no romper nada, en línea por ahora **no hay tienda,
+construcciones, granadas, molotovs, robot ni mejoras de nivel** (siguen igual en solitario y en el
+cooperativo directo); el dinero no se usa. Se conservan armas de cajas, munición y botiquines.
+Zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra (y 1,4 veces su vida, como en el
+cooperativo). Si caes, revives al terminar la oleada junto a un compañero; la partida termina cuando
+caen todos. La siguiente oleada la inicia cualquiera (o empieza sola a los 45 s). El zombi dorado
+vale 5 bajas. Quien entra a una sala con la partida empezada espera en la sala y juega la
+siguiente. Si alguien pierde la conexión, su personaje se queda quieto, los zombis lo ignoran y no
+recibe daño durante 20 s; si vuelve (con el token de reconexión, también tras recargar la página)
+recupera el mismo personaje; si no, sale de la sala.
+
+### Ejecutar en local
+
+```bash
+npm run server:install   # una vez: dependencias del servidor
+npm run server           # servidor en ws://localhost:2567 (salud: http://localhost:2567/health)
+npm run dev              # en otra terminal: el juego en http://localhost:8080
+```
+
+En `localhost` (o abriendo el juego por `http://IP-DE-TU-PC:8080`) el juego busca solo el servidor
+en el puerto 2567 de ese mismo equipo.
+
+### Probar con dos navegadores
+
+1. Abre `http://localhost:8080` en Chrome y en otro navegador (o una ventana de incógnito).
+2. En el primero: **En línea · hasta 10 → Crear sala → Copiar invitación**.
+3. Pega la invitación en el segundo (o escribe el código) → **Unirse → Estoy listo**.
+4. En el primero: **Iniciar partida**.
+5. Toca el indicador de conexión (arriba a la izquierda) o pulsa **F3** para ver el diagnóstico:
+   RTT de aplicación y su variación, pasos por segundo del servidor y su duración, CPU del servidor,
+   salas y jugadores, KB/s del WebSocket y correcciones de posición.
+
+Para probar cortes: recarga la página en plena partida (vuelves a tu personaje), o en las
+herramientas de desarrollo de Chrome pon la red en *Offline* unos segundos (se reconecta solo).
+Para probar latencia: arranca el servidor con `COLYSEUS_LATENCY=150 npm run server` (simula 150 ms
+de ida y vuelta en el servidor) o usa la limitación de red de Chrome (simula una red lenta en el
+navegador).
+
+### Pruebas y carga
+
+```bash
+npm run server:test      # salas, cupos, permisos, entradas inválidas, reconexión, limpieza, predicción
+npm run server           # en otra terminal, para la prueba de carga
+npm run server:load      # 10 clientes: 1 sala de 10 y luego 5 salas de 2 (60 s cada una)
+node server/tools/load.ts --url wss://tu-servidor.onrender.com --secs 30 --rooms 1x10
+```
+
+Resultados medidos **en localhost** (servidor y 10 clientes en el mismo PC con Windows; no son
+medidas de red real):
+
+| Prueba | Fotos/s por cliente | KB/s por cliente | Pasos/s del servidor | Paso medio · peor | CPU del servidor |
+| --- | --- | --- | --- | --- | --- |
+| 1 sala de 10, 20 fotos/s | 20,0 | ~28 | 60,0 (0 descartados) | 1,5 ms · 16 ms | 26 % de un núcleo |
+| 1 sala de 10, 10 fotos/s (`SNAP_HZ=10`) | 10,0 | ~15 | 60,0 (0 descartados) | 0,8 ms · 10 ms | 15 % de un núcleo |
+| 5 salas de 2 | 15,5 (las salas terminan al morir los bots) | ~17 | 60 por sala (3 descartados) | 0,9 ms · 22 ms | 34 % de un núcleo |
+| 1 sala de 10 con `COLYSEUS_LATENCY=100` | 20,0 | ~25 | 60,0 | 0,8 ms · 6 ms | 16 % de un núcleo |
+
+Con 100 ms de latencia simulada el RTT medido fue de 124 ms de mediana, y en el navegador el
+personaje propio empezó a moverse en el primer fotograma (unas 10 entradas sin confirmar, 0
+correcciones al caminar). El objetivo de un RTT por debajo de 50 ms depende de lo cerca que esté el
+servidor de los jugadores: **no está medido en un servidor remoto** y no se garantiza. El RTT que se
+muestra es de aplicación (ida y vuelta de un mensaje), no el ping de red ni el tiempo total de
+respuesta (que suma el retraso de dibujo y los fotogramas). Las pérdidas de paquetes no se miden:
+WebSocket va sobre TCP, que las oculta reenviando.
+
+### Publicar el servidor gratis en Render
+
+Condiciones actuales del plan gratis de Render (revisadas en octubre de 2026,
+[documentación](https://render.com/docs/free)): 512 MB de RAM y **0,1 CPU**; se duerme tras 15
+minutos sin tráfico (cuentan las peticiones HTTP y los mensajes WebSocket) y tarda **cerca de un
+minuto** en despertar con la siguiente conexión; 750 horas gratis al mes; Render puede reiniciarlo
+en cualquier momento. **Al reiniciarse o dormirse se pierden las partidas en curso** (todo vive en
+memoria).
+
+1. Sube el repositorio a GitHub.
+2. En [render.com](https://render.com): **New → Blueprint**, elige el repositorio (usa
+   `render.yaml`). O bien **New → Web Service** con:
+   - Build Command: `npm ci --prefix server && npm run build --prefix server`
+   - Start Command: `npm start --prefix server`
+   - Health Check Path: `/health`
+   - Variables: `NODE_VERSION=24`, `ALLOWED_ORIGINS=https://tu-juego.vercel.app` (las páginas desde
+     las que se juega, separadas por comas) y `SNAP_HZ=10`.
+3. Cuando esté en marcha, copia su dirección y ponla en `NET.server` de `js/config.js` con `wss://`
+   (por ejemplo `wss://dead-zone-server.onrender.com`), ejecuta `npm run stamp` y publica el juego.
+   También se puede probar sin publicar abriendo el juego con `?servidor=wss://…`.
+
+Con 0,1 CPU, una sala de 10 a 60 pasos y 20 fotos por segundo **probablemente no da abasto** (en
+este PC usó un 26 % de un núcleo). Por eso `render.yaml` baja las fotos a 10 por segundo; aun así,
+en el plan gratis conviene probar primero con pocos jugadores y mirar el diagnóstico (pasos/s y
+CPU). Para 10 jugadores fluidos hace falta más CPU (por ejemplo el plan Starter de Render, de pago,
+o una máquina virtual). No he desplegado nada ni he creado cuentas.
+
+### Alternativa: una máquina virtual Linux (también ARM)
+
+Las dependencias son JavaScript puro (Node 22.18 o más nuevo), así que funciona igual en x86 y en
+ARM (por ejemplo una VM Ampere). Ejemplo con Ubuntu:
+
+```bash
+sudo apt install -y nodejs npm git        # o Node 24 desde nodesource / nvm
+git clone https://github.com/TU-USUARIO/Juego--safari.git && cd Juego--safari
+npm ci --prefix server
+ALLOWED_ORIGINS=https://tu-juego.vercel.app npm start --prefix server
+```
+
+Para dejarlo siempre encendido usa un servicio de systemd, y para `wss://` pon delante un proxy
+con HTTPS (por ejemplo Caddy: `tu-dominio.com { reverse_proxy localhost:2567 }`, que consigue el
+certificado solo). Detén el servicio con `SIGTERM` (`systemctl stop`): el servidor avisa a los
+jugadores antes de cerrar.
+
+### Variables de entorno
+
+Están todas, con su explicación, en [`server/.env.example`](server/.env.example) (no hay secretos:
+el servidor no usa claves). La frecuencia de simulación no es una variable: es `NET.tickHz` en
+`js/config.js`, porque el navegador la necesita igual para predecir.
+
+### Seguridad básica
+
+El servidor valida tipo, rango y tamaño de cada mensaje (más de 16 KB corta la conexión), limita
+cuántas entradas y acciones manda cada jugador por segundo, rechaza secuencias repetidas o muy
+adelantadas, recorta la dirección a longitud 1 y aplica él mismo la velocidad, la cadencia y la
+munición. La identidad sale de la sesión de Colyseus (nunca de un id que mande el cliente): conocer
+el código de la sala sólo permite pedir entrar. `ALLOWED_ORIGINS` limita qué páginas pueden
+conectarse. Los tokens no se registran.
+
+### Limitaciones y trabajo pendiente
+
+- Fase 1: faltan en línea la tienda, las construcciones, las granadas y molotovs, el robot y las
+  mejoras de nivel. El ácido del gordo no hace daño en línea.
+- Sin compensación de latencia para los disparos: las balas son proyectiles que simula el servidor
+  en su presente. Con mucho RTT, al apuntar a un zombi que se mueve de lado puedes fallar por poco.
+- Tu personaje no predice el empujón de los zombis (lo corrige el servidor; se nota como un leve
+  deslizamiento al chocar con la horda).
+- Una sola instancia y todo en memoria: reiniciar el proceso termina las partidas.
+- Las fotos van en JSON/msgpack con posiciones cercanas (unos 25–30 KB/s por jugador a 20 fotos/s);
+  se podrían comprimir más con un formato binario o con diferencias entre fotos.
+- Medido sólo en localhost; falta medir en un servidor real y con celulares.
+
 ## Versiones y caché
 
 `node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: un pequeño
@@ -226,8 +392,14 @@ js/music.js         Música dinámica (calma, amenaza, horda)
 js/accounts.js      Cuentas, guardado por cuenta y clasificación
 js/robot.js         Robot de combate pilotable
 js/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
+js/online.js        Modo en línea: sala, predicción, interpolación y diagnóstico
+js/netcode.js       Predicción/reconciliación e interpolación (compartido con el servidor)
+js/combat.js        Reglas de impacto de bala (compartidas con el servidor)
+js/vendor/          SDK de Colyseus para el navegador (se carga sólo en línea)
 js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
 js/version.js       Versión del código (la genera tools/stamp.mjs)
+server/             Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
+render.yaml         Despliegue del servidor en Render
 js/sprites.js       Todo el arte, generado por código
 ```
 

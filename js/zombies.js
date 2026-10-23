@@ -90,6 +90,23 @@ function clearLine(world, x0, y0, x1, y1) {
   return true;
 }
 
+// Objetivo vacío (en línea, cuando no queda nadie vivo).
+const IDLE = { x: 0, y: 0, r: 14, alive: false };
+
+function nearestAlive(list, z) {
+  let best = IDLE;
+  let bd = Infinity;
+  for (const pl of list) {
+    if (!pl.alive) continue;
+    const d = (z.x - pl.x) ** 2 + (z.y - pl.y) ** 2;
+    if (d < bd) {
+      bd = d;
+      best = pl;
+    }
+  }
+  return best;
+}
+
 export class Horde {
   constructor() {
     this.list = [];
@@ -197,9 +214,11 @@ export class Horde {
   }
 
   update(dt, game) {
+    // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
+    const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
-    const p0 = game.player;
-    const peer = game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    const p0 = targets ? IDLE : game.player;
+    const peer = !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
     let p = p0;
     const world = game.world;
     const time = game.time;
@@ -211,7 +230,14 @@ export class Horde {
     for (let i = 0; i < list.length; i++) {
       const z = list[i];
       const def = z.def;
-      if (peer) {
+      if (targets) {
+        p = nearestAlive(targets, z);
+        if (p === IDLE) {
+          // nadie a quien perseguir: se queda donde está
+          IDLE.x = z.x + 1;
+          IDLE.y = z.y;
+        }
+      } else if (peer) {
         const d0 = p0.alive ? (z.x - p0.x) ** 2 + (z.y - p0.y) ** 2 : Infinity;
         p = (z.x - peer.x) ** 2 + (z.y - peer.y) ** 2 < d0 ? peer : p0;
       }
@@ -290,9 +316,10 @@ export class Horde {
       } else {
         // ruta: hacia su punto de flanqueo mientras esté lejos; después, directo por ti
         let field = world.main;
-        if (p !== p0) field = world.main2;
+        if (targets) field = p.field || world.main;
+        else if (p !== p0) field = world.main2;
         else if (!z.planned && d > 320 && p.alive) this.planRoute(z, p, world);
-        if (p === p0 && z.anchor >= 0) {
+        if (!targets && p === p0 && z.anchor >= 0) {
           const a = world.anchors[z.anchor];
           if (!a.ok || d < 170 || Math.hypot(a.x - z.x, a.y - z.y) < 90) z.anchor = -2;
           else field = a;
@@ -472,7 +499,7 @@ export class Horde {
         o.x += nx * ov * (z.mass / tm);
         o.y += ny * ov * (z.mass / tm);
       }
-      for (const pl of peer ? [p0, peer] : [p0]) {
+      for (const pl of targets || (peer ? [p0, peer] : [p0])) {
         if (!pl.alive) continue;
         const dx = pl.x - z.x;
         const dy = pl.y - z.y;
@@ -529,7 +556,9 @@ export class Horde {
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
       z.y = clamp(z.y, 30, WORLD_SIZE - 30);
     }
-    if (p0.alive) world.collide(p0, p0.r, true);
+    if (targets) {
+      for (const pl of targets) if (pl.alive) world.collide(pl, pl.r, true);
+    } else if (p0.alive) world.collide(p0, p0.r, true);
     grid.clear();
     for (const z of list) grid.insert(z);
   }

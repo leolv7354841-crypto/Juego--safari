@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 8080 }
+    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 8080 },
+    { "name": "server", "runtimeExecutable": "npm", "runtimeArgs": ["start", "--prefix", "server"], "port": 2567 }
   ]
 }

@@ -6,6 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "npx --yes http-server -c-1 -p 8080 .",
-    "stamp": "node tools/stamp.mjs"
+    "stamp": "node tools/stamp.mjs",
+    "server": "npm start --prefix server",
+    "server:install": "npm ci --prefix server",
+    "server:test": "npm test --prefix server",
+    "server:load": "npm run load --prefix server"
   }
 }

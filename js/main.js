@@ -3,9 +3,11 @@ import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS,
 import { Music } from './music.js';
 import { Robot } from './robot.js';
 import { Coop } from './coop.js';
+import { Online, validName, explainOnline } from './online.js';
 import { VERSION } from './version.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
+import { bulletHit } from './combat.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -94,6 +96,7 @@ class Game {
     this.structures = new Structures();
     this.robot = new Robot();
     this.coop = new Coop(this);
+    this.online = new Online(this);
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
     this.ash = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), v: rand(0.004, 0.012), p: rand(0, TAU) }));
@@ -131,6 +134,15 @@ class Game {
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
     window.__deadzone = this;
+    // invitación (?sala=CÓDIGO) o vuelta tras recargar en plena partida en línea
+    this.inviteCode = (new URLSearchParams(location.search).get('sala') || '').toUpperCase().slice(0, 6);
+    if (this.accounts.current) this.openInvite();
+  }
+
+  // ¿Simula otro (el anfitrión del cooperativo o el servidor en línea)? Entonces aquí no se
+  // calcula daño: las balas propias son de adorno.
+  get remoteSim() {
+    return this.coop.isGuest || this.online.active;
   }
 
   /* ---------- partidas ---------- */
@@ -236,6 +248,7 @@ class Game {
     this.$('screen-account').hidden = s !== 'account';
     this.$('screen-board').hidden = s !== 'board';
     this.$('screen-coop').hidden = s !== 'coop';
+    this.$('screen-online').hidden = s !== 'online';
   }
 
   pause() {
@@ -388,38 +401,14 @@ class Game {
 
   hitZombie(z, b, hx, hy) {
     // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
-    if (z.dead || this.coop.isGuest) return;
+    if (z.dead || this.remoteSim) return;
     // quién lo hirió (cooperativo: las bajas del compañero le dan el dinero a él)
     z.lastOwner = b.owner || null;
-    z.hp -= b.dmg;
-    z.flash = 0.08;
-    // reacción breve: sacudida hacia un lado y leve agrandado (no frena su comportamiento)
-    z.hitT = 0.18;
-    z.hitJolt = rand(0.2, 0.5) * (Math.random() < 0.5 ? -1 : 1) * (z.type === 'heavy' && !b.blast ? 0.25 : 1);
-    z.lastDx = b.dx;
-    z.lastDy = b.dy;
-    if (Math.random() < 0.12) this.decals.splat(hx + b.dx * 14, hy + b.dy * 14, rand(7, 12));
-    // el super blindado no se frena ni retrocede con las balas: sólo las explosiones lo mueven
-    const armored = z.type === 'heavy' && !b.blast;
-    // normales y velocistas: la bala no los avienta; se frenan, sangran y se arrastran
-    const flesh = (z.type === 'normal' || z.type === 'sprinter') && !b.blast;
-    if (flesh) {
-      z.slow = 0.45;
-      z.wounded = true;
-      this.decals.splat(hx + b.dx * 6, hy + b.dy * 6, rand(8, 13));
-    } else if (z.type !== 'giant' && !armored) z.slow = 0.16;
-    if (!armored && !flesh) {
-      const kn = (b.knock * 3) / z.mass;
-      z.kx += b.dx * kn;
-      z.ky += b.dy * kn;
-    }
-    const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'bull' || z.type === 'giant';
-    this.particles.hit(hx, hy, b.dx, b.dy, big);
+    bulletHit(this, z, b, hx, hy);
     if (b.shot && !b.shot.hit) {
       b.shot.hit = true;
       this.player.shotsHit++;
     }
-    this.sfx.hit(big);
     if (z.hp <= 0) this.killZombie(z);
   }
 
@@ -476,6 +465,7 @@ class Game {
 
   // Subirse o bajarse del robot (E o el botón ROBOT).
   toggleRobot() {
+    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.toast('En cooperativo el robot es del anfitrión');
     const rb = this.robot;
     const p = this.player;
@@ -527,13 +517,13 @@ class Game {
 
   // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
   rocketHit(z, x, y, b) {
-    if (this.coop.isGuest) return;
+    if (this.remoteSim) return;
     if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(this, z, x, y, b);
     else this.rocketBlast(x, y, b.owner);
   }
 
   rocketBlast(x, y, owner = null) {
-    if (this.coop.isGuest) return;
+    if (this.remoteSim) return;
     this.structures.explode(this, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
   }
 
@@ -768,6 +758,152 @@ class Game {
 
   /* ---------- cooperativo: sala ---------- */
 
+  /* ---------- en línea (servidor, hasta 10) ---------- */
+
+  showOnline(keepStatus) {
+    this.sfx.unlock();
+    this.setState('online');
+    const name = this.$('ol-name');
+    if (!name.value) name.value = this.accounts.current ? this.accounts.current.name : '';
+    if (this.inviteCode) this.$('ol-code-in').value = this.inviteCode;
+    const url = this.online.serverUrl();
+    if (!keepStatus) this.onlineStatus(url ? '' : 'No hay servidor configurado: ver NET.server en js/config.js.', !url);
+    this.renderLobby();
+  }
+
+  onlineStatus(text, bad = false) {
+    const el = this.$('ol-status');
+    el.textContent = text;
+    el.classList.toggle('bad', bad);
+  }
+
+  // Lista de integrantes, botones y resultados según la fase de la sala.
+  renderLobby() {
+    const ol = this.online;
+    const room = ol.room;
+    this.$('ol-choose').hidden = !!room;
+    this.$('ol-lobby').hidden = !room;
+    if (!room || !room.state || !room.state.members) return;
+    const st = room.state;
+    const me = ol.me;
+    this.$('ol-code').textContent = st.code || room.roomId;
+    const list = this.$('ol-members');
+    list.innerHTML = '';
+    const rows = [];
+    st.members.forEach((m, id) => rows.push([id, m]));
+    rows.sort((a, b) => a[1].joinedAt - b[1].joinedAt);
+    for (const [id, m] of rows) {
+      const li = document.createElement('li');
+      li.className = 'ol-member' + (id === room.sessionId ? ' me' : '') + (m.connected ? '' : ' off');
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = (id === st.ownerId ? '★ ' : '') + m.name + (id === room.sessionId ? ' (tú)' : '');
+      const tag = document.createElement('span');
+      tag.className = 'tg';
+      tag.textContent = !m.connected ? 'reconectando…' : st.phase === 'playing' ? (m.inGame ? (m.alive ? 'jugando' : 'caído') : 'esperando') : id === st.ownerId ? 'propietario' : m.ready ? 'listo' : 'no listo';
+      li.append(nm, tag);
+      list.appendChild(li);
+    }
+    this.$('ol-count').textContent = `${rows.length}/${st.maxPlayers}`;
+    const phase = st.phase;
+    const owner = ol.isOwner;
+    const lobbyLike = phase === 'waiting' || phase === 'finished';
+    this.$('btn-ol-ready').hidden = owner || !lobbyLike;
+    this.$('btn-ol-ready').textContent = me && me.ready ? 'Ya no estoy listo' : 'Estoy listo';
+    this.$('btn-ol-start').hidden = !owner || !lobbyLike;
+    const waitingFor = rows.filter(([id, m]) => id !== st.ownerId && m.connected && !m.ready).length;
+    this.$('btn-ol-start').disabled = waitingFor > 0;
+    this.$('btn-ol-start').textContent = waitingFor ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}` : 'Iniciar partida';
+    this.$('btn-ol-lobby').hidden = !owner || phase !== 'finished';
+    const ph = { waiting: 'Esperando jugadores', loading: 'Cargando…', playing: 'Partida en curso', finished: 'Partida terminada' }[phase] || '';
+    this.$('ol-phase').textContent = ph;
+    const res = this.$('ol-results');
+    const r = ol.results;
+    res.hidden = !r || phase !== 'finished';
+    if (r && phase === 'finished') {
+      res.innerHTML = '';
+      const h = document.createElement('p');
+      h.className = 'ol-res-head';
+      h.textContent = `Oleada ${r.wave} · ${fmtTime(r.time)} · ${r.kills} bajas en total`;
+      res.appendChild(h);
+      for (const pl of r.players || []) {
+        const row = document.createElement('div');
+        row.className = 'ol-res-row';
+        row.textContent = `${pl.name}: ${pl.kills} bajas · ${pl.deaths} caídas`;
+        res.appendChild(row);
+      }
+    }
+  }
+
+  onlineName() {
+    const n = this.$('ol-name').value.replace(/\s+/g, ' ').trim();
+    if (!validName(n)) {
+      this.onlineStatus('Nombre no válido: de 1 a 16 letras, números, espacios, _ . -', true);
+      return null;
+    }
+    return n;
+  }
+
+  async onlineCreate() {
+    const name = this.onlineName();
+    if (!name || this.onlineBusy) return;
+    this.onlineBusy = true;
+    this.onlineStatus('Conectando con el servidor…');
+    try {
+      await this.online.create(name);
+      this.onlineStatus('Sala creada: comparte el código o la invitación.');
+      this.renderLobby();
+    } catch (err) {
+      this.onlineStatus(explainOnline(err), true);
+    }
+    this.onlineBusy = false;
+  }
+
+  async onlineJoin() {
+    const name = this.onlineName();
+    const code = this.$('ol-code-in').value.trim().toUpperCase();
+    if (!name || this.onlineBusy) return;
+    if (!/^[A-Z0-9]{6}$/.test(code)) return this.onlineStatus('El código tiene 6 letras o números.', true);
+    this.onlineBusy = true;
+    this.onlineStatus('Entrando a la sala…');
+    try {
+      await this.online.join(code, name);
+      this.inviteCode = '';
+      this.onlineStatus('');
+      this.renderLobby();
+    } catch (err) {
+      this.onlineStatus(explainOnline(err), true);
+    }
+    this.onlineBusy = false;
+  }
+
+  copyInvite() {
+    const room = this.online.room;
+    if (!room) return;
+    const u = new URL(location.href);
+    u.search = '';
+    u.hash = '';
+    const keep = new URLSearchParams(location.search).get('servidor');
+    if (keep) u.searchParams.set('servidor', keep);
+    u.searchParams.set('sala', room.roomId);
+    const text = u.toString();
+    const done = () => this.onlineStatus('Invitación copiada: ' + text);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => this.onlineStatus(text));
+    else this.onlineStatus(text);
+  }
+
+  // Abre la sala de una invitación, o vuelve a la partida tras recargar la página.
+  async openInvite() {
+    if (await this.online.resume()) return this.showOnline(true);
+    if (this.inviteCode) this.showOnline();
+  }
+
+  toggleDiag() {
+    if (!this.online.active) return;
+    const el = this.$('net-diag');
+    el.hidden = !el.hidden;
+  }
+
   showCoop() {
     this.sfx.unlock();
     this.setState('coop');
@@ -979,6 +1115,7 @@ class Game {
   }
 
   startNextRound() {
+    if (this.online.active) return this.online.send('next');
     if (this.coop.isGuest) return this.coop.send({ t: 'next' });
     if (this.state !== 'play' || (!this.player.alive && !this.coop.active)) return;
     this.sfx.unlock();
@@ -986,6 +1123,7 @@ class Game {
   }
 
   openShop() {
+    if (this.online.active) return;
     this.shopPending = false;
     this.input.reset();
     this.setState('shop');
@@ -1160,6 +1298,7 @@ class Game {
   }
 
   tryBuild() {
+    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.coop.guestBuild();
     if (this.inv[this.buildSel] <= 0) {
       const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
@@ -1190,6 +1329,7 @@ class Game {
   }
 
   tryGrenade(kind = 'grenade') {
+    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.coop.guestThrow(kind);
     if (this.inv[kind] <= 0) {
       this.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
@@ -1273,6 +1413,7 @@ class Game {
     on('btn-resume', () => this.resume());
     // en cooperativo reinicia el anfitrión (el invitado espera)
     const again = () => {
+      if (this.online.active) return this.toast('En línea la partida sigue mientras quede alguien vivo');
       if (this.coop.isHost) return this.coop.restart();
       if (this.coop.isGuest) return this.toast('Espera a que el anfitrión reinicie la partida');
       // venías del cooperativo: al menú, donde sigue tu partida normal
@@ -1290,11 +1431,13 @@ class Game {
     });
     on('btn-menu', () => {
       this.coop.leave();
+      this.online.leave();
       this.newWorld();
       this.setupMenu();
     });
     on('btn-over-menu', () => {
       this.coop.leave();
+      this.online.leave();
       this.newWorld();
       this.setupMenu();
     });
@@ -1307,6 +1450,31 @@ class Game {
     on('btn-account', () => this.showAccount());
     on('btn-leaderboard', () => this.showBoard());
     on('btn-coop', () => this.showCoop());
+    on('btn-online', () => this.showOnline());
+    on('btn-ol-create', () => this.onlineCreate());
+    on('btn-ol-back', () => {
+      this.online.leave();
+      this.setupMenu();
+    });
+    on('btn-ol-ready', () => {
+      const me = this.online.me;
+      if (me) this.online.send('ready', { v: !me.ready });
+    });
+    on('btn-ol-start', () => this.online.send('start'));
+    on('btn-ol-lobby', () => this.online.send('lobby'));
+    on('btn-ol-copy', () => this.copyInvite());
+    this.$('ol-join-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.onlineJoin();
+    });
+    // tocar el indicador de conexión abre el panel de diagnóstico (también con F3)
+    this.$('net-stat').addEventListener('click', () => this.toggleDiag());
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'F3' && this.online.active) {
+        e.preventDefault();
+        this.toggleDiag();
+      }
+    });
     on('btn-coop-create', () => this.coopCreate());
     on('btn-coop-back', () => {
       this.coop.cancel();
@@ -1561,15 +1729,17 @@ class Game {
     try {
       this.adaptQuality(dt);
       this.coop.tick(dt);
+      this.online.tick(dt);
       // indicador de conexión del cooperativo (se actualiza una vez por segundo)
       const ns = this.$('net-stat');
-      if (this.coop.active && this.state !== 'menu') {
-        const txt = this.coop.stats(dt);
+      if ((this.coop.active || this.online.active) && this.state !== 'menu') {
+        const txt = this.online.active ? this.online.stats(dt) : this.coop.stats(dt);
         if (txt) ns.textContent = txt;
         ns.hidden = false;
       } else ns.hidden = true;
       if (this.state === 'play') {
-        if (this.coop.isGuest) this.coop.guestUpdate(dt);
+        if (this.online.active) this.online.update(dt);
+        else if (this.coop.isGuest) this.coop.guestUpdate(dt);
         else this.update(dt);
       }
       else if (this.state === 'menu') this.updateMenu(dt);
@@ -1726,10 +1896,12 @@ class Game {
       else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
       this.coop.drawPeer(ctx);
+      this.online.drawPeers(ctx);
     }
     this.horde.draw(ctx, v, base, 'giant');
     this.bullets.draw(ctx);
     this.coop.drawRemoteBullets(ctx);
+    this.online.drawRemoteBullets(ctx);
     this.structures.drawGrenades(ctx);
     this.world.drawOverhead(ctx, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
     this.particles.draw(ctx, v);

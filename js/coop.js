@@ -13,8 +13,8 @@ import { zombieSprites, drawSurvivor } from './sprites.js';
 import { Bullets } from './bullets.js';
 import { rand, angleTo, TAU } from './util.js';
 
-const TYPES = ['normal', 'swat', 'sprinter', 'fat', 'heavy', 'golden', 'bull', 'giant'];
-const PICKS = ['ammo', 'med', 'crate'];
+export const TYPES = ['normal', 'swat', 'sprinter', 'fat', 'heavy', 'golden', 'bull', 'giant'];
+export const PICKS = ['ammo', 'med', 'crate'];
 const SNAP_HZ = 12;
 const IN_HZ = 20;
 const VIEW = 1000;
@@ -22,9 +22,9 @@ const VIEW = 1000;
 const WINDOW = 6;
 const FX_MAX = 500;
 // efectos que el invitado genera por su cuenta (no hace falta mandarlos)
-const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
-const SFX_SYNC = ['shot', 'hit', 'kill', 'stomp', 'explosion', 'acid', 'ricochet', 'blockHit', 'blockBreak', 'build', 'turret', 'goldenSpawn', 'punch', 'bullRoar', 'bullCharge', 'bullHit', 'bullSlam', 'throwBottle', 'molotov', 'crackle', 'burnScream', 'rocketStick', 'rocketArm', 'gore', 'wave'];
-const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
+export const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
+export const SFX_SYNC = ['shot', 'hit', 'kill', 'stomp', 'explosion', 'acid', 'ricochet', 'blockHit', 'blockBreak', 'build', 'turret', 'goldenSpawn', 'punch', 'bullRoar', 'bullCharge', 'bullHit', 'bullSlam', 'throwBottle', 'molotov', 'crackle', 'burnScream', 'rocketStick', 'rocketArm', 'gore', 'wave'];
+export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
 
 const r100 = (v) => Math.round(v * 100);
 

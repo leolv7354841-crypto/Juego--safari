@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=7748ce1b">
+  <link rel="stylesheet" href="css/style.css?v=ac2e09f2">
   <script id="dz-latest">
     // githack guarda en caché el link con el nombre de la rama y a veces sirve una versión
     // vieja; aquí se pregunta a GitHub cuál es el último cambio y se salta a su link exacto.
@@ -35,13 +35,13 @@
   <!-- version:start -->
   <script id="dz-loader">
     (function () {
-      var v = '7748ce1b';
+      var v = 'ac2e09f2';
       var b = '';
       try {
         b = new URLSearchParams(location.search).get('b') || '';
       } catch (e) {}
       var q = '?v=' + v + (b ? '&b=' + encodeURIComponent(b) : '');
-      var mods = ["accounts.js","audio.js","build.js","bullets.js","config.js","coop.js","director.js","input.js","lighting.js","main.js","music.js","net.js","particles.js","pickups.js","player.js","robot.js","sprites.js","upgrades.js","util.js","version.js","world.js","zombies.js"];
+      var mods = ["accounts.js","audio.js","build.js","bullets.js","combat.js","config.js","coop.js","director.js","input.js","lighting.js","main.js","music.js","net.js","netcode.js","online.js","particles.js","pickups.js","player.js","robot.js","sprites.js","upgrades.js","util.js","version.js","world.js","zombies.js"];
       var map = { imports: {} };
       mods.forEach(function (f) {
         map.imports['./js/' + f] = './js/' + f + q;
@@ -90,6 +90,7 @@
           <div class="inv" id="inv"></div>
         </div>
         <div id="net-stat" hidden></div>
+        <pre id="net-diag" hidden></pre>
         <div id="money-pops" aria-live="polite"></div>
       </div>
       <div class="hud-right">
@@ -163,6 +164,7 @@
           <button class="btn primary" id="btn-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-start">Jugar</button>
           <button class="btn coop-btn" id="btn-coop">Cooperativo · 2 jugadores</button>
+          <button class="btn coop-btn" id="btn-online">En línea · hasta 10</button>
         </div>
         <p class="best" id="acct-best"></p>
         <div class="controls-help">
@@ -184,7 +186,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 7748ce1b</span></p>
+        <p class="ver"><span id="ver">Versión ac2e09f2</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -221,6 +223,39 @@
         </div>
         <p class="coop-status" id="coop-status" aria-live="polite"></p>
         <button class="btn ghost" id="btn-coop-back" type="button">Volver</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-online" hidden>
+      <div class="panel coop-panel">
+        <p class="kicker">Hasta 10 jugadores</p>
+        <h2>En línea</h2>
+        <p class="acct-lead">Todos se conectan a un <b>servidor</b>: funciona en cualquier red. Sala privada con código o invitación; si alguien cae, revive al terminar la oleada.</p>
+        <div class="coop-step" id="ol-choose">
+          <form class="acct-form ol-name" autocomplete="off" onsubmit="return false">
+            <label for="ol-name">Tu nombre</label>
+            <input id="ol-name" maxlength="16" spellcheck="false" autocomplete="nickname">
+          </form>
+          <button class="btn primary" id="btn-ol-create" type="button">Crear sala</button>
+          <div class="coop-or">o únete con un código</div>
+          <form class="coop-join" id="ol-join-form" autocomplete="off">
+            <input id="ol-code-in" maxlength="6" placeholder="CÓDIGO" autocapitalize="characters" spellcheck="false" aria-label="Código de la sala">
+            <button class="btn" type="submit">Unirse</button>
+          </form>
+        </div>
+        <div class="coop-step" id="ol-lobby" hidden>
+          <p class="coop-label">Código de la sala · <span id="ol-phase"></span></p>
+          <div class="coop-code ol-code" id="ol-code">······</div>
+          <button class="btn" id="btn-ol-copy" type="button">Copiar invitación</button>
+          <p class="coop-label">Jugadores <span id="ol-count"></span></p>
+          <ul class="ol-members" id="ol-members"></ul>
+          <div class="ol-results" id="ol-results" hidden></div>
+          <button class="btn primary" id="btn-ol-ready" type="button">Estoy listo</button>
+          <button class="btn primary" id="btn-ol-start" type="button">Iniciar partida</button>
+          <button class="btn" id="btn-ol-lobby" type="button" hidden>Volver a la sala</button>
+        </div>
+        <p class="coop-status" id="ol-status" aria-live="polite"></p>
+        <button class="btn ghost" id="btn-ol-back" type="button">Salir</button>
       </div>
     </section>
 

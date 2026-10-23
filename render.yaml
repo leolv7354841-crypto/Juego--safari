@@ -1,0 +1,22 @@
+# Servidor multijugador en Render (plan gratis). El juego (la página) se publica aparte
+# (Vercel, raw.githack…); aquí sólo va el servidor de la carpeta server/.
+# El servidor importa módulos de js/, por eso se construye desde la raíz del repositorio.
+services:
+  - type: web
+    name: dead-zone-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix server && npm run build --prefix server
+    startCommand: npm start --prefix server
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Node 22.18 o más nuevo (ejecuta TypeScript sin compilar)
+      - key: NODE_VERSION
+        value: "24"
+      # páginas que pueden usar el servidor, separadas por comas (sin barra final)
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # en el plan gratis (0,1 CPU) conviene mandar menos fotos por segundo; ver README
+      - key: SNAP_HZ
+        value: "10"
