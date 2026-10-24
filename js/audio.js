@@ -352,6 +352,20 @@ export class Sfx {
     this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
   }
 
+  // Silbido del misil balístico que cae del cielo.
+  missile() {
+    if (!this.ok('missile', 0.2, true)) return;
+    this.tone({ freq: 2400, to: 500, dur: 1.35, gain: 0.22, type: 'triangle' });
+    this.burst({ dur: 1.3, freq: 3000, sweep: 900, gain: 0.12, type: 'bandpass', q: 3, attack: 0.4 });
+  }
+
+  // Impulso del Booster: zumbido que sube.
+  boost() {
+    if (!this.ok('boost', 0.2, true)) return;
+    this.tone({ freq: 220, to: 880, dur: 0.35, gain: 0.3, type: 'sawtooth' });
+    this.burst({ dur: 0.4, freq: 1500, sweep: 5000, gain: 0.2, type: 'bandpass', q: 2 });
+  }
+
   // Cohete que se clava en carne o en metal.
   rocketStick(fat) {
     if (!this.ok('rocketStick', 0.05, true)) return;

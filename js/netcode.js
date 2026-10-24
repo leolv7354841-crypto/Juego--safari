@@ -12,7 +12,8 @@ export const IN_RELOAD = 4;
 const silent = new Proxy({}, { get: () => () => {} });
 
 // Estado del jugador que manda el servidor y que la predicción restaura.
-export const BODY = ['x', 'y', 'vx', 'vy', 'kx', 'ky', 'stamina', 'sinceRun', 'legAngle'];
+// boostT: impulso del Booster (lo baja Player.move, así que se predice igual que el movimiento)
+export const BODY = ['x', 'y', 'vx', 'vy', 'kx', 'ky', 'stamina', 'sinceRun', 'legAngle', 'boostT'];
 
 export function packBody(p) {
   return [...BODY.map((k) => Math.round(p[k] * 100) / 100), p.exhausted ? 1 : 0];

@@ -73,7 +73,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   inset: 0;
   pointer-events: none;
 }
-.state-menu #hud, .state-look #hud { display: none; }
+.state-menu #hud, .state-look #hud, .state-class #hud { display: none; }
 
 .xp-track {
   position: absolute;
@@ -132,6 +132,34 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .btn-upgrade kbd { font-size: 10px; color: var(--accent-ink); border-color: rgba(0, 0, 0, 0.3); background: rgba(0, 0, 0, 0.12); }
 .touch .btn-upgrade kbd { display: none; }
 @keyframes up-glow { 50% { box-shadow: 0 0 14px rgba(134, 168, 146, 0.8); } }
+/* habilidad de clase: se llena mientras espera y brilla cuando está lista */
+.btn-ability {
+  --k: 1;
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  min-width: 150px;
+  padding: 4px 9px 4px 7px;
+  font: 700 12px var(--ui);
+  color: var(--dim);
+  background: linear-gradient(to top, rgba(217, 120, 58, 0.28) calc(var(--k) * 100%), var(--panel) 0);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.btn-ability[hidden] { display: none; }
+.btn-ability .ab-ic { width: 26px; height: 26px; }
+.btn-ability .ab-ic svg { width: 100%; height: 100%; }
+.btn-ability .ab-tx { display: grid; line-height: 1.05; text-align: left; }
+.btn-ability small { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.btn-ability b { font-size: 14px; color: var(--ink); }
+.btn-ability kbd { margin-left: auto; font-size: 10px; }
+.btn-ability.ready { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); animation: ab-glow 1.4s ease-in-out infinite; }
+.btn-ability.ready b { color: var(--accent-ink); }
+.touch .btn-ability kbd { display: none; }
+@keyframes ab-glow { 50% { box-shadow: 0 0 14px rgba(217, 120, 58, 0.85); } }
 .lvl-badge b { font-family: var(--display); font-size: 30px; font-weight: 600; color: var(--xp); }
 
 .vitals { display: grid; gap: 5px; width: 210px; }
@@ -601,6 +629,17 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 #btn-robot { right: 160px; bottom: 200px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-color: rgba(201, 165, 74, 0.7); }
 .tbtn.gone { display: none; }
 #btn-build { right: 34px; bottom: 176px; }
+#btn-ab-touch {
+  --k: 1;
+  right: 156px;
+  bottom: 144px;
+  border-color: transparent;
+  background:
+    radial-gradient(circle, rgba(15, 17, 13, 0.75) 62%, transparent 63%),
+    conic-gradient(rgba(217, 120, 58, 0.9) calc(var(--k) * 360deg), rgba(230, 224, 210, 0.18) 0);
+}
+#btn-ab-touch:not(.ready) { opacity: 0.6; }
+#btn-ab-touch.ready { color: var(--accent); box-shadow: 0 0 12px rgba(217, 120, 58, 0.7); }
 #btn-reload { right: 4px; bottom: 112px; }
 #btn-swap { right: 74px; bottom: 96px; }
 
@@ -753,6 +792,27 @@ kbd {
 .card .tg { font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
 .card .key { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
 .touch .card .key { display: none; }
+.card.cls { border-top-color: var(--accent); }
+.card.cls .ic { color: var(--accent); }
+.card.cls.sel { background: rgba(217, 120, 58, 0.12); }
+#screen-class .btn { margin-top: 16px; }
+/* selector compacto de clase en las salas */
+.class-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0 14px; }
+.cls-btn {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: 700 12px var(--ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: rgba(230, 224, 210, 0.05);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.cls-btn svg { width: 24px; height: 24px; }
+.cls-btn.sel { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 
 .results {
   display: grid;

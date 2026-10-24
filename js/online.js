@@ -5,7 +5,7 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN, SHOP, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE } from './config.js';
+import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN, SHOP, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE, CLASS_ORDER } from './config.js';
 import { Player } from './player.js';
 import { Robot } from './robot.js';
 import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
@@ -13,13 +13,14 @@ import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
 import { UPGRADES } from './upgrades.js';
+import { Abilities } from './abilities.js';
 import { rand, TAU, angleTo } from './util.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
-const PEER_N = 15;
+const PEER_N = 16;
 // mismo orden que STAT_KEYS en server/src/sim/ServerSim.ts
-const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
+const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult', 'cdMult'];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
@@ -116,12 +117,12 @@ export class Online {
 
   async create(name) {
     const c = await this.client();
-    this.attach(await c.create('dz', { name, look: lookCode(this.game.look) }));
+    this.attach(await c.create('dz', { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
 
   async join(code, name) {
     const c = await this.client();
-    this.attach(await c.joinById(code, { name, look: lookCode(this.game.look) }));
+    this.attach(await c.joinById(code, { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
 
   // Tras recargar la página: vuelve a la misma sala con el token (dentro de la ventana de 20 s).
@@ -306,6 +307,8 @@ export class Online {
     g.director.coop = true;
     g.director.state = 'break';
     const p = g.player;
+    // la clase la confirma el servidor en cada foto (ab)
+    p.cls = g.classPick;
     this.pred = new Predictor(p, g.world);
     this.phys = { x: p.x, y: p.y };
     this.fresh = true;
@@ -413,6 +416,7 @@ export class Online {
         if (inp.consume('grenade')) g.tryGrenade();
         if (inp.consume('molotov')) g.tryGrenade('molotov');
         if (inp.consume('robot')) g.toggleRobot();
+        if (inp.consume('ability')) g.useAbility();
         // a mitad de oleada la mejora se abre cuando él quiere (U o el botón)
         if (inp.consume('upgrade') && this.upReady) return g.openLevelUp();
       }
@@ -421,6 +425,8 @@ export class Online {
     g.time += dt;
     // la mira y el disparo se ven al instante (las balas propias son de adorno: el daño es del servidor)
     if (live && p.alive) p.act(dt, g, inp.move());
+    // espera de la habilidad y megarráfaga propia (de adorno: las balas reales son del servidor)
+    Abilities.update(dt, g, p);
     this.pred.decay(dt);
     p.x = this.phys.x + this.pred.ox;
     p.y = this.phys.y + this.pred.oy;
@@ -438,6 +444,7 @@ export class Online {
     const st = g.structures;
     st.time = g.time;
     for (const f of st.fires) f.t += dt;
+    for (const m of st.missiles) m.t = Math.min(m.dur, m.t + dt);
     for (const q of st.blasts) q.t -= dt;
     for (const q of st.scorches) q.t += dt;
     for (const b of st.blocks) b.hitT -= dt;
@@ -691,6 +698,15 @@ export class Online {
     g.xpNeed = Math.max(1, ec[2] | 0);
     g.pendingLevels = Math.max(0, ec[3] | 0);
     if (Array.isArray(s.ps)) STAT_KEYS.forEach((k, i) => Number.isFinite(s.ps[i]) && (p.stats[k] = s.ps[i]));
+    // habilidad: la clase y la espera las lleva el servidor (justo después de usarla manda lo predicho)
+    if (Array.isArray(s.ab)) {
+      const cls = CLASS_ORDER[s.ab[0]];
+      if (cls) p.cls = cls;
+      if (performance.now() - (this.abAt || 0) > 500) {
+        p.abCd = Math.max(0, (Number(s.ab[1]) || 0) / 10);
+        p.rageT = Math.max(0, (Number(s.ab[2]) || 0) / 100);
+      }
+    }
     const up = Array.isArray(s.up) && s.up.length > 1 ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) } : null;
     this.up = up && up.ids.length ? up : null;
     // fin de oleada: tienda y mejoras; si empieza la siguiente con la tienda abierta, se cierra
@@ -731,6 +747,7 @@ export class Online {
   act(k, extra = {}) {
     if (!this.pred) return;
     this.send('act', { s: this.pred.seq, k, ...extra });
+    if (k === 'ab') this.abAt = performance.now();
   }
 
   // Granadas en el aire, fuego, cohetes clavados, explosiones; barricadas y trampas cuando cambian.
@@ -762,6 +779,9 @@ export class Online {
     const so = Array.isArray(s.so) ? s.so : [];
     st.stuck = [];
     for (let i = 0; i + 6 < so.length; i += 7) st.stuck.push({ x: so[i], y: so[i + 1], ang: so[i + 2] / 100, t: so[i + 3] / 100, stick: so[i + 4] / 100, glow: so[i + 5] / 100, kind: so[i + 6] ? 'fat' : 'heavy' });
+    const ms = Array.isArray(s.ms) ? s.ms : [];
+    st.missiles = [];
+    for (let i = 0; i + 3 < ms.length; i += 4) st.missiles.push({ x: ms[i], y: ms[i + 1], t: ms[i + 2] / 100, dur: ms[i + 3] / 100 });
     const bl = Array.isArray(s.bl) ? s.bl : [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
@@ -863,6 +883,9 @@ export class Online {
       q.idx = idx;
       q.inRobot = !!pl[i + 14];
       q.r = q.inRobot ? ROBOT.radius : PLAYER_BASE.radius;
+      // habilidad en curso (sólo para dibujarla): 1 megarráfaga, 2 impulso
+      q.rageT = pl[i + 15] & 1 ? 1 : 0;
+      q.boostT = pl[i + 15] & 2 ? 1 : 0;
     }
     for (const idx of this.peers.keys()) if (!seen.has(idx)) this.peers.delete(idx);
   }
