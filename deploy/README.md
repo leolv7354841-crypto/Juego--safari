@@ -102,9 +102,10 @@ Mira que «pasos/s por sala» quede en 60 y «descartados» en 0.
 
 ## Mantenimiento
 
-- **Actualizar** tras cambiar el código (en la máquina, mejor cuando nadie juegue: las partidas en
-  curso se pierden y los jugadores ven el aviso de reinicio):
-  `cd ~/dead-zone && bash deploy/actualizar.sh`
+- **Actualizar a mano** (si no configuraste la publicación automática): en la máquina,
+  `cd ~/dead-zone && bash deploy/actualizar.sh --esperar`. Espera a que no haya salas abiertas
+  (como mucho 30 minutos); sin `--esperar` reinicia ya y las partidas en curso se pierden. Si no
+  cambió nada que use el servidor (`server/`, `js/`, `deploy/`), no reinicia.
 - **Ver registros:** `cd ~/dead-zone/deploy && docker compose logs -f dz`
 - **Estado:** `docker compose ps` (en `deploy/`) o `https://servidor.yeyo.games/health`.
 - **Cambiar capacidad o páginas permitidas:** edita `deploy/.env` (`MAX_PLAYERS`, `MAX_ROOMS`,
@@ -112,6 +113,37 @@ Mira que «pasos/s por sala» quede en 60 y «descartados» en 0.
   repite la prueba de carga con más salas (`--rooms 8x4`) antes de anunciarlo.
 - Si añades otro dominio para el juego, agrégalo a `ALLOWED_ORIGINS`; si no, el servidor rechaza
   esa página con el error «origen».
+
+## Publicación automática
+
+Con esto, cada push a la rama principal que cambie `server/`, `js/` o `deploy/` actualiza la
+máquina solo (`.github/workflows/servidor.yml`), esperando a que no haya salas abiertas.
+Hace falta la cuenta dueña del repositorio, porque los secretos de GitHub sólo los puede
+crear un administrador.
+
+1. En la máquina (`ssh root@LA-IP`), crea una clave que **sólo** pueda ejecutar la actualización:
+
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C github-deploy -f ~/.ssh/github-deploy
+   echo "command=\"bash /root/dead-zone/deploy/actualizar.sh --esperar\",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding $(cat ~/.ssh/github-deploy.pub)" >> ~/.ssh/authorized_keys
+   cat ~/.ssh/github-deploy
+   ```
+
+   Copia todo lo que muestra el último comando, desde `-----BEGIN` hasta `END … KEY-----`.
+
+2. En GitHub, en el repositorio: **Settings → Secrets and variables → Actions → New repository
+   secret**. Crea dos:
+   - `SERVER_HOST`: `servidor.yeyo.games`
+   - `SERVER_SSH_KEY`: la clave que copiaste.
+
+3. Vuelve a la máquina y borra la copia de la clave privada: `rm ~/.ssh/github-deploy`.
+
+4. Pruébalo en GitHub: **Actions → Publicar servidor → Run workflow**. Debe terminar en verde
+   mostrando la respuesta de `/health`.
+
+Aunque alguien consiguiera esa clave, sólo podría lanzar la actualización desde el repositorio:
+no da una terminal en la máquina. Para revocarla, borra su línea (`github-deploy`) de
+`~/.ssh/authorized_keys`.
 
 ## Cómo protege los 5 cupos
 

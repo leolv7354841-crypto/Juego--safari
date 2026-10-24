@@ -1,7 +1,37 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 8080 },
-    { "name": "server", "runtimeExecutable": "npm", "runtimeArgs": ["start", "--prefix", "server"], "port": 2567 }
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "start",
+        "--prefix",
+        "server"
+      ],
+      "port": 2567
+    },
+    {
+      "name": "dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "-c-1",
+        "-p",
+        "8081",
+        "dist"
+      ],
+      "port": 8081
+    }
   ]
 }

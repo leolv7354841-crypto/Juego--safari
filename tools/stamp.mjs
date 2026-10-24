@@ -11,8 +11,10 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const mods = readdirSync(root + 'js').filter((f) => f.endsWith('.js')).sort();
 const h = createHash('sha1');
-for (const f of mods) if (f !== 'version.js') h.update(readFileSync(root + 'js/' + f));
-h.update(readFileSync(root + 'css/style.css'));
+// sin \r: el mismo código da el mismo hash en Windows (CRLF al hacer checkout) y en Linux
+const text = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+for (const f of mods) if (f !== 'version.js') h.update(text(root + 'js/' + f));
+h.update(text(root + 'css/style.css'));
 const v = h.digest('hex').slice(0, 8);
 
 writeFileSync(root + 'js/version.js', `// Generado por tools/stamp.mjs: versión del código (sirve para detectar archivos viejos en caché).\nexport const VERSION = '${v}';\n`);

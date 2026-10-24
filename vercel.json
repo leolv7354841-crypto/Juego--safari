@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "node tools/build.mjs",
+  "outputDirectory": "dist",
   "redirects": [
     { "source": "/", "destination": "/deadzone/", "permanent": false },
     { "source": "/deadzone", "destination": "/deadzone/", "permanent": false }

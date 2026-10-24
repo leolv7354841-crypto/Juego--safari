@@ -152,11 +152,32 @@ Para probar en tu celular, conéctalo a la misma red Wi-Fi y abre `http://IP-DE-
 
 ## Publicar en Vercel
 
-Es un sitio estático: no hay paso de compilación.
+Flujo actual:
 
-1. Entra a [vercel.com](https://vercel.com) → **Add New… → Project** → importa este repositorio de GitHub.
-2. Framework Preset: **Other**. Deja vacíos *Build Command* y *Output Directory*.
-3. **Deploy**. Cada `git push` vuelve a publicar automáticamente.
+1. **Push a la rama principal** → el proyecto `deadzone` de Vercel publica en producción
+   (`deadzone-five-red.vercel.app`). Las demás ramas del repositorio generan una vista previa.
+2. Vercel no publica la carpeta tal cual: ejecuta `node tools/build.mjs` (lo pide `vercel.json`),
+   que sella la versión y copia a `dist/` sólo el juego (`index.html`, `manifest.webmanifest`,
+   `css/`, `js/`, `assets/`). El servidor, la documentación y los scripts no quedan públicos.
+3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request que el
+   sellado está al día, que el build funciona y que pasan las pruebas del servidor.
+4. Si cambió código que usa el servidor (`server/`, `js/`, `deploy/`),
+   `.github/workflows/servidor.yml` actualiza la máquina de Vultr en cuanto no hay salas
+   abiertas (ver «Publicación automática» en [`deploy/README.md`](deploy/README.md)).
+
+Para crear el proyecto desde cero: [vercel.com](https://vercel.com) → **Add New… → Project** →
+importa este repositorio. `vercel.json` ya define el build (*Framework Preset* da igual).
+
+**yeyo.games/deadzone.** El hub `yeyo.games` es otro proyecto de Vercel. Para que muestre
+siempre la última versión, no debe guardar una copia del juego: en su `vercel.json`, redirige
+(sin copiar archivos) al proyecto `deadzone`:
+
+```json
+"rewrites": [
+  { "source": "/deadzone", "destination": "https://deadzone-five-red.vercel.app/deadzone/" },
+  { "source": "/deadzone/:path*", "destination": "https://deadzone-five-red.vercel.app/deadzone/:path*" }
+]
+```
 
 En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de inicio** para jugar a pantalla completa.
 
@@ -377,7 +398,9 @@ conectarse. Los tokens no se registran.
 `node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: un pequeño
 cargador arma un *import map* para pedir cada módulo con `?v=<hash>`, y `js/version.js` guarda el
 mismo hash. Si un CDN (como raw.githack.com) entrega un archivo viejo, el juego lo detecta al abrir y se
-recarga solo pidiendo todo de nuevo. Ejecútalo antes de cada commit. La versión aparece en el menú.
+recarga solo pidiendo todo de nuevo. Ejecútalo antes de cada commit (GitHub Actions avisa si se
+olvida, y Vercel vuelve a sellar al publicar). El hash no depende de los saltos de línea (CRLF o LF), así
+que sale igual en Windows y en Linux. La versión aparece en el menú.
 
 ## Estructura
 

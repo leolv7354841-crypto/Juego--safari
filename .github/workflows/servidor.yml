@@ -1,0 +1,42 @@
+# Publica el servidor en línea (máquina de Vultr) cuando cambia código que usa: entra por SSH
+# con una clave que en la máquina sólo puede ejecutar deploy/actualizar.sh --esperar (espera a
+# que no haya salas abiertas, como mucho 30 min). Configuración: deploy/README.md, «Publicación
+# automática». Sin los secretos SERVER_HOST y SERVER_SSH_KEY, no hace nada.
+name: Publicar servidor
+
+on:
+  push:
+    branches: [main, claude/juego-safari-setup-t5zanh]
+    paths: ['server/**', 'js/**', 'deploy/**', 'package.json']
+  workflow_dispatch:
+
+concurrency:
+  group: servidor
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HOST: ${{ secrets.SERVER_HOST }}
+      KEY: ${{ secrets.SERVER_SSH_KEY }}
+    steps:
+      - name: ¿Está configurado?
+        id: cfg
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ]; then
+            echo "::notice::Faltan los secretos SERVER_HOST y SERVER_SSH_KEY: no se publica el servidor."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Actualizar la máquina
+        if: steps.cfg.outputs.ok == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -t ed25519 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -T -i ~/.ssh/deploy -o BatchMode=yes -o ServerAliveInterval=30 "root@$HOST"
+          curl -fsS "https://$HOST/health"
