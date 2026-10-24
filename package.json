@@ -11,5 +11,8 @@
     "server:install": "npm ci --prefix server",
     "server:test": "npm test --prefix server",
     "server:load": "npm run load --prefix server"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.2"
   }
 }
