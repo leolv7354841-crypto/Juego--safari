@@ -13,6 +13,11 @@ const BLAST_R = 140;
 export const ACID = { radius: 105, burn: 5, dps: 2 };
 const near = [];
 
+// Bala de la torreta (la misma en el servidor y, de adorno, en los clientes en línea).
+export function turretBullet(x, y, a, owner = null) {
+  return { x, y, dx: Math.cos(a), dy: Math.sin(a), speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null, owner, turret: true };
+}
+
 // Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
 function nearestPlayer(game, x, y) {
   let best = Infinity;
@@ -489,7 +494,9 @@ export class Structures {
     const a = b.ang + rand(-0.04, 0.04);
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    game.bullets.spawn({ x: cx + ca * 20, y: cy + sa * 20, dx: ca, dy: sa, speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null, owner: b.owner });
+    game.bullets.spawn(turretBullet(cx + ca * 20, cy + sa * 20, a, b.owner));
+    // en línea: el servidor avisa del disparo y cada cliente lanza su propia bala de adorno
+    if (game.onTurretShot) game.onTurretShot(cx + ca * 20, cy + sa * 20, a);
     game.particles.muzzleSmoke(cx + ca * 22, cy + sa * 22, a);
     game.sfx.turret();
   }

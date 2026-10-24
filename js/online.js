@@ -12,6 +12,7 @@ import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD,
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
+import { turretBullet } from './build.js';
 import { UPGRADES } from './upgrades.js';
 import { rand, TAU, angleTo } from './util.js';
 
@@ -440,7 +441,10 @@ export class Online {
     for (const f of st.fires) f.t += dt;
     for (const q of st.blasts) q.t -= dt;
     for (const q of st.scorches) q.t += dt;
-    for (const b of st.blocks) b.hitT -= dt;
+    for (const b of st.blocks) {
+      b.hitT -= dt;
+      if (b.flash) b.flash = Math.max(0, b.flash - dt);
+    }
     for (const w of st.wires) w.hitT -= dt;
     g.particles.update(dt);
     g.decals.update(dt);
@@ -927,6 +931,7 @@ export class Online {
     if (!Array.isArray(args)) return;
     try {
       if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
+      else if (tag === 't' && n === 'shot') this.turretShot(Number(args[0]), Number(args[1]), Number(args[2]));
       else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
       else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0));
       else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
@@ -940,6 +945,21 @@ export class Online {
       }
     } catch {
       /* efecto con datos raros: se ignora */
+    }
+  }
+
+  // Disparo de una torreta: bala de adorno local (choca con los zombis y paredes que se ven) y
+  // el cañón gira hacia donde disparó, con su fogonazo.
+  turretShot(x, y, a) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(a)) return;
+    const g = this.game;
+    g.bullets.spawn(turretBullet(x, y, a));
+    const cx = x - Math.cos(a) * 20;
+    const cy = y - Math.sin(a) * 20;
+    for (const b of g.structures.blocks) {
+      if (b.kind !== 'turret' || Math.abs(b.x + b.w / 2 - cx) > 4 || Math.abs(b.y + b.h / 2 - cy) > 4) continue;
+      b.ang = a;
+      b.flash = 0.05;
     }
   }
 
