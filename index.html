@@ -11,50 +11,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Dead Zone">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=4b2c3bbc">
-  <script id="dz-latest">
-    // githack guarda en caché el link con el nombre de la rama y a veces sirve una versión
-    // vieja; aquí se pregunta a GitHub cuál es el último cambio y se salta a su link exacto.
-    (function () {
-      var BRANCH = 'claude/juego-safari-setup-t5zanh';
-      var REPO = 'leolv7354841-crypto/Juego--safari';
-      if (!/githack\.com$/.test(location.hostname) || location.pathname.indexOf('/' + BRANCH + '/') < 0) return;
-      window.fetch('https://api.github.com/repos/' + REPO + '/commits/' + BRANCH, { headers: { Accept: 'application/vnd.github.sha' }, cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.text() : ''; })
-        .then(function (sha) {
-          if (/^[0-9a-f]{40}$/.test(sha)) location.replace(location.pathname.replace('/' + BRANCH + '/', '/' + sha + '/') + location.search + location.hash);
-        })
-        .catch(function () {});
-    })();
-  </script>
-  <!-- version:start -->
-  <script id="dz-loader">
-    (function () {
-      var v = '4b2c3bbc';
-      var b = '';
-      try {
-        b = new URLSearchParams(location.search).get('b') || '';
-      } catch (e) {}
-      var q = '?v=' + v + (b ? '&b=' + encodeURIComponent(b) : '');
-      var mods = ["accounts.js","audio.js","build.js","bullets.js","combat.js","config.js","coop.js","director.js","input.js","lighting.js","main.js","music.js","net.js","netcode.js","online.js","particles.js","pickups.js","player.js","robot.js","sprites.js","upgrades.js","util.js","version.js","world.js","zombies.js"];
-      var map = { imports: {} };
-      mods.forEach(function (f) {
-        map.imports['./js/' + f] = './js/' + f + q;
-      });
-      var im = document.createElement('script');
-      im.type = 'importmap';
-      im.textContent = JSON.stringify(map);
-      document.currentScript.after(im);
-      window.DZ_VERSION = v;
-      window.DZ_QUERY = q;
-    })();
-  </script>
-  <!-- version:end -->
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
   <div id="game" class="state-menu">
@@ -188,7 +151,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 4b2c3bbc</span></p>
+        <p class="ver"><span id="ver">Versión</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -393,13 +356,5 @@
     </section>
 
   </div>
-  <script id="dz-main">
-    (function () {
-      var s = document.createElement('script');
-      s.type = 'module';
-      s.src = 'js/main.js' + (window.DZ_QUERY || '');
-      document.body.appendChild(s);
-    })();
-  </script>
 </body>
 </html>

@@ -114,19 +114,12 @@ export class Online {
     return '';
   }
 
-  // El SDK de Colyseus sólo se carga cuando alguien entra al modo en línea.
+  // El SDK de Colyseus sólo se descarga cuando alguien entra al modo en línea.
   sdk() {
-    if (window.Colyseus) return Promise.resolve(window.Colyseus);
     if (!this.sdkP) {
-      this.sdkP = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = './js/vendor/colyseus.js' + (window.DZ_QUERY || '');
-        s.onload = () => (window.Colyseus ? resolve(window.Colyseus) : reject(new Error('sdk')));
-        s.onerror = () => {
-          this.sdkP = null;
-          reject(new Error('sdk'));
-        };
-        document.head.appendChild(s);
+      this.sdkP = import('@colyseus/sdk').catch(() => {
+        this.sdkP = null;
+        throw new Error('sdk');
       });
     }
     return this.sdkP;
