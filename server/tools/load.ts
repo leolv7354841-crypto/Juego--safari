@@ -19,14 +19,46 @@ const SECS = Number(arg('secs', '60'));
 // el servidor real sólo deja crear salas desde las páginas de ALLOWED_ORIGINS
 const ORIGIN = arg('origin', '');
 const newClient = () => new Client(URL_, ORIGIN ? { headers: { Origin: ORIGIN } } : undefined);
-const PLAN = arg('rooms', '5x4').split(',').map((s) => s.split('x').map(Number) as [number, number]);
+const PLAN = arg('rooms', '5x4')
+  .split(',')
+  .map((s) => s.split('x').map(Number) as [number, number]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const TAU = Math.PI * 2;
 
-type Bot = { room: any; name: string; left: number; snaps: number; bytes: number; rtts: number[]; jit: number; last: number; seq: number; me: number[] | null; target: number | null; alive: boolean; kills: number; t0: number };
+type Bot = {
+  room: any;
+  name: string;
+  left: number;
+  snaps: number;
+  bytes: number;
+  rtts: number[];
+  jit: number;
+  last: number;
+  seq: number;
+  me: number[] | null;
+  target: number | null;
+  alive: boolean;
+  kills: number;
+  t0: number;
+};
 
 async function bot(room: any, name: string): Promise<Bot> {
-  const b: Bot = { room, name, left: 0, snaps: 0, bytes: 0, rtts: [], jit: 0, last: 0, seq: 0, me: null, target: null, alive: true, kills: 0, t0: Date.now() };
+  const b: Bot = {
+    room,
+    name,
+    left: 0,
+    snaps: 0,
+    bytes: 0,
+    rtts: [],
+    jit: 0,
+    last: 0,
+    seq: 0,
+    me: null,
+    target: null,
+    alive: true,
+    kills: 0,
+    t0: Date.now(),
+  };
   const ws = room.connection.transport.ws;
   ws.addEventListener('message', (e: any) => (b.bytes += e.data.byteLength || e.data.length || 0));
   room.onMessage('*', () => {});
@@ -67,7 +99,18 @@ function drive(bots: Bot[]) {
       const a = (t / 90 + b.name.length) % TAU;
       const aim = b.target ?? a;
       const run = t % 240 < 60 ? 1 : 0;
-      b.room.send('in', { i: [[++b.seq, Math.round(Math.cos(a) * 1000) / 1000, Math.round(Math.sin(a) * 1000) / 1000, run | 2, Math.round(aim * 1000) / 1000, -1]] });
+      b.room.send('in', {
+        i: [
+          [
+            ++b.seq,
+            Math.round(Math.cos(a) * 1000) / 1000,
+            Math.round(Math.sin(a) * 1000) / 1000,
+            run | 2,
+            Math.round(aim * 1000) / 1000,
+            -1,
+          ],
+        ],
+      });
     }
   }, 1000 / 60);
   const ping = setInterval(() => {
@@ -108,7 +151,11 @@ async function scenario(rooms: number, per: number) {
   const ticks: any[] = [];
   for (let s = 0; s < SECS; s++) {
     await sleep(1000);
-    ticks.push(await fetch(`${HTTP}/health`).then((r) => r.json()).catch(() => null));
+    ticks.push(
+      await fetch(`${HTTP}/health`)
+        .then((r) => r.json())
+        .catch(() => null),
+    );
   }
   stop();
   const secs = (Date.now() - bots[0].t0) / 1000;
@@ -119,13 +166,27 @@ async function scenario(rooms: number, per: number) {
   const ok = ticks.filter(Boolean);
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
   console.log(`fotos/s por cliente: media ${avg(snapsPer).toFixed(1)} · mín ${Math.min(...snapsPer).toFixed(1)}`);
-  console.log(`recibido por cliente: media ${avg(kbPer).toFixed(1)} KB/s · máx ${Math.max(...kbPer).toFixed(1)} KB/s · total ${(avg(kbPer) * bots.length).toFixed(0)} KB/s`);
-  console.log(`RTT de aplicación: p50 ${pct(0.5).toFixed(1)} ms · p95 ${pct(0.95).toFixed(1)} ms · máx ${pct(1).toFixed(1)} ms · variación media ${avg(bots.map((b) => b.jit)).toFixed(1)} ms`);
-  console.log(`servidor: ${avg(ok.map((t) => t.tickHz)).toFixed(1)} pasos/s por sala (objetivo 60) · paso medio ${avg(ok.map((t) => t.tickMs)).toFixed(2)} ms · peor ${Math.max(...ok.map((t) => t.tickMaxMs)).toFixed(2)} ms · descartados ${ok.length ? ok[ok.length - 1].skippedTicks : '?'}`);
-  console.log(`CPU del proceso servidor: media ${avg(ok.map((t) => t.cpuPercent)).toFixed(1)} % de un núcleo · máx ${Math.max(...ok.map((t) => t.cpuPercent)).toFixed(1)} % · memoria ${ok.length ? ok[ok.length - 1].rssMb : '?'} MB`);
-  console.log(`bajas de los bots: ${bots.reduce((a, b) => a + b.kills, 0)} · vivos al final: ${bots.filter((b) => b.alive).length}/${bots.length}`);
+  console.log(
+    `recibido por cliente: media ${avg(kbPer).toFixed(1)} KB/s · máx ${Math.max(...kbPer).toFixed(1)} KB/s · total ${(avg(kbPer) * bots.length).toFixed(0)} KB/s`,
+  );
+  console.log(
+    `RTT de aplicación: p50 ${pct(0.5).toFixed(1)} ms · p95 ${pct(0.95).toFixed(1)} ms · máx ${pct(1).toFixed(1)} ms · variación media ${avg(bots.map((b) => b.jit)).toFixed(1)} ms`,
+  );
+  console.log(
+    `servidor: ${avg(ok.map((t) => t.tickHz)).toFixed(1)} pasos/s por sala (objetivo 60) · paso medio ${avg(ok.map((t) => t.tickMs)).toFixed(2)} ms · peor ${Math.max(...ok.map((t) => t.tickMaxMs)).toFixed(2)} ms · descartados ${ok.length ? ok[ok.length - 1].skippedTicks : '?'}`,
+  );
+  console.log(
+    `CPU del proceso servidor: media ${avg(ok.map((t) => t.cpuPercent)).toFixed(1)} % de un núcleo · máx ${Math.max(...ok.map((t) => t.cpuPercent)).toFixed(1)} % · memoria ${ok.length ? ok[ok.length - 1].rssMb : '?'} MB`,
+  );
+  console.log(
+    `bajas de los bots: ${bots.reduce((a, b) => a + b.kills, 0)} · vivos al final: ${bots.filter((b) => b.alive).length}/${bots.length}`,
+  );
   const out = bots.filter((b) => b.left);
-  console.log(out.length ? `DESCONECTADOS: ${out.length} (códigos ${[...new Set(out.map((b) => b.left))].join(', ')}; 4100 = expulsado por el servidor)` : 'desconectados: 0');
+  console.log(
+    out.length
+      ? `DESCONECTADOS: ${out.length} (códigos ${[...new Set(out.map((b) => b.left))].join(', ')}; 4100 = expulsado por el servidor)`
+      : 'desconectados: 0',
+  );
   await Promise.all(bots.map((b) => Promise.race([b.room.leave().catch(() => {}), sleep(1000)])));
   await sleep(1500);
 }

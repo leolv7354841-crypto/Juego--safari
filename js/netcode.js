@@ -98,7 +98,12 @@ export class Predictor {
 
   // correcciones del último periodo (para el diagnóstico) y reinicio del contador
   takeStats() {
-    const s = { n: this.corrections, avg: this.corrections ? this.corrSum / this.corrections : 0, max: this.corrMax, snaps: this.snaps };
+    const s = {
+      n: this.corrections,
+      avg: this.corrections ? this.corrSum / this.corrections : 0,
+      max: this.corrMax,
+      snaps: this.snaps,
+    };
     this.corrections = 0;
     this.corrSum = 0;
     this.corrMax = 0;

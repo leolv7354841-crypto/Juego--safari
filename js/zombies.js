@@ -51,7 +51,12 @@ function pickRole() {
   const r = Math.random();
   const tactic = r < 0.45 ? 'direct' : r < 0.8 ? 'flank' : 'rear';
   const lag = Math.random() < 0.18;
-  return { tactic, side: Math.random() < 0.5 ? -1 : 1, role: lag ? 'lag' : 'walker', pace: lag ? rand(0.6, 0.78) : rand(0.9, 1.1) };
+  return {
+    tactic,
+    side: Math.random() < 0.5 ? -1 : 1,
+    role: lag ? 'lag' : 'walker',
+    pace: lag ? rand(0.6, 0.78) : rand(0.9, 1.1),
+  };
 }
 
 // Con menos zombis que esto todos van directo; con más, la horda empieza a rodearte.
@@ -124,7 +129,7 @@ export class Horde {
     if (z.tactic === 'direct' || this.list.length < ENCIRCLE_MIN) return;
     const b = Math.atan2(z.y - p.y, z.x - p.x);
     const off = z.tactic === 'rear' ? Math.PI + rand(-0.6, 0.6) : z.side * (Math.PI / 2) + rand(-0.5, 0.5);
-    const k = (((Math.round((b + off) / OCT) % 8) + 8) % 8);
+    const k = ((Math.round((b + off) / OCT) % 8) + 8) % 8;
     if (world.anchors[k].ok) z.anchor = k;
   }
 
@@ -218,7 +223,8 @@ export class Horde {
     const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
     const p0 = targets ? IDLE : game.player;
-    const peer = !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    const peer =
+      !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
     let p = p0;
     const world = game.world;
     const time = game.time;
@@ -287,14 +293,18 @@ export class Horde {
         z.dripT -= dt;
         if (z.dripT <= 0) {
           z.dripT = rand(0.18, 0.34);
-          game.decals.drip(z.x - Math.cos(z.angle) * z.r * 0.5 + rand(-3, 3), z.y - Math.sin(z.angle) * z.r * 0.5 + rand(-3, 3));
+          game.decals.drip(
+            z.x - Math.cos(z.angle) * z.r * 0.5 + rand(-3, 3),
+            z.y - Math.sin(z.angle) * z.r * 0.5 + rand(-3, 3),
+          );
         }
         if (z.hp <= 0) {
           game.killZombie(z);
           continue;
         }
       }
-      z.tilt = (z.wounded ? Math.sin(time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(time * 23 + z.wob) * 0.28 : 0);
+      z.tilt =
+        (z.wounded ? Math.sin(time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(time * 23 + z.wob) * 0.28 : 0);
       if (z.type === 'bull' && this.bullThink(z, p, dx, dy, d, dt, game, world)) continue;
       let mx;
       let my;
@@ -723,7 +733,7 @@ export class Horde {
       const half = z.spr.half;
       if (z.x + half < view.x0 || z.x - half > view.x1 || z.y + half < view.y0 || z.y - half > view.y1) continue;
       const frames = z.flash > 0 ? z.spr.flash : z.spr.frames;
-      const f = ((z.anim | 0) % frames.length + frames.length) % frames.length;
+      const f = (((z.anim | 0) % frames.length) + frames.length) % frames.length;
       const img = frames[f];
       const ang = z.angle + z.tilt + (z.hitT > 0 ? z.hitJolt * (z.hitT / 0.18) : 0);
       const c = Math.cos(ang);
@@ -747,8 +757,10 @@ export class Horde {
       const lift = z.air > 0 ? z.air : 0;
       // hinchado por el cohete clavado: crece y tiembla antes de reventar
       const swell = z.swell > 0 ? z.swell : 0;
-      const k = s * pop * grow * (1 + lift / 140) * (1 + swell * 0.35 + (swell ? Math.sin(z.id + swell * 60) * 0.03 : 0));
-      const shake = z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : swell ? (Math.random() - 0.5) * (2 + swell * 5) : 0;
+      const k =
+        s * pop * grow * (1 + lift / 140) * (1 + swell * 0.35 + (swell ? Math.sin(z.id + swell * 60) * 0.03 : 0));
+      const shake =
+        z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : swell ? (Math.random() - 0.5) * (2 + swell * 5) : 0;
       const lx = z.x + c * z.lunge * 5 + shake;
       const ly = z.y + sn * z.lunge * 5 - lift * 0.7 + shake;
       if (lift > 0) {

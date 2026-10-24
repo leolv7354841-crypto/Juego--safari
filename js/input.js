@@ -179,9 +179,14 @@ export class Input {
     // evita zoom por gestos y menú contextual en iOS
     this.on(document, 'gesturestart', prevent);
     this.on(document, 'dblclick', prevent);
-    this.on(this.root, 'touchmove', (e) => {
-      if (e.cancelable && !e.target.closest('.screen')) e.preventDefault();
-    }, { passive: false });
+    this.on(
+      this.root,
+      'touchmove',
+      (e) => {
+        if (e.cancelable && !e.target.closest('.screen')) e.preventDefault();
+      },
+      { passive: false },
+    );
   }
 
   setRun(v) {

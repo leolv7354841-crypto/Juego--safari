@@ -23,7 +23,33 @@ const WINDOW = 6;
 const FX_MAX = 500;
 // efectos que el invitado genera por su cuenta (no hace falta mandarlos)
 export const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
-export const SFX_SYNC = ['shot', 'hit', 'kill', 'stomp', 'explosion', 'acid', 'ricochet', 'blockHit', 'blockBreak', 'build', 'turret', 'goldenSpawn', 'punch', 'bullRoar', 'bullCharge', 'bullHit', 'bullSlam', 'throwBottle', 'molotov', 'crackle', 'burnScream', 'rocketStick', 'rocketArm', 'gore', 'wave'];
+export const SFX_SYNC = [
+  'shot',
+  'hit',
+  'kill',
+  'stomp',
+  'explosion',
+  'acid',
+  'ricochet',
+  'blockHit',
+  'blockBreak',
+  'build',
+  'turret',
+  'goldenSpawn',
+  'punch',
+  'bullRoar',
+  'bullCharge',
+  'bullHit',
+  'bullSlam',
+  'throwBottle',
+  'molotov',
+  'crackle',
+  'burnScream',
+  'rocketStick',
+  'rocketArm',
+  'gore',
+  'wave',
+];
 export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
 
 const r100 = (v) => Math.round(v * 100);
@@ -188,7 +214,14 @@ export class Coop {
     this.peer.tx = this.peer.x;
     this.peer.ty = this.peer.y;
     this.installRecording();
-    this.send({ t: 'start', seed: g.world.seedBase, x: Math.round(this.peer.x), y: Math.round(this.peer.y), name: this.myName(), look: g.look });
+    this.send({
+      t: 'start',
+      seed: g.world.seedBase,
+      x: Math.round(this.peer.x),
+      y: Math.round(this.peer.y),
+      name: this.myName(),
+      look: g.look,
+    });
     g.input.reset();
     g.input.setRun(false);
     g.setState('play');
@@ -286,7 +319,19 @@ export class Coop {
   }
 
   packCorpse([z, dx, dy]) {
-    return [{ type: z.type, si: z.si | 0, x: Math.round(z.x), y: Math.round(z.y), r: z.r, a: r100(z.angle) / 100, burnt: !!z.burnt }, dx, dy];
+    return [
+      {
+        type: z.type,
+        si: z.si | 0,
+        x: Math.round(z.x),
+        y: Math.round(z.y),
+        r: z.r,
+        a: r100(z.angle) / 100,
+        burnt: !!z.burnt,
+      },
+      dx,
+      dy,
+    ];
   }
 
   // Ejecuta algo sin grabarlo (lo que provoca el invitado ya lo vio en su celular).
@@ -361,25 +406,80 @@ export class Coop {
     const zx = [];
     for (const o of g.horde.list) {
       if (o.dead || !near(o.x, o.y)) continue;
-      const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
-        | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
+      const flags =
+        (o.flash > 0 ? 1 : 0) |
+        (o.burn > 0 ? 2 : 0) |
+        (o.wounded ? 4 : 0) |
+        (o.bs === 'windup' ? 8 : 0) |
+        (o.hitT > 0 ? 16 : 0) |
+        (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
+        (o.lunge > 0.3 ? 64 : 0);
       // compacto: posición relativa al compañero y ángulo en 64 pasos
-      z.push(o.id, TYPES.indexOf(o.type), Math.round(o.x - ox), Math.round(o.y - oy), Math.round((o.angle / TAU) * 64) & 63, flags);
+      z.push(
+        o.id,
+        TYPES.indexOf(o.type),
+        Math.round(o.x - ox),
+        Math.round(o.y - oy),
+        Math.round((o.angle / TAU) * 64) & 63,
+        flags,
+      );
       if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
     }
     const st = g.structures;
     const s = {
-      t: 's', q: ++this.snapSeq, ts: Math.round(performance.now()), o: [ox, oy], zx, w: g.director.wave, ds: g.director.state, tm: Math.round(g.time), lv: g.level, xp: Math.round(g.xp), xn: g.xpNeed,
-      z, hp: this.packPlayer(g.player),
-      pk: g.pickups.list.flatMap((it) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
-      b: g.bullets.list.flatMap((b) => (b.owner !== 'peer' && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
-      gr: st.grenades.flatMap((q) => [Math.round(q.x), Math.round(q.y), Math.round(q.h), r100(q.rot), q.kind === 'molotov' ? 1 : 0, q.t > q.dur ? 1 : 0]),
+      t: 's',
+      q: ++this.snapSeq,
+      ts: Math.round(performance.now()),
+      o: [ox, oy],
+      zx,
+      w: g.director.wave,
+      ds: g.director.state,
+      tm: Math.round(g.time),
+      lv: g.level,
+      xp: Math.round(g.xp),
+      xn: g.xpNeed,
+      z,
+      hp: this.packPlayer(g.player),
+      pk: g.pickups.list.flatMap((it) =>
+        near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
+      ),
+      b: g.bullets.list.flatMap((b) =>
+        b.owner !== 'peer' && near(b.x, b.y)
+          ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0]
+          : [],
+      ),
+      gr: st.grenades.flatMap((q) => [
+        Math.round(q.x),
+        Math.round(q.y),
+        Math.round(q.h),
+        r100(q.rot),
+        q.kind === 'molotov' ? 1 : 0,
+        q.t > q.dur ? 1 : 0,
+      ]),
       fi: st.fires.flatMap((f) => [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)]),
-      so: st.stuck.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.ang || 0), r100(q.t), r100(q.stick), r100(q.glow), q.kind === 'fat' ? 1 : 0]),
+      so: st.stuck.flatMap((q) => [
+        Math.round(q.x),
+        Math.round(q.y),
+        r100(q.ang || 0),
+        r100(q.t),
+        r100(q.stick),
+        r100(q.glow),
+        q.kind === 'fat' ? 1 : 0,
+      ]),
       bl: st.blasts.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t)]),
     };
     const rb = g.robot;
-    s.rb = rb.owned ? [Math.round(rb.x), Math.round(rb.y), r100(rb.angle), r100(rb.legAngle), r100(rb.walk), Math.round(rb.hp), rb.piloted ? 1 : 0] : 0;
+    s.rb = rb.owned
+      ? [
+          Math.round(rb.x),
+          Math.round(rb.y),
+          r100(rb.angle),
+          r100(rb.legAngle),
+          r100(rb.walk),
+          Math.round(rb.hp),
+          rb.piloted ? 1 : 0,
+        ]
+      : 0;
     // lo que cambia poco va cada medio segundo
     if (this.snapN++ % 6 === 0) {
       s.blk = st.blocks.map((b) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]);
@@ -391,8 +491,24 @@ export class Coop {
   }
 
   packPlayer(p) {
-    return [Math.round(p.x), Math.round(p.y), r100(p.angle), r100(p.legAngle), Math.round(p.walkPhase * 10), p.running ? 1 : 0, p.weapon.id, p.weapon.mag,
-      r100(Math.max(0, p.reloadT)), r100(p.reloadProg || 0), p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.inRobot ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow)];
+    return [
+      Math.round(p.x),
+      Math.round(p.y),
+      r100(p.angle),
+      r100(p.legAngle),
+      Math.round(p.walkPhase * 10),
+      p.running ? 1 : 0,
+      p.weapon.id,
+      p.weapon.mag,
+      r100(Math.max(0, p.reloadT)),
+      r100(p.reloadProg || 0),
+      p.flashT > 0 ? 1 : 0,
+      p.alive ? 1 : 0,
+      p.inRobot ? 1 : 0,
+      p.hurtT > 0 ? 1 : 0,
+      r100(p.recoil),
+      Math.round(p.speedNow),
+    ];
   }
 
   // La mira y las piernas del compañero giran suave hacia lo último recibido.
@@ -457,14 +573,21 @@ export class Coop {
       case 'build': {
         const kind = m.kind;
         this.syncPeer(m);
-        const ok = !!SHOP[kind] && !SHOP[kind].consumable && this.quiet(() => this.withPlayer(peer, () => g.structures.place(g, kind)));
+        const ok =
+          !!SHOP[kind] &&
+          !SHOP[kind].consumable &&
+          this.quiet(() => this.withPlayer(peer, () => g.structures.place(g, kind)));
         this.send({ t: 'built', kind, ok });
         break;
       }
       case 'throw': {
         const kind = m.kind === 'molotov' ? 'molotov' : 'grenade';
         this.syncPeer(m);
-        this.quiet(() => this.withPlayer(peer, () => (kind === 'molotov' ? g.structures.throwMolotov(g, m.tx, m.ty) : g.structures.throwGrenade(g, m.tx, m.ty))));
+        this.quiet(() =>
+          this.withPlayer(peer, () =>
+            kind === 'molotov' ? g.structures.throwMolotov(g, m.tx, m.ty) : g.structures.throwGrenade(g, m.tx, m.ty),
+          ),
+        );
         const q = g.structures.grenades[g.structures.grenades.length - 1];
         if (q) q.owner = 'peer';
         break;
@@ -501,10 +624,19 @@ export class Coop {
     const peer = this.peer;
     for (const a of m.a.slice(0, 12)) {
       g.bullets.spawn({
-        x: Number(m.x), y: Number(m.y), dx: Math.cos(a), dy: Math.sin(a),
-        speed: d.speed * rand(0.95, 1.05), life: d.range * (d.pellets > 1 ? rand(0.8, 1) : 1),
-        dmg: Math.min(Number(m.dmg) || d.damage, d.damage * 4), pierce: Math.min(m.pi | 0, 10), knock: d.knock,
-        shot: null, hits: null, rocket: !!d.rocket, owner: 'peer',
+        x: Number(m.x),
+        y: Number(m.y),
+        dx: Math.cos(a),
+        dy: Math.sin(a),
+        speed: d.speed * rand(0.95, 1.05),
+        life: d.range * (d.pellets > 1 ? rand(0.8, 1) : 1),
+        dmg: Math.min(Number(m.dmg) || d.damage, d.damage * 4),
+        pierce: Math.min(m.pi | 0, 10),
+        knock: d.knock,
+        shot: null,
+        hits: null,
+        rocket: !!d.rocket,
+        owner: 'peer',
       });
     }
     // el anfitrión también ve y oye el disparo de su compañero
@@ -596,7 +728,11 @@ export class Coop {
           const c = args[0] || {};
           const sets = zombieSprites()[c.type];
           if (!sets) return;
-          g.decals.corpse({ type: c.type, spr: sets[c.si] || sets[0], x: c.x, y: c.y, r: c.r, angle: c.a, burnt: c.burnt }, args[1], args[2]);
+          g.decals.corpse(
+            { type: c.type, spr: sets[c.si] || sets[0], x: c.x, y: c.y, r: c.r, angle: c.a, burnt: c.burnt },
+            args[1],
+            args[2],
+          );
         } else g.decals[n](...args);
       }
     } catch {
@@ -621,16 +757,41 @@ export class Coop {
     if (this.inT > 0) return;
     this.inT = 1 / IN_HZ;
     const w = p.weapon;
-    this.send({
-      t: 'in', ak: this.lastSeq || 0, ts: Math.round(performance.now()), x: Math.round(p.x), y: Math.round(p.y), a: r100(p.angle) / 100, la: r100(p.legAngle) / 100, wp: Math.round(p.walkPhase * 10) / 10,
-      sp: Math.round(p.speedNow), run: p.running ? 1 : 0, al: p.alive ? 1 : 0, hp: Math.ceil(p.hp), mh: p.stats.maxHp,
-      na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
-      w: w.id, mag: w.mag, rl: r100(Math.max(0, p.reloadT)) / 100, rp: r100(p.reloadProg || 0) / 100,
-    }, true);
+    this.send(
+      {
+        t: 'in',
+        ak: this.lastSeq || 0,
+        ts: Math.round(performance.now()),
+        x: Math.round(p.x),
+        y: Math.round(p.y),
+        a: r100(p.angle) / 100,
+        la: r100(p.legAngle) / 100,
+        wp: Math.round(p.walkPhase * 10) / 10,
+        sp: Math.round(p.speedNow),
+        run: p.running ? 1 : 0,
+        al: p.alive ? 1 : 0,
+        hp: Math.ceil(p.hp),
+        mh: p.stats.maxHp,
+        na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
+        w: w.id,
+        mag: w.mag,
+        rl: r100(Math.max(0, p.reloadT)) / 100,
+        rp: r100(p.reloadProg || 0) / 100,
+      },
+      true,
+    );
   }
 
   sendShot(x, y, angles, d, stats) {
-    this.send({ t: 'shot', x: Math.round(x), y: Math.round(y), a: angles.map((a) => Math.round(a * 1000) / 1000), w: d.id, dmg: d.damage * stats.dmgMult, pi: d.pierce + stats.pierce });
+    this.send({
+      t: 'shot',
+      x: Math.round(x),
+      y: Math.round(y),
+      a: angles.map((a) => Math.round(a * 1000) / 1000),
+      w: d.id,
+      dmg: d.damage * stats.dmgMult,
+      pi: d.pierce + stats.pierce,
+    });
   }
 
   guestBuild() {
@@ -644,13 +805,22 @@ export class Coop {
     if (!g.structures.placement(g, g.buildSel).ok) return g.toast('No cabe ahí');
     this.pendingBuild = g.buildSel;
     const p = g.player;
-    this.send({ t: 'build', kind: g.buildSel, x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
+    this.send({
+      t: 'build',
+      kind: g.buildSel,
+      x: Math.round(p.x),
+      y: Math.round(p.y),
+      a: Math.round(p.angle * 1000) / 1000,
+    });
   }
 
   guestThrow(kind) {
     const g = this.game;
     const p = g.player;
-    if (g.inv[kind] <= 0) return g.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
+    if (g.inv[kind] <= 0)
+      return g.toast(
+        kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda',
+      );
     let tx = p.x + Math.cos(p.angle) * 220;
     let ty = p.y + Math.sin(p.angle) * 220;
     if (g.input.mode === 'mouse') {
@@ -662,7 +832,15 @@ export class Coop {
       ty = p.target.y;
     }
     g.inv[kind]--;
-    this.send({ t: 'throw', kind, tx: Math.round(tx), ty: Math.round(ty), x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
+    this.send({
+      t: 'throw',
+      kind,
+      tx: Math.round(tx),
+      ty: Math.round(ty),
+      x: Math.round(p.x),
+      y: Math.round(p.y),
+      a: Math.round(p.angle * 1000) / 1000,
+    });
   }
 
   applySnapshot(s) {
@@ -695,14 +873,33 @@ export class Coop {
     // objetos, balas, granadas, fuego, cohetes clavados, explosiones
     const pk = s.pk || [];
     g.pickups.list = [];
-    for (let i = 0; i + 3 < pk.length; i += 4) g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
+    for (let i = 0; i + 3 < pk.length; i += 4)
+      g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
     const b = s.b || [];
     this.remoteBullets = [];
-    for (let i = 0; i + 4 < b.length; i += 5) this.remoteBullets.push({ x: b[i], y: b[i + 1], dx: b[i + 2] / 100, dy: b[i + 3] / 100, rocket: !!b[i + 4], trail: 22, age: 0 });
+    for (let i = 0; i + 4 < b.length; i += 5)
+      this.remoteBullets.push({
+        x: b[i],
+        y: b[i + 1],
+        dx: b[i + 2] / 100,
+        dy: b[i + 3] / 100,
+        rocket: !!b[i + 4],
+        trail: 22,
+        age: 0,
+      });
     const st = g.structures;
     const gr = s.gr || [];
     st.grenades = [];
-    for (let i = 0; i + 5 < gr.length; i += 6) st.grenades.push({ x: gr[i], y: gr[i + 1], h: gr[i + 2], rot: gr[i + 3] / 100, kind: gr[i + 4] ? 'molotov' : 'grenade', t: gr[i + 5] ? 2 : 0, dur: 1 });
+    for (let i = 0; i + 5 < gr.length; i += 6)
+      st.grenades.push({
+        x: gr[i],
+        y: gr[i + 1],
+        h: gr[i + 2],
+        rot: gr[i + 3] / 100,
+        kind: gr[i + 4] ? 'molotov' : 'grenade',
+        t: gr[i + 5] ? 2 : 0,
+        dur: 1,
+      });
     const fi = s.fi || [];
     const fires = [];
     for (let i = 0; i + 4 < fi.length; i += 5) {
@@ -712,7 +909,12 @@ export class Coop {
         for (let k = 0; k < 16; k++) {
           const a = rand(0, TAU);
           const dd = Math.sqrt(Math.random()) * f.r * 0.85;
-          f.flames.push({ x: f.x + Math.cos(a) * dd, y: f.y + Math.sin(a) * dd * 0.85, s: rand(0.7, 1.25), ph: rand(0, 10) });
+          f.flames.push({
+            x: f.x + Math.cos(a) * dd,
+            y: f.y + Math.sin(a) * dd * 0.85,
+            s: rand(0.7, 1.25),
+            ph: rand(0, 10),
+          });
         }
         this.fireMap.set(f.id, f);
       }
@@ -724,15 +926,43 @@ export class Coop {
     st.fires = fires;
     const so = s.so || [];
     st.stuck = [];
-    for (let i = 0; i + 6 < so.length; i += 7) st.stuck.push({ x: so[i], y: so[i + 1], ang: so[i + 2] / 100, t: so[i + 3] / 100, stick: so[i + 4] / 100, glow: so[i + 5] / 100, kind: so[i + 6] ? 'fat' : 'heavy' });
+    for (let i = 0; i + 6 < so.length; i += 7)
+      st.stuck.push({
+        x: so[i],
+        y: so[i + 1],
+        ang: so[i + 2] / 100,
+        t: so[i + 3] / 100,
+        stick: so[i + 4] / 100,
+        glow: so[i + 5] / 100,
+        kind: so[i + 6] ? 'fat' : 'heavy',
+      });
     const bl = s.bl || [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
     if (s.blk) {
-      st.blocks = s.blk.filter((q) => SHOP[q[0]]).map((q) => ({ k: 0, kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, ang: q[6] / 100, low: true, block: true, hitT: 0, cd: 0 }));
+      st.blocks = s.blk
+        .filter((q) => SHOP[q[0]])
+        .map((q) => ({
+          k: 0,
+          kind: q[0],
+          x: q[1],
+          y: q[2],
+          w: q[3],
+          h: q[4],
+          hp: q[5],
+          max: SHOP[q[0]].hp,
+          ang: q[6] / 100,
+          low: true,
+          block: true,
+          hitT: 0,
+          cd: 0,
+        }));
       st.relayer();
     }
-    if (s.wir) st.wires = s.wir.filter((q) => SHOP[q[0]]).map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
+    if (s.wir)
+      st.wires = s.wir
+        .filter((q) => SHOP[q[0]])
+        .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
     if (s.sc) st.scorches = s.sc.map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
     // robot del anfitrión
     const rb = g.robot;
@@ -793,9 +1023,31 @@ export class Coop {
         const def = ZOMBIES[type];
         const sets = zombieSprites()[type];
         o = {
-          id, type, def, r: def.radius, mass: def.mass, si: id % sets.length, spr: sets[id % sets.length] || sets[0], x, y,
-          angle: ang, anim: 0, flash: 0, hitT: 0, hitJolt: 0, lunge: 0, spawnT: 0, tilt: 0, air: 0, swell: 0, burn: 0,
-          bs: 'walk', life: 99, dead: false, wob: rand(0, 100), fireFx: 0,
+          id,
+          type,
+          def,
+          r: def.radius,
+          mass: def.mass,
+          si: id % sets.length,
+          spr: sets[id % sets.length] || sets[0],
+          x,
+          y,
+          angle: ang,
+          anim: 0,
+          flash: 0,
+          hitT: 0,
+          hitJolt: 0,
+          lunge: 0,
+          spawnT: 0,
+          tilt: 0,
+          air: 0,
+          swell: 0,
+          burn: 0,
+          bs: 'walk',
+          life: 99,
+          dead: false,
+          wob: rand(0, 100),
+          fireFx: 0,
         };
         this.zmap.set(id, o);
       }
@@ -854,7 +1106,8 @@ export class Coop {
       z.anim += Math.hypot(z.x - ox, z.y - oy) / (z.r * 0.55);
       z.hitT -= dt;
       z.lunge = Math.max(0, z.lunge - dt * 4);
-      z.tilt = (z.wounded ? Math.sin(g.time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(g.time * 23 + z.wob) * 0.28 : 0);
+      z.tilt =
+        (z.wounded ? Math.sin(g.time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(g.time * 23 + z.wob) * 0.28 : 0);
       if (z.burn > 0) {
         z.fireFx -= dt;
         if (z.fireFx <= 0) {
@@ -898,7 +1151,8 @@ export class Coop {
     g.particles.update(dt);
     g.decals.update(dt);
     g.emitFires(dt);
-    if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05))) g.sfx.groan(Math.min(3, 0.5 + nc / 10));
+    if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
+      g.sfx.groan(Math.min(3, 0.5 + nc / 10));
     g.stepT -= dt;
     if (nc > 0 && g.stepT <= 0) {
       g.sfx.footstep(Math.min(1, nc / 20));

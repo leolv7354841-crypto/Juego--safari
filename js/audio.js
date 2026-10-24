@@ -20,15 +20,59 @@ const SHOTS = {
 
 // Etapas de recarga sincronizadas con el progreso de la animación (0..1).
 export const RELOAD_STEPS = {
-  pistol: [[0.12, 'magOut'], [0.6, 'magIn'], [0.88, 'slide']],
-  smg: [[0.15, 'magOut'], [0.58, 'magIn'], [0.86, 'bolt']],
-  ar: [[0.14, 'magOut'], [0.56, 'magIn'], [0.85, 'bolt']],
-  rifle: [[0.12, 'boltOpen'], [0.3, 'magOut'], [0.62, 'magIn'], [0.9, 'boltClose']],
-  sniper: [[0.1, 'boltOpen'], [0.3, 'shell'], [0.5, 'shell'], [0.7, 'shell'], [0.9, 'boltClose']],
-  shotgun: [[0.15, 'shell'], [0.32, 'shell'], [0.49, 'shell'], [0.66, 'shell'], [0.88, 'pump']],
-  autoshotgun: [[0.12, 'magOut'], [0.55, 'drumIn'], [0.86, 'bolt']],
-  lmg: [[0.08, 'coverOpen'], [0.3, 'magOut'], [0.55, 'belt'], [0.75, 'coverClose'], [0.9, 'bolt']],
-  bazooka: [[0.12, 'coverOpen'], [0.45, 'rocketIn'], [0.7, 'rocketSeat'], [0.92, 'boltClose']],
+  pistol: [
+    [0.12, 'magOut'],
+    [0.6, 'magIn'],
+    [0.88, 'slide'],
+  ],
+  smg: [
+    [0.15, 'magOut'],
+    [0.58, 'magIn'],
+    [0.86, 'bolt'],
+  ],
+  ar: [
+    [0.14, 'magOut'],
+    [0.56, 'magIn'],
+    [0.85, 'bolt'],
+  ],
+  rifle: [
+    [0.12, 'boltOpen'],
+    [0.3, 'magOut'],
+    [0.62, 'magIn'],
+    [0.9, 'boltClose'],
+  ],
+  sniper: [
+    [0.1, 'boltOpen'],
+    [0.3, 'shell'],
+    [0.5, 'shell'],
+    [0.7, 'shell'],
+    [0.9, 'boltClose'],
+  ],
+  shotgun: [
+    [0.15, 'shell'],
+    [0.32, 'shell'],
+    [0.49, 'shell'],
+    [0.66, 'shell'],
+    [0.88, 'pump'],
+  ],
+  autoshotgun: [
+    [0.12, 'magOut'],
+    [0.55, 'drumIn'],
+    [0.86, 'bolt'],
+  ],
+  lmg: [
+    [0.08, 'coverOpen'],
+    [0.3, 'magOut'],
+    [0.55, 'belt'],
+    [0.75, 'coverClose'],
+    [0.9, 'bolt'],
+  ],
+  bazooka: [
+    [0.12, 'coverOpen'],
+    [0.45, 'rocketIn'],
+    [0.7, 'rocketSeat'],
+    [0.92, 'boltClose'],
+  ],
 };
 
 export class Sfx {
@@ -144,13 +188,15 @@ export class Sfx {
     }
     if (kind === 'sniper') this.burst({ dur: 0.9, freq: 400, sweep: 60, gain: 0.28, attack: 0.05, delay: 0.05 });
     // bazuca: silbido del cohete al salir
-    if (kind === 'bazooka') this.burst({ dur: 1.1, freq: 900, sweep: 3200, gain: 0.35, type: 'bandpass', q: 1.5, attack: 0.03, delay: 0.04 });
+    if (kind === 'bazooka')
+      this.burst({ dur: 1.1, freq: 900, sweep: 3200, gain: 0.35, type: 'bandpass', q: 1.5, attack: 0.03, delay: 0.04 });
   }
 
   // Un paso de la recarga: cada tipo suena distinto (metal contra metal, plástico, muelle).
   reloadStep(step) {
     if (!this.ok('rl-' + step, 0.06, true)) return;
-    const click = (f, g, d = 0.04, delay = 0) => this.burst({ dur: d, freq: f, gain: g, type: 'bandpass', q: 8, delay });
+    const click = (f, g, d = 0.04, delay = 0) =>
+      this.burst({ dur: d, freq: f, gain: g, type: 'bandpass', q: 8, delay });
     switch (step) {
       case 'magOut':
         click(1800, 0.45);
@@ -273,7 +319,16 @@ export class Sfx {
     if (!this.ok('step', 0.09)) return;
     const v = rand(0.8, 1.25);
     this.burst({ dur: rand(0.06, 0.12), freq: 260 * v, gain: 0.07 + vol * 0.1, type: 'lowpass' });
-    if (Math.random() < 0.4) this.burst({ dur: 0.15, freq: 1400 * v, sweep: 600, gain: 0.03 + vol * 0.03, type: 'bandpass', q: 1, delay: 0.04 });
+    if (Math.random() < 0.4)
+      this.burst({
+        dur: 0.15,
+        freq: 1400 * v,
+        sweep: 600,
+        gain: 0.03 + vol * 0.03,
+        type: 'bandpass',
+        q: 1,
+        delay: 0.04,
+      });
   }
 
   stomp(vol) {
@@ -291,14 +346,25 @@ export class Sfx {
   // Monedas que se caen del bolsillo al recibir un golpe.
   moneyLost() {
     if (!this.ok('moneyLost', 0.12, true)) return;
-    for (let i = 0; i < 3; i++) this.tone({ freq: rand(1800, 2600), to: rand(900, 1300), dur: 0.08, gain: 0.08, type: 'triangle', delay: i * 0.05 });
+    for (let i = 0; i < 3; i++)
+      this.tone({
+        freq: rand(1800, 2600),
+        to: rand(900, 1300),
+        dur: 0.08,
+        gain: 0.08,
+        type: 'triangle',
+        delay: i * 0.05,
+      });
   }
 
   // Recompensa del zombi dorado.
   gold() {
     if (!this.ok('gold', 0.3, true)) return;
-    [784, 988, 1175, 1568, 1976].forEach((f, i) => this.tone({ freq: f, dur: 0.35, gain: 0.16, type: 'triangle', delay: i * 0.06 }));
-    for (let i = 0; i < 6; i++) this.tone({ freq: rand(2500, 4200), dur: 0.12, gain: 0.05, type: 'sine', delay: 0.1 + i * 0.05 });
+    [784, 988, 1175, 1568, 1976].forEach((f, i) =>
+      this.tone({ freq: f, dur: 0.35, gain: 0.16, type: 'triangle', delay: i * 0.06 }),
+    );
+    for (let i = 0; i < 6; i++)
+      this.tone({ freq: rand(2500, 4200), dur: 0.12, gain: 0.05, type: 'sine', delay: 0.1 + i * 0.05 });
   }
 
   goldenSpawn() {
@@ -321,12 +387,15 @@ export class Sfx {
     this.burst({ dur: 0.05, freq: 2200, gain: 0.35, type: 'bandpass', q: 6 });
     this.tone({ freq: 660, dur: 0.08, gain: 0.16, type: 'triangle', delay: 0.02 });
     this.tone({ freq: 990, dur: 0.12, gain: 0.16, type: 'triangle', delay: 0.07 });
-    for (let i = 0; i < 3; i++) this.burst({ dur: 0.02, freq: 4200 + i * 300, gain: 0.12, type: 'bandpass', q: 9, delay: 0.04 + i * 0.03 });
+    for (let i = 0; i < 3; i++)
+      this.burst({ dur: 0.02, freq: 4200 + i * 300, gain: 0.12, type: 'bandpass', q: 9, delay: 0.04 + i * 0.03 });
   }
 
   level() {
     if (!this.ok('level', 0.3, true)) return;
-    [392, 494, 587, 784].forEach((f, i) => this.tone({ freq: f, dur: 0.25, gain: 0.18, type: 'triangle', delay: i * 0.08 }));
+    [392, 494, 587, 784].forEach((f, i) =>
+      this.tone({ freq: f, dur: 0.25, gain: 0.18, type: 'triangle', delay: i * 0.08 }),
+    );
   }
 
   wave() {
@@ -365,13 +434,15 @@ export class Sfx {
     if (!this.ok('gore', 0.1, true)) return;
     this.tone({ freq: 70, to: 25, dur: 0.6, gain: 1 });
     this.burst({ dur: 0.5, freq: 600, sweep: 120, gain: 0.9, q: 1.5 });
-    for (let i = 0; i < 6; i++) this.burst({ dur: 0.08, freq: rand(300, 900), gain: 0.35, q: 2, delay: 0.1 + i * rand(0.04, 0.09) });
+    for (let i = 0; i < 6; i++)
+      this.burst({ dur: 0.08, freq: rand(300, 900), gain: 0.35, q: 2, delay: 0.1 + i * rand(0.04, 0.09) });
   }
 
   // Pitido del cohete a punto de estallar dentro del gordo.
   rocketArm() {
     if (!this.ok('rocketArm', 0.05, true)) return;
-    for (let i = 0; i < 6; i++) this.tone({ freq: 1800 + i * 150, dur: 0.05, gain: 0.12, type: 'square', delay: i * (0.11 - i * 0.012) });
+    for (let i = 0; i < 6; i++)
+      this.tone({ freq: 1800 + i * 150, dur: 0.05, gain: 0.12, type: 'square', delay: i * (0.11 - i * 0.012) });
   }
 
   // Super golpe del blindado: impacto sordo y metálico.
@@ -420,7 +491,8 @@ export class Sfx {
   // Vidrio roto y llamarada.
   molotov() {
     if (!this.ok('molotov', 0.08, true)) return;
-    for (let i = 0; i < 5; i++) this.burst({ dur: 0.05, freq: rand(3500, 6500), gain: 0.25, type: 'bandpass', q: 8, delay: i * 0.025 });
+    for (let i = 0; i < 5; i++)
+      this.burst({ dur: 0.05, freq: rand(3500, 6500), gain: 0.25, type: 'bandpass', q: 8, delay: i * 0.025 });
     this.burst({ dur: 0.9, freq: 700, sweep: 2200, gain: 0.7, type: 'lowpass', attack: 0.05, delay: 0.04 });
     this.tone({ freq: 70, to: 40, dur: 0.5, gain: 0.5, delay: 0.04 });
   }
@@ -428,7 +500,8 @@ export class Sfx {
   // Chisporroteo del fuego.
   crackle() {
     if (!this.ok('crackle', 0.12)) return;
-    for (let i = 0; i < 3; i++) this.burst({ dur: 0.02, freq: rand(1800, 4000), gain: 0.12, type: 'bandpass', q: 5, delay: rand(0, 0.15) });
+    for (let i = 0; i < 3; i++)
+      this.burst({ dur: 0.02, freq: rand(1800, 4000), gain: 0.12, type: 'bandpass', q: 5, delay: rand(0, 0.15) });
   }
 
   // Alarido de un zombi en llamas.

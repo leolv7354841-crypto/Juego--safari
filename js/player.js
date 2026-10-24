@@ -4,7 +4,17 @@ import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
-const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41, bazooka: 46 };
+const GUN_TIP = {
+  pistol: 22.5,
+  smg: 29.7,
+  shotgun: 32.8,
+  rifle: 38.1,
+  ar: 35,
+  autoshotgun: 35,
+  sniper: 46,
+  lmg: 41,
+  bazooka: 46,
+};
 
 export class Player {
   constructor(x, y) {
@@ -311,7 +321,7 @@ export class Player {
     const shot = { hit: false };
     const fired = [];
     for (let i = 0; i < d.pellets; i++) {
-      const off = d.pellets > 1 ? ((i / (d.pellets - 1)) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
+      const off = d.pellets > 1 ? (i / (d.pellets - 1) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
       const a = aim + off;
       fired.push(a);
       game.bullets.spawn({

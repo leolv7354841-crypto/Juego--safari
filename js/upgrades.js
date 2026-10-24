@@ -2,30 +2,69 @@ import { WEAPONS } from './config.js';
 
 // Cada mejora modifica las estadísticas reales del jugador.
 export const UPGRADES = [
-  { id: 'dmg', name: 'Munición pesada', desc: '+15% daño de armas', icon: 'dmg', apply: (p) => (p.stats.dmgMult += 0.15) },
-  { id: 'rate', name: 'Gatillo ligero', desc: '+10% velocidad de disparo', icon: 'rate', apply: (p) => (p.stats.rateMult += 0.1) },
   {
-    id: 'hp', name: 'Aguante', desc: '+20% vida máxima', icon: 'hp',
+    id: 'dmg',
+    name: 'Munición pesada',
+    desc: '+15% daño de armas',
+    icon: 'dmg',
+    apply: (p) => (p.stats.dmgMult += 0.15),
+  },
+  {
+    id: 'rate',
+    name: 'Gatillo ligero',
+    desc: '+10% velocidad de disparo',
+    icon: 'rate',
+    apply: (p) => (p.stats.rateMult += 0.1),
+  },
+  {
+    id: 'hp',
+    name: 'Aguante',
+    desc: '+20% vida máxima',
+    icon: 'hp',
     apply: (p) => {
       p.stats.maxHp += 20;
       p.hp += 20;
     },
   },
   {
-    id: 'armor', name: 'Chaleco reforzado', desc: '+15% resistencia al daño', icon: 'armor', max: 5,
+    id: 'armor',
+    name: 'Chaleco reforzado',
+    desc: '+15% resistencia al daño',
+    icon: 'armor',
+    max: 5,
     apply: (p) => (p.stats.armor = 1 - (1 - p.stats.armor) * 0.85),
   },
   {
-    id: 'stam', name: 'Pulmones de acero', desc: '+20% estamina máxima', icon: 'stam',
+    id: 'stam',
+    name: 'Pulmones de acero',
+    desc: '+20% estamina máxima',
+    icon: 'stam',
     apply: (p) => {
       p.stats.maxStamina += 20;
       p.stamina += 20;
     },
   },
-  { id: 'regen', name: 'Segundo aliento', desc: '+15% recuperación de estamina', icon: 'regen', apply: (p) => (p.stats.staminaRegenMult += 0.15) },
-  { id: 'speed', name: 'Botas ligeras', desc: '+10% velocidad de movimiento', icon: 'speed', max: 5, apply: (p) => (p.stats.speedMult += 0.1) },
   {
-    id: 'ammo', name: 'Cargadores extendidos', desc: '+25% capacidad de munición', icon: 'ammo', max: 4,
+    id: 'regen',
+    name: 'Segundo aliento',
+    desc: '+15% recuperación de estamina',
+    icon: 'regen',
+    apply: (p) => (p.stats.staminaRegenMult += 0.15),
+  },
+  {
+    id: 'speed',
+    name: 'Botas ligeras',
+    desc: '+10% velocidad de movimiento',
+    icon: 'speed',
+    max: 5,
+    apply: (p) => (p.stats.speedMult += 0.1),
+  },
+  {
+    id: 'ammo',
+    name: 'Cargadores extendidos',
+    desc: '+25% capacidad de munición',
+    icon: 'ammo',
+    max: 4,
     apply: (p) => {
       p.stats.ammoMult += 0.25;
       for (const w of p.weapons) {
@@ -34,10 +73,28 @@ export const UPGRADES = [
       }
     },
   },
-  { id: 'pierce', name: 'Balas perforantes', desc: 'Las balas atraviesan +1 enemigo', icon: 'pierce', max: 3, apply: (p) => (p.stats.pierce += 1) },
-  { id: 'reload', name: 'Manos rápidas', desc: '+15% velocidad de recarga', icon: 'reload', max: 5, apply: (p) => (p.stats.reloadMult += 0.15) },
   {
-    id: 'heal', name: 'Botiquín de campaña', desc: 'Recupera 40% de la vida', icon: 'heal', repeat: true,
+    id: 'pierce',
+    name: 'Balas perforantes',
+    desc: 'Las balas atraviesan +1 enemigo',
+    icon: 'pierce',
+    max: 3,
+    apply: (p) => (p.stats.pierce += 1),
+  },
+  {
+    id: 'reload',
+    name: 'Manos rápidas',
+    desc: '+15% velocidad de recarga',
+    icon: 'reload',
+    max: 5,
+    apply: (p) => (p.stats.reloadMult += 0.15),
+  },
+  {
+    id: 'heal',
+    name: 'Botiquín de campaña',
+    desc: 'Recupera 40% de la vida',
+    icon: 'heal',
+    repeat: true,
     when: (p) => p.hp < p.stats.maxHp * 0.7,
     apply: (p) => (p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.4)),
   },

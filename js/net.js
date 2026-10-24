@@ -146,7 +146,9 @@ export class Net {
   async join(code) {
     this.role = 'guest';
     this.cancelled = false;
-    code = String(code || '').trim().toUpperCase();
+    code = String(code || '')
+      .trim()
+      .toUpperCase();
     const room = await db(code);
     if (!room || Date.now() - (room.t || 0) > ROOM_TTL) throw new Error('no-existe');
     if (room.connected) throw new Error('llena');

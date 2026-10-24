@@ -66,7 +66,9 @@ test('colores del personaje: se guardan si son válidos, si no quedan vacíos', 
 
 test('entradas simultáneas al último cupo: sólo una entra', async () => {
   const rooms = await fill(MAX - 1);
-  const tries = await Promise.allSettled([1, 2, 3, 4].map((i) => client(url).joinById(rooms[0].roomId, { name: `Carrera ${i}` })));
+  const tries = await Promise.allSettled(
+    [1, 2, 3, 4].map((i) => client(url).joinById(rooms[0].roomId, { name: `Carrera ${i}` })),
+  );
   const ok = tries.filter((t) => t.status === 'fulfilled');
   assert.equal(ok.length, 1, 'exactamente una entrada');
   await waitFor(() => serverRoom(rooms[0].roomId).clients.length === MAX, 4000, 'sala llena en el servidor');
@@ -115,9 +117,18 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   const room = serverRoom(owner.roomId);
   const slot = room.sim.slots.get(guest.sessionId);
   const bad: any[] = [
-    null, 5, 'x', { i: 'no' }, { i: [] }, { i: new Array(50).fill([1, 0, 0, 0, 0, -1]) },
-    { i: [[1, NaN, 0, 0, 0, -1]] }, { i: [[1, 0, 0, 99, 0, -1]] }, { i: [['1', 0, 0, 0, 0, -1]] },
-    { i: [[-3, 0, 0, 0, 0, -1]] }, { i: [[1, 0, 0, 0, 1e9, -1]] }, { i: [[1, 0, 0, 0, 0, 77]] },
+    null,
+    5,
+    'x',
+    { i: 'no' },
+    { i: [] },
+    { i: new Array(50).fill([1, 0, 0, 0, 0, -1]) },
+    { i: [[1, NaN, 0, 0, 0, -1]] },
+    { i: [[1, 0, 0, 99, 0, -1]] },
+    { i: [['1', 0, 0, 0, 0, -1]] },
+    { i: [[-3, 0, 0, 0, 0, -1]] },
+    { i: [[1, 0, 0, 0, 1e9, -1]] },
+    { i: [[1, 0, 0, 0, 0, 77]] },
     { i: [[999999, 0, 0, 0, 0, -1]] }, // secuencia muy adelantada
   ];
   for (const m of bad) guest.send('in', m);
@@ -244,7 +255,11 @@ test(`tope de ${CONFIG.maxRooms} salas: la siguiente da servidor-lleno`, async (
   await waitFor(() => STATS.rooms === CONFIG.maxRooms - 1, 4000, 'se libera un cupo');
   const tries = await Promise.allSettled([1, 2, 3].map((i) => client(url).create('dz', { name: `Carrera ${i}` })));
   const ok = tries.filter((t) => t.status === 'fulfilled');
-  assert.equal(ok.length, 1, 'exactamente una sala nueva: ' + tries.map((t: any) => t.status + ' ' + (t.reason?.message || '')).join(' / '));
+  assert.equal(
+    ok.length,
+    1,
+    'exactamente una sala nueva: ' + tries.map((t: any) => t.status + ' ' + (t.reason?.message || '')).join(' / '),
+  );
   assert.equal(STATS.rooms, CONFIG.maxRooms);
   // a una sala existente sí se puede entrar con el servidor lleno
   const guest = await client(url).joinById(owners[0].roomId, { name: 'Invitado' });

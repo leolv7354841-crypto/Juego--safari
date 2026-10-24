@@ -20,7 +20,7 @@ export const rrange = (rng, a, b) => a + rng() * (b - a);
 export const rpick = (rng, arr) => arr[(rng() * arr.length) | 0];
 
 export function angleTo(a, b, maxStep) {
-  let d = (((b - a + Math.PI) % TAU) + TAU) % TAU - Math.PI;
+  let d = ((((b - a + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
   if (d > maxStep) d = maxStep;
   else if (d < -maxStep) d = -maxStep;
   return a + d;

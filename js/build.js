@@ -102,7 +102,22 @@ export class Structures {
     if (def.ground) {
       this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0, owner });
     } else {
-      const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0, cd: 0, ang: game.player.angle, owner };
+      const o = {
+        k: 0,
+        x: pl.x,
+        y: pl.y,
+        w: pl.w,
+        h: pl.h,
+        low: true,
+        block: true,
+        kind,
+        hp: def.hp,
+        max: def.hp,
+        hitT: 0,
+        cd: 0,
+        ang: game.player.angle,
+        owner,
+      };
       this.blocks.push(o);
       game.world.addDynamic(o);
       this.relayer();
@@ -119,7 +134,8 @@ export class Structures {
       let n = 0;
       for (let k = 0; k < i; k++) {
         const b = list[k];
-        if (o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) n = Math.max(n, (b.layer || 0) + 1);
+        if (o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y)
+          n = Math.max(n, (b.layer || 0) + 1);
       }
       o.layer = Math.min(n, 6);
     }
@@ -140,7 +156,12 @@ export class Structures {
     o = this.topOf(o);
     o.hp -= dmg;
     o.hitT = 0.12;
-    game.particles.impact(o.x + o.w / 2 + rand(-o.w, o.w) * 0.3, o.y + o.h / 2 + rand(-o.h, o.h) * 0.3, rand(-1, 1), rand(-1, 1));
+    game.particles.impact(
+      o.x + o.w / 2 + rand(-o.w, o.w) * 0.3,
+      o.y + o.h / 2 + rand(-o.h, o.h) * 0.3,
+      rand(-1, 1),
+      rand(-1, 1),
+    );
     game.sfx.blockHit(o.kind);
     if (o.hp <= 0) {
       const i = this.blocks.indexOf(o);
@@ -156,7 +177,8 @@ export class Structures {
   trapAt(z, dt, game) {
     for (let i = 0; i < this.wires.length; i++) {
       const w = this.wires[i];
-      if (z.x + z.r * 0.5 < w.x || z.x - z.r * 0.5 > w.x + w.w || z.y + z.r * 0.5 < w.y || z.y - z.r * 0.5 > w.y + w.h) continue;
+      if (z.x + z.r * 0.5 < w.x || z.x - z.r * 0.5 > w.x + w.w || z.y + z.r * 0.5 < w.y || z.y - z.r * 0.5 > w.y + w.h)
+        continue;
       if (w.kind === 'mine') {
         this.wires.splice(i, 1);
         this.explode(game, { x: w.x + w.w / 2, y: w.y + w.h / 2, owner: w.owner }, 115, 280);
@@ -201,10 +223,17 @@ export class Structures {
     const lx = x - z.x;
     const ly = y - z.y;
     this.stuck.push({
-      z, kind: z.type, x, y, owner: b.owner || null,
-      ox: (lx * c - ly * s) * 0.7, oy: (lx * s + ly * c) * 0.7,
+      z,
+      kind: z.type,
+      x,
+      y,
+      owner: b.owner || null,
+      ox: (lx * c - ly * s) * 0.7,
+      oy: (lx * s + ly * c) * 0.7,
       a: Math.atan2(b.dy, b.dx) - z.angle,
-      t: 0, stick: fat ? ROCKET.fatStick : ROCKET.heavyStick, glow: fat ? ROCKET.fatGlow : 0,
+      t: 0,
+      stick: fat ? ROCKET.fatStick : ROCKET.heavyStick,
+      glow: fat ? ROCKET.fatGlow : 0,
     });
     game.sfx.rocketStick(fat);
     game.particles.impact(x, y, -b.dx, -b.dy);
@@ -401,7 +430,20 @@ export class Structures {
       if (d > R + z.r) continue;
       const f = clamp(1 - d / R, 0, 1);
       const n = d || 1;
-      game.hitZombie(z, { dmg: power * (0.35 + 0.65 * f), dx: dx / n, dy: dy / n, knock: (120 + 260 * f) * (1 + fling), shot: null, blast: true, owner: g.owner }, z.x, z.y);
+      game.hitZombie(
+        z,
+        {
+          dmg: power * (0.35 + 0.65 * f),
+          dx: dx / n,
+          dy: dy / n,
+          knock: (120 + 260 * f) * (1 + fling),
+          shot: null,
+          blast: true,
+          owner: g.owner,
+        },
+        z.x,
+        z.y,
+      );
       if (fling && !z.dead) {
         z.airV = Math.max(z.airV || 0, ((160 + 320 * f) * fling) / Math.sqrt(z.mass));
         z.air = z.air || 0.01;
@@ -489,7 +531,20 @@ export class Structures {
     const a = b.ang + rand(-0.04, 0.04);
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    game.bullets.spawn({ x: cx + ca * 20, y: cy + sa * 20, dx: ca, dy: sa, speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null, owner: b.owner });
+    game.bullets.spawn({
+      x: cx + ca * 20,
+      y: cy + sa * 20,
+      dx: ca,
+      dy: sa,
+      speed: 1100,
+      life: TURRET_RANGE + 40,
+      dmg: 34,
+      pierce: 1,
+      knock: 40,
+      shot: null,
+      hits: null,
+      owner: b.owner,
+    });
     game.particles.muzzleSmoke(cx + ca * 22, cy + sa * 22, a);
     game.sfx.turret();
   }
@@ -632,7 +687,13 @@ function drawBlock(ctx, b) {
     ctx.lineTo(x + w - 4, y + h - 4);
     ctx.stroke();
     ctx.fillStyle = '#b8b2a4';
-    for (const [nx, ny] of [[5, 5], [w - 5, 5], [5, h - 5], [w - 5, h - 5]]) ctx.fillRect(x + nx - 1, y + ny - 1, 2.5, 2.5);
+    for (const [nx, ny] of [
+      [5, 5],
+      [w - 5, 5],
+      [5, h - 5],
+      [w - 5, h - 5],
+    ])
+      ctx.fillRect(x + nx - 1, y + ny - 1, 2.5, 2.5);
   } else if (b.kind === 'metal') {
     const g = ctx.createLinearGradient(x, y, x + w, y + h);
     g.addColorStop(0, '#8a8f93');
@@ -648,7 +709,12 @@ function drawBlock(ctx, b) {
     ctx.lineTo(x + w - 6, y + 6);
     ctx.stroke();
     ctx.fillStyle = '#3d4044';
-    for (const [nx, ny] of [[4, 4], [w - 4, 4], [4, h - 4], [w - 4, h - 4]]) {
+    for (const [nx, ny] of [
+      [4, 4],
+      [w - 4, 4],
+      [4, h - 4],
+      [w - 4, h - 4],
+    ]) {
       ctx.beginPath();
       ctx.arc(x + nx, y + ny, 2, 0, TAU);
       ctx.fill();
@@ -665,7 +731,7 @@ function drawBlock(ctx, b) {
         const cy = horiz ? y + across : y + along;
         ctx.fillStyle = (i + row) % 2 ? '#8a7d5c' : '#7f7354';
         ctx.beginPath();
-        ctx.ellipse(cx, cy, horiz ? 10.5 : (w * 0.3), horiz ? (h * 0.3) : 10.5, 0, 0, TAU);
+        ctx.ellipse(cx, cy, horiz ? 10.5 : w * 0.3, horiz ? h * 0.3 : 10.5, 0, 0, TAU);
         ctx.fill();
         ctx.strokeStyle = OUT;
         ctx.lineWidth = 1.2;

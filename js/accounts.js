@@ -22,15 +22,26 @@ function hash(text) {
   return h.toString(36);
 }
 
-const newUid = () => Array.from({ length: 16 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[(Math.random() * 32) | 0]).join('');
+const newUid = () =>
+  Array.from({ length: 16 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[(Math.random() * 32) | 0]).join('');
 
 // Limpia una fila que viene de fuera (cualquiera puede escribir en la clasificación mundial).
 function cleanRow(d, uid) {
   if (!d || typeof d !== 'object') return null;
   const num = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
-  const name = String(d.name || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 16);
+  const name = String(d.name || '')
+    .replace(/[\u0000-\u001f]/g, '')
+    .trim()
+    .slice(0, 16);
   if (!name) return null;
-  return { uid, name, wave: num(d.wave, 999), kills: num(d.kills, 1e7), time: num(d.time, 1e6), level: num(d.level, 999) };
+  return {
+    uid,
+    name,
+    wave: num(d.wave, 999),
+    kills: num(d.kills, 1e7),
+    time: num(d.time, 1e6),
+    level: num(d.level, 999),
+  };
 }
 
 // Explica un error de Firebase en palabras simples (se muestra en el Salón de la fama).
@@ -41,12 +52,18 @@ async function describe(r) {
   } catch {
     /* sin cuerpo */
   }
-  if (r.status === 401 || r.status === 403 || /permission/i.test(msg)) return 'Firebase no da permiso: revisa la pestaña Reglas de tu Realtime Database.';
+  if (r.status === 401 || r.status === 403 || /permission/i.test(msg))
+    return 'Firebase no da permiso: revisa la pestaña Reglas de tu Realtime Database.';
   if (r.status === 404) return 'No se encontró la base de datos de Firebase: revisa la URL.';
   return `Error del servidor de la clasificación (${r.status}${msg ? ': ' + msg : ''}).`;
 }
 
-const keyOf = (name) => name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 24);
+const keyOf = (name) =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .slice(0, 24);
 
 // Mejor marca: primero la oleada, después las bajas.
 const better = (a, b) => !b || a.wave > b.wave || (a.wave === b.wave && a.kills > b.kills);
@@ -156,7 +173,14 @@ export class Accounts {
     try {
       const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
         method: 'PUT',
-        body: JSON.stringify({ name: acc.name.slice(0, 16), wave: b.wave, kills: b.kills, time: b.time || 0, level: b.level || 1, at: Date.now() }),
+        body: JSON.stringify({
+          name: acc.name.slice(0, 16),
+          wave: b.wave,
+          kills: b.kills,
+          time: b.time || 0,
+          level: b.level || 1,
+          at: Date.now(),
+        }),
       });
       this.onlineError = r.ok ? null : await describe(r);
     } catch {
@@ -174,10 +198,13 @@ export class Accounts {
         return null;
       }
       const all = (await r.json()) || {};
-      const rows = Object.entries(all).map(([uid, d]) => cleanRow(d, uid)).filter(Boolean);
+      const rows = Object.entries(all)
+        .map(([uid, d]) => cleanRow(d, uid))
+        .filter(Boolean);
       // tu mejor marca siempre aparece, aunque todavía no haya llegado al servidor
       const acc = this.current;
-      if (acc && acc.best && !rows.some((r) => r.uid === acc.uid)) rows.push(cleanRow({ name: acc.name, ...acc.best }, acc.uid));
+      if (acc && acc.best && !rows.some((r) => r.uid === acc.uid))
+        rows.push(cleanRow({ name: acc.name, ...acc.best }, acc.uid));
       return rows.sort((a, b) => b.wave - a.wave || b.kills - a.kills).slice(0, 50);
     } catch {
       this.onlineError = 'Sin conexión con el servidor de la clasificación.';
@@ -235,7 +262,10 @@ export class Accounts {
   async cloudPull() {
     if (!this.cloud || !this.active) return false;
     let changed = false;
-    for (const [kind, key] of [['save', this.saveKey()], ['check', this.checkKey()]]) {
+    for (const [kind, key] of [
+      ['save', this.saveKey()],
+      ['check', this.checkKey()],
+    ]) {
       try {
         const snap = await this.cloud.db.doc(`data/users/${this.cloud.id}/${kind}-${this.active}`).get();
         if (!snap.exists) continue;
@@ -260,7 +290,14 @@ export class Accounts {
       const snap = await ref.get();
       const prev = snap.exists ? snap.data() : null;
       if (prev && !better(acc.best, prev)) return;
-      await ref.set({ name: acc.name.slice(0, 16), wave: acc.best.wave, kills: acc.best.kills, time: acc.best.time, level: acc.best.level, at: Date.now() });
+      await ref.set({
+        name: acc.name.slice(0, 16),
+        wave: acc.best.wave,
+        kills: acc.best.kills,
+        time: acc.best.time,
+        level: acc.best.level,
+        at: Date.now(),
+      });
     } catch {
       /* los visitantes de sólo lectura no pueden escribir en la clasificación global */
     }

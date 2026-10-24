@@ -16,7 +16,24 @@ import { Robot } from '../../../js/robot.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, xpForLevel } from '../../../js/config.js';
+import {
+  GOLDEN,
+  DROPS,
+  WORLD_SIZE,
+  WEAPON_ORDER,
+  NET,
+  WEAPONS,
+  BOUNTY,
+  SELL_RATE,
+  SHOP,
+  SHOP_ORDER,
+  BUILD_ORDER,
+  THROWABLES,
+  ROBOT,
+  ROCKET,
+  MONEY_LOSS,
+  xpForLevel,
+} from '../../../js/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
 import type { Cmd, Act } from '../validate.ts';
@@ -37,7 +54,18 @@ const STRUCT_EVERY = 6;
 const r100 = (v: number) => Math.round(v * 100);
 const UPGRADE_BY_ID = new Map<string, any>(UPGRADES.map((u: any) => [u.id, u]));
 // estadísticas del jugador que cambian con las mejoras (el cliente las necesita para predecir)
-export const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
+export const STAT_KEYS = [
+  'maxHp',
+  'armor',
+  'dmgMult',
+  'rateMult',
+  'maxStamina',
+  'staminaRegenMult',
+  'speedMult',
+  'ammoMult',
+  'pierce',
+  'reloadMult',
+];
 
 type Fx = { e: unknown[]; x?: number; y?: number; by: string | null };
 
@@ -121,9 +149,38 @@ export class ServerSim {
       this.world.collide(p, p.r, true);
       p.field = this.newField();
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
-      this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [],
-        level: 1, xp: 0, xpNeed: xpForLevel(1), pending: 0, taken: {}, choices: [], choiceN: 0,
-        inv: Object.fromEntries(SHOP_ORDER.map((k: string) => [k, 0])), robot: new Robot(), acts: [], acidT: 0, acidTick: 0, lost: 0, stGeo: '', stSent: '', stN: 0 });
+      this.slots.set(pl.id, {
+        id: pl.id,
+        idx: pl.idx,
+        name: pl.name,
+        p,
+        queue: [],
+        last: idle,
+        ack: 0,
+        kills: 0,
+        money: 0,
+        deaths: 0,
+        away: false,
+        dropped: 0,
+        starve: 0,
+        toasts: [],
+        level: 1,
+        xp: 0,
+        xpNeed: xpForLevel(1),
+        pending: 0,
+        taken: {},
+        choices: [],
+        choiceN: 0,
+        inv: Object.fromEntries(SHOP_ORDER.map((k: string) => [k, 0])),
+        robot: new Robot(),
+        acts: [],
+        acidT: 0,
+        acidTick: 0,
+        lost: 0,
+        stGeo: '',
+        stSent: '',
+        stN: 0,
+      });
     });
   }
 
@@ -136,7 +193,10 @@ export class ServerSim {
 
   makeGame() {
     const sim = this;
-    const rec = (tag: string, n: string) => (...args: any[]) => sim.record(tag, n, args);
+    const rec =
+      (tag: string, n: string) =>
+      (...args: any[]) =>
+        sim.record(tag, n, args);
     const recorder = (tag: string, allow: (n: string) => boolean) =>
       new Proxy({}, { get: (_t, n: string) => (allow(n) ? rec(tag, n) : () => {}) });
     const input = {
@@ -196,7 +256,8 @@ export class ServerSim {
         if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(g, z, x, y, b);
         else g.rocketBlast(x, y, b.owner);
       },
-      rocketBlast: (x: number, y: number, owner: string | null = null) => this.structures.explode(g, { x, y, owner }, ROCKET.radius, ROCKET.power, 1),
+      rocketBlast: (x: number, y: number, owner: string | null = null) =>
+        this.structures.explode(g, { x, y, owner }, ROCKET.radius, ROCKET.power, 1),
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => {
         g.particles.dust(x, y, 18);
@@ -234,7 +295,19 @@ export class ServerSim {
       const z = args[0];
       x = z.x;
       y = z.y;
-      packed = [{ type: z.type, si: z.si | 0, x: Math.round(z.x), y: Math.round(z.y), r: z.r, a: r100(z.angle) / 100, burnt: !!z.burnt }, args[1], args[2]];
+      packed = [
+        {
+          type: z.type,
+          si: z.si | 0,
+          x: Math.round(z.x),
+          y: Math.round(z.y),
+          r: z.r,
+          a: r100(z.angle) / 100,
+          burnt: !!z.burnt,
+        },
+        args[1],
+        args[2],
+      ];
     } else if ((tag === 'p' || tag === 'd') && typeof args[0] === 'number' && typeof args[1] === 'number') {
       x = args[0];
       y = args[1];
@@ -724,24 +797,63 @@ export class ServerSim {
     const zh: number[] = [];
     for (const o of this.horde.list) {
       if (o.dead || !near(o.x, o.y)) continue;
-      const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
-        | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
-      z.push(o.id, TYPES.indexOf(o.type), Math.round(o.x - ox), Math.round(o.y - oy), Math.round((o.angle / TAU) * 64) & 63, flags);
-      if (o.hp < o.maxHp && o.type !== 'normal' && o.type !== 'sprinter') zh.push(o.id, Math.max(0, Math.ceil((o.hp / o.maxHp) * 100)));
+      const flags =
+        (o.flash > 0 ? 1 : 0) |
+        (o.burn > 0 ? 2 : 0) |
+        (o.wounded ? 4 : 0) |
+        (o.bs === 'windup' ? 8 : 0) |
+        (o.hitT > 0 ? 16 : 0) |
+        (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
+        (o.lunge > 0.3 ? 64 : 0);
+      z.push(
+        o.id,
+        TYPES.indexOf(o.type),
+        Math.round(o.x - ox),
+        Math.round(o.y - oy),
+        Math.round((o.angle / TAU) * 64) & 63,
+        flags,
+      );
+      if (o.hp < o.maxHp && o.type !== 'normal' && o.type !== 'sprinter')
+        zh.push(o.id, Math.max(0, Math.ceil((o.hp / o.maxHp) * 100)));
       if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
     }
     const pl: number[] = [];
     for (const q of this.slots.values()) {
       if (q === s) continue;
       const p = q.p;
-      pl.push(q.idx, Math.round(p.x), Math.round(p.y), r100(p.angle), r100(p.legAngle), p.running ? 1 : 0, WEAPON_ORDER.indexOf(p.weapon.id),
-        p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow), Math.ceil(p.hp), q.away ? 1 : 0, p.inRobot ? 1 : 0);
+      pl.push(
+        q.idx,
+        Math.round(p.x),
+        Math.round(p.y),
+        r100(p.angle),
+        r100(p.legAngle),
+        p.running ? 1 : 0,
+        WEAPON_ORDER.indexOf(p.weapon.id),
+        p.flashT > 0 ? 1 : 0,
+        p.alive ? 1 : 0,
+        p.hurtT > 0 ? 1 : 0,
+        r100(p.recoil),
+        Math.round(p.speedNow),
+        Math.ceil(p.hp),
+        q.away ? 1 : 0,
+        p.inRobot ? 1 : 0,
+      );
     }
     // robots de todos (el propio también): estacionados o con su piloto dentro
     const rb: number[] = [];
     for (const q of this.slots.values()) {
       const r = q.robot;
-      if (r.owned && near(r.x, r.y)) rb.push(q.idx, Math.round(r.x), Math.round(r.y), r100(r.angle), r100(r.legAngle), r100(r.walk % TAU), Math.max(0, Math.round(r.hp)), r.piloted ? 1 : 0);
+      if (r.owned && near(r.x, r.y))
+        rb.push(
+          q.idx,
+          Math.round(r.x),
+          Math.round(r.y),
+          r100(r.angle),
+          r100(r.legAngle),
+          r100(r.walk % TAU),
+          Math.max(0, Math.round(r.hp)),
+          r.piloted ? 1 : 0,
+        );
     }
     const st = this.structures;
     const fx: unknown[] = [];
@@ -754,23 +866,75 @@ export class ServerSim {
     }
     const d = this.director;
     const snap: any = {
-      q: ++this.snapN, t: this.tick, ts: Math.round(now), ack: s.ack,
+      q: ++this.snapN,
+      t: this.tick,
+      ts: Math.round(now),
+      ack: s.ack,
       me: packBody(me),
-      st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills, s.money,
-        Math.round(s.acidT * 10), me.inRobot ? 1 : 0],
+      st: [
+        Math.ceil(me.hp),
+        me.stats.maxHp,
+        me.alive ? 1 : 0,
+        me.wi,
+        r100(Math.max(0, me.reloadT)),
+        r100(me.reloadProg || 0),
+        s.kills,
+        s.money,
+        Math.round(s.acidT * 10),
+        me.inRobot ? 1 : 0,
+      ],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
-      o: [ox, oy], z, zx, zh, pl,
-      pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
-      b: this.bullets.list.flatMap((b: any) => (b.owner !== id && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
-      w: d.wave, ds: d.state, tm: Math.round(this.time), kl: this.totalKills(), lft: d.queue.length + this.horde.list.length,
+      o: [ox, oy],
+      z,
+      zx,
+      zh,
+      pl,
+      pk: this.pickups.list.flatMap((it: any) =>
+        near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
+      ),
+      b: this.bullets.list.flatMap((b: any) =>
+        b.owner !== id && near(b.x, b.y)
+          ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0]
+          : [],
+      ),
+      w: d.wave,
+      ds: d.state,
+      tm: Math.round(this.time),
+      kl: this.totalKills(),
+      lft: d.queue.length + this.horde.list.length,
       ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
       iv: SHOP_ORDER.map((k: string) => s.inv[k]),
       rb,
       // granadas en el aire, fuego, cohetes clavados y explosiones (sólo lo cercano)
-      gr: st.grenades.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), Math.round(q.h), r100(q.rot), q.kind === 'molotov' ? 1 : 0, q.t > q.dur ? 1 : 0] : [])),
-      fi: st.fires.flatMap((f: any) => (near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [])),
-      so: st.stuck.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.ang || 0), r100(q.t), r100(q.stick), r100(q.glow), q.kind === 'fat' ? 1 : 0] : [])),
+      gr: st.grenades.flatMap((q: any) =>
+        near(q.x, q.y)
+          ? [
+              Math.round(q.x),
+              Math.round(q.y),
+              Math.round(q.h),
+              r100(q.rot),
+              q.kind === 'molotov' ? 1 : 0,
+              q.t > q.dur ? 1 : 0,
+            ]
+          : [],
+      ),
+      fi: st.fires.flatMap((f: any) =>
+        near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [],
+      ),
+      so: st.stuck.flatMap((q: any) =>
+        near(q.x, q.y)
+          ? [
+              Math.round(q.x),
+              Math.round(q.y),
+              r100(q.ang || 0),
+              r100(q.t),
+              r100(q.stick),
+              r100(q.glow),
+              q.kind === 'fat' ? 1 : 0,
+            ]
+          : [],
+      ),
       bl: st.blasts.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.t)] : [])),
     };
     this.structSnap(s, snap);
@@ -792,9 +956,19 @@ export class ServerSim {
   structSnap(s: Slot, snap: any) {
     const st = this.structures;
     const sc = st.scorches[st.scorches.length - 1];
-    const geo = st.blocks.map((b: any) => `${b.kind}${b.x},${b.y},${b.w},${b.h}`).join() + '|' + st.wires.map((w: any) => `${w.kind}${w.x},${w.y},${w.w},${w.h}`).join()
-      + '|' + st.scorches.length + (sc ? `,${Math.round(sc.x)},${Math.round(sc.y)}` : '');
-    const full = geo + '|' + st.blocks.map((b: any) => Math.round(b.hp)).join() + '|' + st.wires.map((w: any) => Math.round(w.hp)).join();
+    const geo =
+      st.blocks.map((b: any) => `${b.kind}${b.x},${b.y},${b.w},${b.h}`).join() +
+      '|' +
+      st.wires.map((w: any) => `${w.kind}${w.x},${w.y},${w.w},${w.h}`).join() +
+      '|' +
+      st.scorches.length +
+      (sc ? `,${Math.round(sc.x)},${Math.round(sc.y)}` : '');
+    const full =
+      geo +
+      '|' +
+      st.blocks.map((b: any) => Math.round(b.hp)).join() +
+      '|' +
+      st.wires.map((w: any) => Math.round(w.hp)).join();
     s.stN++;
     if (full === s.stSent || (geo === s.stGeo && s.stN < STRUCT_EVERY)) return;
     s.stGeo = geo;
@@ -816,7 +990,9 @@ export class ServerSim {
       wave: this.director.wave,
       time: Math.round(this.time),
       kills: this.totalKills(),
-      players: [...this.slots.values()].map((s) => ({ name: s.name, kills: s.kills, deaths: s.deaths })).sort((a, b) => b.kills - a.kills),
+      players: [...this.slots.values()]
+        .map((s) => ({ name: s.name, kills: s.kills, deaths: s.deaths }))
+        .sort((a, b) => b.kills - a.kills),
     };
   }
 }

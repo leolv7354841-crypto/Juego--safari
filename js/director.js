@@ -50,7 +50,20 @@ export class Director {
     this.spawnT = 0.5;
     this.state = 'active';
     this.straggleT = 0;
-    game.banner(`Oleada ${w}`, w === 3 ? 'Llegan los toros: esquiva sus embestidas' : w === 11 ? 'Llegan los super blindados' : heavies ? 'Super blindados en la horda' : w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
+    game.banner(
+      `Oleada ${w}`,
+      w === 3
+        ? 'Llegan los toros: esquiva sus embestidas'
+        : w === 11
+          ? 'Llegan los super blindados'
+          : heavies
+            ? 'Super blindados en la horda'
+            : w === 1
+              ? 'Velocistas y policías SWAT'
+              : fats
+                ? 'Cuidado con los gordos'
+                : 'Sobrevive',
+    );
     game.sfx.wave();
   }
 

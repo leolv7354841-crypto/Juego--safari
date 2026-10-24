@@ -1,5 +1,12 @@
 // Arma el servidor (transporte, salas y rutas HTTP). Lo usan index.ts y las pruebas.
-import { defineServer, defineRoom, createRouter, createEndpoint, applySimulatedLatency, parseLatencyEnv } from '@colyseus/core';
+import {
+  defineServer,
+  defineRoom,
+  createRouter,
+  createEndpoint,
+  applySimulatedLatency,
+  parseLatencyEnv,
+} from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { DeadZoneRoom } from './rooms/DeadZoneRoom.ts';
 import { CONFIG } from './config.ts';

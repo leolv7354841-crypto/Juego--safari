@@ -105,17 +105,49 @@ export class Particles {
     for (let i = 0; i < 10 + r * 0.5; i++) {
       const a = rand(0, TAU);
       const s = rand(30, 110);
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.7), rand(1.5, 3), pick(i % 3 ? BLOOD : ['#3a4a2c', '#55503e']), 5);
+      this.add(
+        DOT,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.3, 0.7),
+        rand(1.5, 3),
+        pick(i % 3 ? BLOOD : ['#3a4a2c', '#55503e']),
+        5,
+      );
     }
     for (let i = 0; i < 3 + r * 0.1; i++) {
-      this.add(SMOKE, x + rand(-r, r) * 0.5, y + rand(-r, r) * 0.5, rand(-20, 20), rand(-20, 20), rand(0.6, 1), r * 0.3, '95,90,78', 2, r * 0.8);
+      this.add(
+        SMOKE,
+        x + rand(-r, r) * 0.5,
+        y + rand(-r, r) * 0.5,
+        rand(-20, 20),
+        rand(-20, 20),
+        rand(0.6, 1),
+        r * 0.3,
+        '95,90,78',
+        2,
+        r * 0.8,
+      );
     }
   }
 
   dust(x, y, r) {
     for (let i = 0; i < 6; i++) {
       const a = rand(0, TAU);
-      this.add(SMOKE, x + Math.cos(a) * r * 0.4, y + Math.sin(a) * r * 0.4, Math.cos(a) * 40, Math.sin(a) * 40, rand(0.5, 0.9), r * 0.2, '110,100,85', 3, r * 0.6);
+      this.add(
+        SMOKE,
+        x + Math.cos(a) * r * 0.4,
+        y + Math.sin(a) * r * 0.4,
+        Math.cos(a) * 40,
+        Math.sin(a) * 40,
+        rand(0.5, 0.9),
+        r * 0.2,
+        '110,100,85',
+        3,
+        r * 0.6,
+      );
     }
   }
 
@@ -124,9 +156,30 @@ export class Particles {
   }
 
   ember(x, y, s = 1) {
-    this.add(EMBER, x + rand(-8, 8) * s, y + rand(-8, 8) * s, rand(-12, 12), rand(-40, -15), rand(0.6, 1.4), rand(1, 2.2), pick(['#f0a050', '#e07a30', '#ffcf80']), 0.5);
+    this.add(
+      EMBER,
+      x + rand(-8, 8) * s,
+      y + rand(-8, 8) * s,
+      rand(-12, 12),
+      rand(-40, -15),
+      rand(0.6, 1.4),
+      rand(1, 2.2),
+      pick(['#f0a050', '#e07a30', '#ffcf80']),
+      0.5,
+    );
     if (Math.random() < 0.35) {
-      this.add(SMOKE, x + rand(-6, 6), y + rand(-6, 6), rand(-8, 8), rand(-30, -10), rand(1.2, 2.2), 6 * s, '60,58,55', 0.5, 22 * s);
+      this.add(
+        SMOKE,
+        x + rand(-6, 6),
+        y + rand(-6, 6),
+        rand(-8, 8),
+        rand(-30, -10),
+        rand(1.2, 2.2),
+        6 * s,
+        '60,58,55',
+        0.5,
+        22 * s,
+      );
     }
   }
 
@@ -135,17 +188,48 @@ export class Particles {
     for (let i = 0; i < 26; i++) {
       const a = rand(0, TAU);
       const s = rand(150, 520);
-      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.12, 0.3), 1, pick(['#ffd890', '#ffb060', '#fff2d0']), 5);
+      this.add(
+        SPARK,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.12, 0.3),
+        1,
+        pick(['#ffd890', '#ffb060', '#fff2d0']),
+        5,
+      );
     }
     for (let i = 0; i < 14; i++) {
       const a = rand(0, TAU);
       const s = rand(30, 140);
-      this.add(SMOKE, x + Math.cos(a) * 10, y + Math.sin(a) * 10, Math.cos(a) * s, Math.sin(a) * s, rand(0.8, 1.6), rand(10, 20), i < 5 ? '230,140,60' : '70,66,60', 2.5, 40);
+      this.add(
+        SMOKE,
+        x + Math.cos(a) * 10,
+        y + Math.sin(a) * 10,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.8, 1.6),
+        rand(10, 20),
+        i < 5 ? '230,140,60' : '70,66,60',
+        2.5,
+        40,
+      );
     }
     for (let i = 0; i < 18; i++) {
       const a = rand(0, TAU);
       const s = rand(80, 260);
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.4, 0.9), rand(2, 4), pick(['#3a352d', '#55503e', '#2a2722']), 4);
+      this.add(
+        DOT,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.4, 0.9),
+        rand(2, 4),
+        pick(['#3a352d', '#55503e', '#2a2722']),
+        4,
+      );
     }
   }
 
@@ -155,19 +239,62 @@ export class Particles {
     for (let i = 0; i < 40; i++) {
       const a = rand(0, TAU);
       const s = rand(90, 420);
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.7), rand(2, 5), pick(['#8fd13a', '#6fae22', '#c4f060', '#4f8a1c']), 4);
+      this.add(
+        DOT,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.3, 0.7),
+        rand(2, 5),
+        pick(['#8fd13a', '#6fae22', '#c4f060', '#4f8a1c']),
+        4,
+      );
     }
     for (let i = 0; i < 12; i++) {
       const a = rand(0, TAU);
       const s = rand(20, 90);
-      this.add(SMOKE, x + Math.cos(a) * 8, y + Math.sin(a) * 8, Math.cos(a) * s, Math.sin(a) * s, rand(0.9, 1.8), rand(10, 18), i < 6 ? '130,200,60' : '80,110,50', 2.5, 34);
+      this.add(
+        SMOKE,
+        x + Math.cos(a) * 8,
+        y + Math.sin(a) * 8,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.9, 1.8),
+        rand(10, 18),
+        i < 6 ? '130,200,60' : '80,110,50',
+        2.5,
+        34,
+      );
     }
   }
 
   // zombi en llamas: brasas que suben y humo negro
   burning(x, y, r) {
-    this.add(EMBER, x + rand(-r, r) * 0.6, y + rand(-r, r) * 0.6, rand(-15, 15), rand(-70, -30), rand(0.4, 0.8), rand(1.2, 2.4), pick(['#ffb050', '#ff7a20', '#ffe08a']), 0.5);
-    if (Math.random() < 0.45) this.add(SMOKE, x + rand(-4, 4), y + rand(-4, 4), rand(-10, 10), rand(-40, -18), rand(0.8, 1.4), r * 0.35, '35,30,26', 0.6, r * 1.4);
+    this.add(
+      EMBER,
+      x + rand(-r, r) * 0.6,
+      y + rand(-r, r) * 0.6,
+      rand(-15, 15),
+      rand(-70, -30),
+      rand(0.4, 0.8),
+      rand(1.2, 2.4),
+      pick(['#ffb050', '#ff7a20', '#ffe08a']),
+      0.5,
+    );
+    if (Math.random() < 0.45)
+      this.add(
+        SMOKE,
+        x + rand(-4, 4),
+        y + rand(-4, 4),
+        rand(-10, 10),
+        rand(-40, -18),
+        rand(0.8, 1.4),
+        r * 0.35,
+        '35,30,26',
+        0.6,
+        r * 1.4,
+      );
   }
 
   // impacto del cohete: una bola de fuego corta y después el humo que sube
@@ -175,17 +302,49 @@ export class Particles {
     this.add(FIREBALL, x, y, 0, 0, 0.32, R * 0.42, '', 0);
     for (let i = 0; i < 4; i++) {
       const a = rand(0, TAU);
-      this.add(FIREBALL, x + Math.cos(a) * R * 0.15, y + Math.sin(a) * R * 0.15, Math.cos(a) * 60, Math.sin(a) * 60, rand(0.18, 0.3), R * rand(0.16, 0.26), '', 3);
+      this.add(
+        FIREBALL,
+        x + Math.cos(a) * R * 0.15,
+        y + Math.sin(a) * R * 0.15,
+        Math.cos(a) * 60,
+        Math.sin(a) * 60,
+        rand(0.18, 0.3),
+        R * rand(0.16, 0.26),
+        '',
+        3,
+      );
     }
     for (let i = 0; i < 16; i++) {
       const a = rand(0, TAU);
       const s = rand(20, 70);
-      this.add(SMOKE, x + Math.cos(a) * R * 0.2, y + Math.sin(a) * R * 0.2, Math.cos(a) * s, Math.sin(a) * s - 25, rand(1.6, 2.8), rand(10, 18), i < 4 ? '90,80,70' : '58,55,52', 1.2, 22, rand(0.18, 0.35));
+      this.add(
+        SMOKE,
+        x + Math.cos(a) * R * 0.2,
+        y + Math.sin(a) * R * 0.2,
+        Math.cos(a) * s,
+        Math.sin(a) * s - 25,
+        rand(1.6, 2.8),
+        rand(10, 18),
+        i < 4 ? '90,80,70' : '58,55,52',
+        1.2,
+        22,
+        rand(0.18, 0.35),
+      );
     }
     for (let i = 0; i < 14; i++) {
       const a = rand(0, TAU);
       const s = rand(200, 480);
-      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.12, 0.28), 1, pick(['#ffd890', '#ffb060', '#fff2d0']), 5);
+      this.add(
+        SPARK,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.12, 0.28),
+        1,
+        pick(['#ffd890', '#ffb060', '#fff2d0']),
+        5,
+      );
     }
   }
 
@@ -194,7 +353,17 @@ export class Particles {
     for (let i = 0; i < 26; i++) {
       const a = rand(0, TAU);
       const s = rand(150, 520);
-      this.add(CHUNK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.6, 1.2), rand(4, 9), pick(['#a8ad7e', '#9fa676', '#8a2a20', '#b0b287']), 3.5);
+      this.add(
+        CHUNK,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.6, 1.2),
+        rand(4, 9),
+        pick(['#a8ad7e', '#9fa676', '#8a2a20', '#b0b287']),
+        3.5,
+      );
     }
     for (let i = 0; i < 60; i++) {
       const a = rand(0, TAU);
@@ -206,8 +375,29 @@ export class Particles {
 
   // estela de humo y chispas del cohete
   rocketTrail(x, y, dx, dy) {
-    this.add(SMOKE, x - dx * 10 + rand(-2, 2), y - dy * 10 + rand(-2, 2), -dx * 30 + rand(-10, 10), -dy * 30 + rand(-10, 10), rand(0.6, 1.1), 4, '180,175,165', 1.5, 16);
-    this.add(EMBER, x - dx * 12, y - dy * 12, -dx * 90 + rand(-30, 30), -dy * 90 + rand(-30, 30), rand(0.1, 0.25), rand(1.2, 2.2), pick(['#ffd890', '#ffb060']), 3);
+    this.add(
+      SMOKE,
+      x - dx * 10 + rand(-2, 2),
+      y - dy * 10 + rand(-2, 2),
+      -dx * 30 + rand(-10, 10),
+      -dy * 30 + rand(-10, 10),
+      rand(0.6, 1.1),
+      4,
+      '180,175,165',
+      1.5,
+      16,
+    );
+    this.add(
+      EMBER,
+      x - dx * 12,
+      y - dy * 12,
+      -dx * 90 + rand(-30, 30),
+      -dy * 90 + rand(-30, 30),
+      rand(0.1, 0.25),
+      rand(1.2, 2.2),
+      pick(['#ffd890', '#ffb060']),
+      3,
+    );
   }
 
   // rebufo de la bazuca hacia atrás
@@ -224,12 +414,32 @@ export class Particles {
     for (let i = 0; i < 14; i++) {
       const a = rand(0, TAU);
       const s = rand(80, 260);
-      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.15, 0.35), 1, pick(['#cfe8e0', '#9fc4b8', '#ffd890']), 6);
+      this.add(
+        SPARK,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.15, 0.35),
+        1,
+        pick(['#cfe8e0', '#9fc4b8', '#ffd890']),
+        6,
+      );
     }
     for (let i = 0; i < 16; i++) {
       const a = rand(0, TAU);
       const s = rand(40, 160);
-      this.add(EMBER, x, y, Math.cos(a) * s, Math.sin(a) * s - 30, rand(0.4, 0.9), rand(1.5, 3), pick(['#ffb050', '#ff7a20', '#ffe08a']), 2);
+      this.add(
+        EMBER,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s - 30,
+        rand(0.4, 0.9),
+        rand(1.5, 3),
+        pick(['#ffb050', '#ff7a20', '#ffe08a']),
+        2,
+      );
     }
     this.add(SMOKE, x, y, 0, -20, 1.4, 14, '230,120,40', 1.5, 40);
   }
@@ -345,7 +555,7 @@ function poolSprite(seed, dark = '#5e1411', light = 'rgba(160,40,32,0.45)') {
   c.width = c.height = size;
   const g = c.getContext('2d');
   let s = seed;
-  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   g.fillStyle = dark;
   g.beginPath();
   for (let i = 0; i < 14; i++) {
@@ -376,7 +586,8 @@ export class Decals {
     this.list = [];
     this.pools = [];
     if (!POOLS.length) for (let i = 1; i <= 4; i++) POOLS.push(poolSprite(i * 7919));
-    if (!ACID_POOLS.length) for (let i = 1; i <= 3; i++) ACID_POOLS.push(poolSprite(i * 4801, '#4f8a1c', 'rgba(190,255,90,0.5)'));
+    if (!ACID_POOLS.length)
+      for (let i = 1; i <= 3; i++) ACID_POOLS.push(poolSprite(i * 4801, '#4f8a1c', 'rgba(190,255,90,0.5)'));
   }
   clear() {
     this.list.length = 0;
@@ -392,32 +603,79 @@ export class Decals {
     // una explosión fuerte (dirección de más de 1) lanza el cuerpo mucho más lejos
     const power = Math.min(5, Math.max(1, l));
     const slide = (variant === 0 ? rand(10, 18) : variant === 1 ? rand(4, 8) : rand(2, 5)) * power;
-    const spin = (variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5)) * (power > 1.5 ? 3 : 1);
+    const spin =
+      (variant === 1 ? rand(0.9, 1.6) * (Math.random() < 0.5 ? -1 : 1) : rand(-0.5, 0.5)) * (power > 1.5 ? 3 : 1);
     // lanzado por una explosión: vuela en arco antes de caer
     const lift = power > 1.5 ? power * rand(8, 12) : 0;
     this.list.push({
-      img: z.burnt ? z.spr.burnt : z.spr.dead, x: z.x, y: z.y, x0: z.x, y0: z.y,
-      x1: z.x + fx * slide * (z.r / 13), y1: z.y + fy * slide * (z.r / 13),
-      a0: z.angle, a1: z.angle + spin, half: z.spr.half, t: 0, fall: (variant === 2 ? 0.55 : 0.4) + (lift ? 0.35 : 0), lift,
-      shrink: variant === 2 ? 0.82 : 0.92, life: z.type === 'heavy' || z.type === 'fat' ? 26 : 16,
+      img: z.burnt ? z.spr.burnt : z.spr.dead,
+      x: z.x,
+      y: z.y,
+      x0: z.x,
+      y0: z.y,
+      x1: z.x + fx * slide * (z.r / 13),
+      y1: z.y + fy * slide * (z.r / 13),
+      a0: z.angle,
+      a1: z.angle + spin,
+      half: z.spr.half,
+      t: 0,
+      fall: (variant === 2 ? 0.55 : 0.4) + (lift ? 0.35 : 0),
+      lift,
+      shrink: variant === 2 ? 0.82 : 0.92,
+      life: z.type === 'heavy' || z.type === 'fat' ? 26 : 16,
     });
     if (this.pools.length >= this.maxPools) this.pools.shift();
-    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x: z.x + fx * slide * 1.2, y: z.y + fy * slide * 1.2,
-      a: rand(0, TAU), size: z.r * rand(2.6, 3.4), t: 0, life: 22, delay: 0.3 });
+    this.pools.push({
+      img: POOLS[(Math.random() * POOLS.length) | 0],
+      x: z.x + fx * slide * 1.2,
+      y: z.y + fy * slide * 1.2,
+      a: rand(0, TAU),
+      size: z.r * rand(2.6, 3.4),
+      t: 0,
+      life: 22,
+      delay: 0.3,
+    });
   }
   splat(x, y, size) {
     if (this.pools.length >= this.maxPools) this.pools.shift();
-    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 9, delay: 0 });
+    this.pools.push({
+      img: POOLS[(Math.random() * POOLS.length) | 0],
+      x,
+      y,
+      a: rand(0, TAU),
+      size,
+      t: 0,
+      life: 9,
+      delay: 0,
+    });
   }
   // gota del rastro de sangre de un zombi herido
   drip(x, y) {
     if (this.pools.length >= this.maxPools) this.pools.shift();
-    this.pools.push({ img: POOLS[(Math.random() * POOLS.length) | 0], x, y, a: rand(0, TAU), size: rand(2.5, 4.5), t: 0, life: 8, delay: 0 });
+    this.pools.push({
+      img: POOLS[(Math.random() * POOLS.length) | 0],
+      x,
+      y,
+      a: rand(0, TAU),
+      size: rand(2.5, 4.5),
+      t: 0,
+      life: 8,
+      delay: 0,
+    });
   }
   // charco de ácido del gordo al reventar
   acid(x, y, size) {
     if (this.pools.length >= this.maxPools) this.pools.shift();
-    this.pools.push({ img: ACID_POOLS[(Math.random() * ACID_POOLS.length) | 0], x, y, a: rand(0, TAU), size, t: 0, life: 14, delay: 0 });
+    this.pools.push({
+      img: ACID_POOLS[(Math.random() * ACID_POOLS.length) | 0],
+      x,
+      y,
+      a: rand(0, TAU),
+      size,
+      t: 0,
+      life: 14,
+      delay: 0,
+    });
   }
   update(dt) {
     for (const d of this.list) {
@@ -433,7 +691,8 @@ export class Decals {
   }
   drawPools(ctx, view) {
     for (const p of this.pools) {
-      if (p.x + p.size < view.x0 || p.x - p.size > view.x1 || p.y + p.size < view.y0 || p.y - p.size > view.y1) continue;
+      if (p.x + p.size < view.x0 || p.x - p.size > view.x1 || p.y + p.size < view.y0 || p.y - p.size > view.y1)
+        continue;
       const tt = p.t - p.delay;
       if (tt <= 0) continue;
       const grow = Math.min(1, tt / 1.1);
@@ -449,7 +708,8 @@ export class Decals {
   }
   draw(ctx, view) {
     for (const d of this.list) {
-      if (d.x + d.half < view.x0 || d.x - d.half > view.x1 || d.y + d.half < view.y0 || d.y - d.half > view.y1) continue;
+      if (d.x + d.half < view.x0 || d.x - d.half > view.x1 || d.y + d.half < view.y0 || d.y - d.half > view.y1)
+        continue;
       const k = Math.min(1, d.t / d.fall);
       const e = 1 - (1 - k) * (1 - k);
       const fadeOut = Math.min(1, (d.life - d.t) / 3);

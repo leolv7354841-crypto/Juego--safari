@@ -241,7 +241,13 @@ export class Robot {
   }
 
   serialize() {
-    return { owned: this.owned, hp: Math.round(this.hp), x: Math.round(this.x), y: Math.round(this.y), angle: this.angle };
+    return {
+      owned: this.owned,
+      hp: Math.round(this.hp),
+      x: Math.round(this.x),
+      y: Math.round(this.y),
+      angle: this.angle,
+    };
   }
 
   restore(d) {

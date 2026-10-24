@@ -64,9 +64,14 @@ export class World {
     for (const o of this.obstacles) {
       let ox, oy, ow, oh;
       if (o.k === 0) {
-        ox = o.x; oy = o.y; ow = o.w; oh = o.h;
+        ox = o.x;
+        oy = o.y;
+        ow = o.w;
+        oh = o.h;
       } else {
-        ox = o.x - o.r; oy = o.y - o.r; ow = oh = o.r * 2;
+        ox = o.x - o.r;
+        oy = o.y - o.r;
+        ow = oh = o.r * 2;
       }
       if (x < ox + ow + pad && x + w + pad > ox && y < oy + oh + pad && y + h + pad > oy) return false;
     }
@@ -125,7 +130,16 @@ export class World {
   addCar(x, y, horizontal, opts = {}) {
     const rng = this.rng;
     const kind = opts.kind || rpick(rng, ['sedan', 'sedan', 'sedan', 'hatch', 'taxi', 'pickup', 'van', 'police']);
-    let len = kind === 'bus' ? 172 : kind === 'van' ? 98 : kind === 'pickup' ? 100 : kind === 'truck' ? 126 : rrange(rng, 82, 94);
+    let len =
+      kind === 'bus'
+        ? 172
+        : kind === 'van'
+          ? 98
+          : kind === 'pickup'
+            ? 100
+            : kind === 'truck'
+              ? 126
+              : rrange(rng, 82, 94);
     const wid = kind === 'bus' ? 52 : kind === 'truck' ? 50 : rrange(rng, 40, 44);
     if (kind === 'hatch') len = 76;
     const w = horizontal ? len : wid;
@@ -436,7 +450,15 @@ export class World {
       for (let i = 0; i < 3; i++) {
         g.fillStyle = 'rgba(30,40,50,0.35)';
         g.beginPath();
-        g.ellipse(x + rrange(rng, 30, w - 30), y + rrange(rng, 30, h - 30), rrange(rng, 10, 28), rrange(rng, 6, 16), rng() * TAU, 0, TAU);
+        g.ellipse(
+          x + rrange(rng, 30, w - 30),
+          y + rrange(rng, 30, h - 30),
+          rrange(rng, 10, 28),
+          rrange(rng, 6, 16),
+          rng() * TAU,
+          0,
+          TAU,
+        );
         g.fill();
       }
       const placed = [];
@@ -444,7 +466,11 @@ export class World {
         for (let t = 0; t < 12; t++) {
           const px = x + rrange(rng, 22, w - 22 - pw);
           const py = y + rrange(rng, 22, h - 22 - ph);
-          if (placed.every(([ax, ay, aw, ah]) => px > ax + aw + 8 || px + pw + 8 < ax || py > ay + ah + 8 || py + ph + 8 < ay)) {
+          if (
+            placed.every(
+              ([ax, ay, aw, ah]) => px > ax + aw + 8 || px + pw + 8 < ax || py > ay + ah + 8 || py + ph + 8 < ay,
+            )
+          ) {
             placed.push([px, py, pw, ph]);
             return [px, py];
           }
@@ -618,7 +644,7 @@ export class World {
       const tx = rrange(rng, x + 40, x + w - 40);
       const ty = rrange(rng, y + 40, y + h - 40);
       const onPath = diag
-        ? Math.abs((tx - x) - (ty - y)) < 50 || Math.abs((tx - x) - (h - (ty - y))) < 50
+        ? Math.abs(tx - x - (ty - y)) < 50 || Math.abs(tx - x - (h - (ty - y))) < 50
         : Math.abs(tx - (x + w / 2)) < 45 || Math.abs(ty - (y + h / 2)) < 45;
       if (onPath) continue;
       this.addTree(tx, ty, rrange(rng, 34, 50), rng() < 0.18);
@@ -779,7 +805,10 @@ export class World {
       }
     }
     const corners = [
-      [x + 70, y + 70], [x + w - 70, y + 70], [x + 70, y + h - 70], [x + w - 70, y + h - 70],
+      [x + 70, y + 70],
+      [x + w - 70, y + 70],
+      [x + 70, y + h - 70],
+      [x + w - 70, y + h - 70],
     ];
     for (const [px, py] of corners) {
       if (rng() < 0.25 || !this.free(px - 34, py - 34, 68, 68, 6)) continue;
@@ -799,7 +828,8 @@ export class World {
       const img = makeTree(this.nextSeed(), r, rng() < 0.15);
       this.trees.push({ x: px, y: py, r, img, ang: rng() * TAU, size: r * 2.6 });
     }
-    for (let i = 0; i < 4; i++) this.bench(rrange(rng, x + 30, x + w - 70), rrange(rng, y + 30, y + h - 40), rng() < 0.5);
+    for (let i = 0; i < 4; i++)
+      this.bench(rrange(rng, x + 30, x + w - 70), rrange(rng, y + 30, y + h - 40), rng() < 0.5);
     if (rng() < 0.5) this.addBarrel(rrange(rng, x + 40, x + w - 40), rrange(rng, y + 40, y + h - 40), rng() < 0.6);
   }
 
@@ -1259,7 +1289,14 @@ export class World {
     // alrededor del jugador, para que algunos zombis lo rodeen por los lados o por detrás
     this.main = { dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false };
     this.dist = this.main.dist;
-    this.anchors = Array.from({ length: 8 }, (_, k) => ({ dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false, k, x: 0, y: 0 }));
+    this.anchors = Array.from({ length: 8 }, (_, k) => ({
+      dist: new Uint16Array(n * n).fill(65535),
+      cell: -1,
+      ok: false,
+      k,
+      x: 0,
+      y: 0,
+    }));
     // segundo campo: hacia el compañero en el modo cooperativo
     this.main2 = { dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false };
     this.anchorTurn = 0;
@@ -1490,7 +1527,13 @@ export class World {
     }
     ctx.globalAlpha = 1;
     for (const o of this.overhead) {
-      if (Math.max(o.x, o.hx) < x0 - 20 || Math.min(o.x, o.hx) > x1 + 20 || Math.max(o.y, o.hy) < y0 - 20 || Math.min(o.y, o.hy) > y1 + 20) continue;
+      if (
+        Math.max(o.x, o.hx) < x0 - 20 ||
+        Math.min(o.x, o.hx) > x1 + 20 ||
+        Math.max(o.y, o.hy) < y0 - 20 ||
+        Math.min(o.y, o.hy) > y1 + 20
+      )
+        continue;
       ctx.lineCap = 'round';
       ctx.strokeStyle = OUT;
       ctx.lineWidth = 6;

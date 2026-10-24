@@ -9,7 +9,9 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const mods = readdirSync(root + 'js').filter((f) => f.endsWith('.js')).sort();
+const mods = readdirSync(root + 'js')
+  .filter((f) => f.endsWith('.js'))
+  .sort();
 const h = createHash('sha1');
 // sin \r: el mismo código da el mismo hash en Windows (CRLF al hacer checkout) y en Linux
 const text = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -17,7 +19,10 @@ for (const f of mods) if (f !== 'version.js') h.update(text(root + 'js/' + f));
 h.update(text(root + 'css/style.css'));
 const v = h.digest('hex').slice(0, 8);
 
-writeFileSync(root + 'js/version.js', `// Generado por tools/stamp.mjs: versión del código (sirve para detectar archivos viejos en caché).\nexport const VERSION = '${v}';\n`);
+writeFileSync(
+  root + 'js/version.js',
+  `// Generado por tools/stamp.mjs: versión del código (sirve para detectar archivos viejos en caché).\nexport const VERSION = '${v}';\n`,
+);
 
 let html = readFileSync(root + 'index.html', 'utf8');
 const loader = `<!-- version:start -->
@@ -45,14 +50,17 @@ const loader = `<!-- version:start -->
   <!-- version:end -->`;
 html = html.replace(/<!-- version:start -->[\s\S]*?<!-- version:end -->/, loader);
 html = html.replace(/href="css\/style\.css(\?v=[^"]*)?"/, `href="css/style.css?v=${v}"`);
-html = html.replace(/<script type="module" src="js\/main\.js[^"]*"><\/script>|<script id="dz-main">[\s\S]*?<\/script>/, `<script id="dz-main">
+html = html.replace(
+  /<script type="module" src="js\/main\.js[^"]*"><\/script>|<script id="dz-main">[\s\S]*?<\/script>/,
+  `<script id="dz-main">
     (function () {
       var s = document.createElement('script');
       s.type = 'module';
       s.src = 'js/main.js' + (window.DZ_QUERY || '');
       document.body.appendChild(s);
     })();
-  </script>`);
+  </script>`,
+);
 html = html.replace(/<span id="ver">[^<]*<\/span>/, `<span id="ver">Versión ${v}</span>`);
 writeFileSync(root + 'index.html', html);
 console.log('versión', v);

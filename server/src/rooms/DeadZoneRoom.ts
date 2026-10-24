@@ -27,7 +27,17 @@ function newCode() {
 }
 
 // strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
-type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; shop: Bucket; act: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
+type Limits = {
+  inp: Bucket;
+  cmds: Bucket;
+  adm: Bucket;
+  shop: Bucket;
+  act: Bucket;
+  ping: Bucket;
+  strikes: number;
+  strikeAt: number;
+  bad: number;
+};
 const STRIKE_FORGET = 10;
 const STRIKE_KICK = 200;
 
@@ -62,32 +72,48 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     // la sala vacía no se borra al instante: espera CONFIG.emptyRoomSeconds (ver update)
     this.autoDispose = false;
     this.emptySince = Date.now();
-    this.state = new LobbyState({ phase: 'waiting', ownerId: '', code: this.roomId, maxPlayers: this.maxClients, wave: 0 });
+    this.state = new LobbyState({
+      phase: 'waiting',
+      ownerId: '',
+      code: this.roomId,
+      maxPlayers: this.maxClients,
+      wave: 0,
+    });
     this.setPatchRate(100);
 
-    this.onMessage('ready', (c, m) => this.admin(c, () => {
-      const mb = this.member(c);
-      if (mb && (this.phase === 'waiting' || this.phase === 'finished')) mb.ready = !!(m && m.v);
-    }));
+    this.onMessage('ready', (c, m) =>
+      this.admin(c, () => {
+        const mb = this.member(c);
+        if (mb && (this.phase === 'waiting' || this.phase === 'finished')) mb.ready = !!(m && m.v);
+      }),
+    );
     this.onMessage('start', (c) => this.admin(c, () => this.start(c)));
     this.onMessage('lobby', (c) => this.admin(c, () => this.backToLobby(c)));
-    this.onMessage('loaded', (c) => this.admin(c, () => {
-      if (this.phase !== 'loading') return;
-      this.loaded.add(c.sessionId);
-      this.maybeGo();
-    }));
-    this.onMessage('next', (c) => this.admin(c, () => {
-      if (this.phase === 'playing' && this.sim && this.member(c)?.inGame) this.sim.nextRound();
-    }));
+    this.onMessage('loaded', (c) =>
+      this.admin(c, () => {
+        if (this.phase !== 'loading') return;
+        this.loaded.add(c.sessionId);
+        this.maybeGo();
+      }),
+    );
+    this.onMessage('next', (c) =>
+      this.admin(c, () => {
+        if (this.phase === 'playing' && this.sim && this.member(c)?.inGame) this.sim.nextRound();
+      }),
+    );
     // elegir mejora y comprar: el servidor comprueba nivel, dinero y momento (entre oleadas)
-    this.onMessage('pick', (c, m) => this.shopMsg(c, () => {
-      if (!m || !Number.isInteger(m.i) || !Number.isInteger(m.n)) return this.strike(c, 'mejora mal formada');
-      this.sim!.pick(c.sessionId, m.i, m.n);
-    }));
-    this.onMessage('buy', (c, m) => this.shopMsg(c, () => {
-      if (!m || typeof m.k !== 'string' || typeof m.id !== 'string') return this.strike(c, 'compra mal formada');
-      this.sim!.shop(c.sessionId, m.k, m.id, Number(m.n) | 0);
-    }));
+    this.onMessage('pick', (c, m) =>
+      this.shopMsg(c, () => {
+        if (!m || !Number.isInteger(m.i) || !Number.isInteger(m.n)) return this.strike(c, 'mejora mal formada');
+        this.sim!.pick(c.sessionId, m.i, m.n);
+      }),
+    );
+    this.onMessage('buy', (c, m) =>
+      this.shopMsg(c, () => {
+        if (!m || typeof m.k !== 'string' || typeof m.id !== 'string') return this.strike(c, 'compra mal formada');
+        this.sim!.shop(c.sessionId, m.k, m.id, Number(m.n) | 0);
+      }),
+    );
     // construir, lanzar y subir al robot: se hacen en el paso de la entrada que indica (s)
     this.onMessage('act', (c, m) => {
       const l = this.limits.get(c.sessionId);
@@ -137,7 +163,17 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   }
 
   onJoin(client: Client, _options: any, auth: { name: string; look?: string }) {
-    const m = new Member({ name: auth.name, look: auth.look || '', idx: this.nextIdx++, ready: false, connected: true, inGame: false, alive: false, kills: 0, joinedAt: Date.now() });
+    const m = new Member({
+      name: auth.name,
+      look: auth.look || '',
+      idx: this.nextIdx++,
+      ready: false,
+      connected: true,
+      inGame: false,
+      alive: false,
+      kills: 0,
+      joinedAt: Date.now(),
+    });
     this.state.members.set(client.sessionId, m);
     if (!this.state.ownerId) this.state.ownerId = client.sessionId;
     this.limits.set(client.sessionId, {
@@ -155,7 +191,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     STATS.players++;
     this.joined = true;
     // a mitad de partida se espera en la sala: entrar sin más rompería la oleada en curso
-    if (this.phase === 'loading' || this.phase === 'playing') client.send('notice', { m: 'Partida en curso: entrarás en la siguiente' });
+    if (this.phase === 'loading' || this.phase === 'playing')
+      client.send('notice', { m: 'Partida en curso: entrarás en la siguiente' });
   }
 
   onDrop(client: Client) {
@@ -183,7 +220,9 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     STATS.players = Math.max(0, STATS.players - 1);
     if (this.state.ownerId === id) {
       // propiedad para el más antiguo, prefiriendo a quien siga conectado
-      const rest = [...this.state.members.entries()].sort((a, b) => Number(b[1].connected) - Number(a[1].connected) || a[1].joinedAt - b[1].joinedAt);
+      const rest = [...this.state.members.entries()].sort(
+        (a, b) => Number(b[1].connected) - Number(a[1].connected) || a[1].joinedAt - b[1].joinedAt,
+      );
       this.state.ownerId = rest.length ? rest[0][0] : '';
     }
     if (this.phase === 'loading') this.maybeGo();
@@ -266,7 +305,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   /* ---------- fases ---------- */
 
   start(c: Client) {
-    if (c.sessionId !== this.state.ownerId) return c.send('error', { m: 'Sólo el propietario puede iniciar la partida' });
+    if (c.sessionId !== this.state.ownerId)
+      return c.send('error', { m: 'Sólo el propietario puede iniciar la partida' });
     if (this.phase !== 'waiting' && this.phase !== 'finished') return;
     const others = [...this.state.members.entries()].filter(([id, m]) => id !== this.state.ownerId && m.connected);
     if (others.some(([, m]) => !m.ready)) return c.send('error', { m: 'Faltan jugadores por estar listos' });
@@ -281,10 +321,13 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     this.broadcast('load', { seed: this.seed, ids }, { afterNextPatch: true });
     // el mundo del servidor se arma mientras los celulares cargan (así no frena al empezar)
     this.setSim(null);
-    this.next = new ServerSim(this.seed, ids.map((id) => {
-      const m = this.state.members.get(id)!;
-      return { id, idx: m.idx, name: m.name };
-    }));
+    this.next = new ServerSim(
+      this.seed,
+      ids.map((id) => {
+        const m = this.state.members.get(id)!;
+        return { id, idx: m.idx, name: m.name };
+      }),
+    );
   }
 
   maybeGo() {
@@ -327,7 +370,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   }
 
   backToLobby(c: Client | null) {
-    if (c && c.sessionId !== this.state.ownerId) return c.send('error', { m: 'Sólo el propietario puede volver a la sala' });
+    if (c && c.sessionId !== this.state.ownerId)
+      return c.send('error', { m: 'Sólo el propietario puede volver a la sala' });
     if (c && this.phase !== 'finished') return;
     this.setSim(null);
     this.next = null;
@@ -346,7 +390,11 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     const anyone = [...this.state.members.values()].some((m) => m.connected);
     if (anyone) this.emptySince = 0;
     else if (!this.emptySince) this.emptySince = now;
-    else if (now - this.emptySince > (this.joined ? CONFIG.emptyRoomSeconds : Math.min(CONFIG.emptyRoomSeconds, this.seatReservationTimeout + 2)) * 1000) {
+    else if (
+      now - this.emptySince >
+      (this.joined ? CONFIG.emptyRoomSeconds : Math.min(CONFIG.emptyRoomSeconds, this.seatReservationTimeout + 2)) *
+        1000
+    ) {
       this.disconnect();
       return;
     }
@@ -392,7 +440,18 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   sendSnaps() {
     const sim = this.sim!;
     const now = performance.now();
-    const dg = ++this.snapRound % (CONFIG.snapHz * 2) === 0 ? { hz: STATS.hz, ms: STATS.tickMs, mx: STATS.tickMax, rooms: STATS.rooms, players: STATS.players, skip: STATS.skipped, cpu: STATS.cpu } : null;
+    const dg =
+      ++this.snapRound % (CONFIG.snapHz * 2) === 0
+        ? {
+            hz: STATS.hz,
+            ms: STATS.tickMs,
+            mx: STATS.tickMax,
+            rooms: STATS.rooms,
+            players: STATS.players,
+            skip: STATS.skipped,
+            cpu: STATS.cpu,
+          }
+        : null;
     for (const c of this.clients) {
       const snap = sim.snapshot(c.sessionId, now);
       if (!snap) continue;

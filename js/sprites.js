@@ -78,8 +78,14 @@ function buildTiles() {
       g.strokeStyle = 'rgba(40,38,34,0.45)';
       g.lineWidth = 1.5;
       for (let i = 0; i <= s; i += 40) {
-        g.beginPath(); g.moveTo(i, 0); g.lineTo(i, s); g.stroke();
-        g.beginPath(); g.moveTo(0, i); g.lineTo(s, i); g.stroke();
+        g.beginPath();
+        g.moveTo(i, 0);
+        g.lineTo(i, s);
+        g.stroke();
+        g.beginPath();
+        g.moveTo(0, i);
+        g.lineTo(s, i);
+        g.stroke();
       }
       g.fillStyle = 'rgba(30,28,24,0.18)';
       g.fillRect(41, 3, 36, 30);
@@ -102,7 +108,8 @@ function buildTiles() {
       for (let i = 0; i < 700; i++) {
         g.strokeStyle = rpick(r, cols);
         g.lineWidth = 1;
-        const x = r() * s, y = r() * s;
+        const x = r() * s,
+          y = r() * s;
         g.beginPath();
         g.moveTo(x, y);
         g.lineTo(x + rrange(r, -2, 2), y - rrange(r, 2, 5));
@@ -169,8 +176,24 @@ const SWAT_PALETTES = [
   { skin: '#8d9c78', shirt: '#262b22', pants: '#1f221c', hair: '#15171a', vest: '#363b31', shield: '#62788a' },
 ];
 const HEAVY_PALETTES = [
-  { skin: '#9fa676', shirt: '#b9a57a', pants: '#6e6247', hair: '#1d1a17', plate: '#5b6a3c', dark: '#3f4a2a', camo: '#8a7a52' },
-  { skin: '#a3a97c', shirt: '#5f6e40', pants: '#4a4a32', hair: '#1d1a17', plate: '#c2ad80', dark: '#7a6a48', camo: '#46532f' },
+  {
+    skin: '#9fa676',
+    shirt: '#b9a57a',
+    pants: '#6e6247',
+    hair: '#1d1a17',
+    plate: '#5b6a3c',
+    dark: '#3f4a2a',
+    camo: '#8a7a52',
+  },
+  {
+    skin: '#a3a97c',
+    shirt: '#5f6e40',
+    pants: '#4a4a32',
+    hair: '#1d1a17',
+    plate: '#c2ad80',
+    dark: '#7a6a48',
+    camo: '#46532f',
+  },
 ];
 const SPRINTER_PALETTES = [
   { skin: '#a9b29c', shirt: '#8a3a2e', pants: '#2a2c30', hair: '#1a1714' },
@@ -200,7 +223,15 @@ function rips(g, rng, x, y, rx, ry, color, n) {
     const a = rng() * TAU;
     const d = rng() * 0.7;
     g.beginPath();
-    g.ellipse(x + Math.cos(a) * rx * d, y + Math.sin(a) * ry * d, rrange(rng, 1.2, 3), rrange(rng, 1, 2.2), rng() * TAU, 0, TAU);
+    g.ellipse(
+      x + Math.cos(a) * rx * d,
+      y + Math.sin(a) * ry * d,
+      rrange(rng, 1.2, 3),
+      rrange(rng, 1, 2.2),
+      rng() * TAU,
+      0,
+      TAU,
+    );
     g.fill();
   }
 }
@@ -345,7 +376,15 @@ function drawHeavy(g, r, p, ph) {
   g.fillStyle = p.camo;
   for (let i = 0; i < 7; i++) {
     g.beginPath();
-    g.ellipse(-r * 0.1 + rrange(rng, -0.55, 0.55) * r, rrange(rng, -0.8, 0.8) * r, rrange(rng, 0.1, 0.22) * r, rrange(rng, 0.06, 0.14) * r, rng() * TAU, 0, TAU);
+    g.ellipse(
+      -r * 0.1 + rrange(rng, -0.55, 0.55) * r,
+      rrange(rng, -0.8, 0.8) * r,
+      rrange(rng, 0.1, 0.22) * r,
+      rrange(rng, 0.06, 0.14) * r,
+      rng() * TAU,
+      0,
+      TAU,
+    );
     g.fill();
   }
   // placa de la espalda y del pecho/barriga
@@ -523,7 +562,12 @@ function drawGiant(g, r, p, ph) {
   g.strokeStyle = OUT;
   g.stroke();
   g.fillStyle = '#3b3b3a';
-  for (const [bx, by] of [[-0.2, -0.12], [0.2, -0.12], [-0.2, 0.12], [0.2, 0.12]]) {
+  for (const [bx, by] of [
+    [-0.2, -0.12],
+    [0.2, -0.12],
+    [-0.2, 0.12],
+    [0.2, 0.12],
+  ]) {
     g.beginPath();
     g.arc(bx * r, by * r, 1.6, 0, TAU);
     g.fill();
@@ -545,8 +589,26 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
-const DRAWERS = { normal: drawNormal, golden: drawNormal, swat: drawSwat, heavy: drawHeavy, sprinter: drawSprinter, fat: drawFat, bull: drawBull, giant: drawGiant };
-const PALETTES = { normal: NORMAL_PALETTES, golden: GOLDEN_PALETTES, swat: SWAT_PALETTES, heavy: HEAVY_PALETTES, sprinter: SPRINTER_PALETTES, fat: FAT_PALETTES, bull: BULL_PALETTES, giant: GIANT_PALETTES };
+const DRAWERS = {
+  normal: drawNormal,
+  golden: drawNormal,
+  swat: drawSwat,
+  heavy: drawHeavy,
+  sprinter: drawSprinter,
+  fat: drawFat,
+  bull: drawBull,
+  giant: drawGiant,
+};
+const PALETTES = {
+  normal: NORMAL_PALETTES,
+  golden: GOLDEN_PALETTES,
+  swat: SWAT_PALETTES,
+  heavy: HEAVY_PALETTES,
+  sprinter: SPRINTER_PALETTES,
+  fat: FAT_PALETTES,
+  bull: BULL_PALETTES,
+  giant: GIANT_PALETTES,
+};
 
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
@@ -585,7 +647,13 @@ function buildSet(type, r, frames, pal, scale, pad) {
   for (let i = 0; i < 9; i++) {
     bg.fillStyle = rng() < 0.5 ? 'rgba(255,120,40,0.55)' : 'rgba(80,70,60,0.6)';
     bg.beginPath();
-    bg.arc(half * scale + rrange(rng, -r, r) * scale * 0.7, half * scale + rrange(rng, -r, r) * scale * 0.7, rrange(rng, 0.6, 1.6) * scale, 0, TAU);
+    bg.arc(
+      half * scale + rrange(rng, -r, r) * scale * 0.7,
+      half * scale + rrange(rng, -r, r) * scale * 0.7,
+      rrange(rng, 0.6, 1.6) * scale,
+      0,
+      TAU,
+    );
     bg.fill();
   }
   out.burnt = b;
@@ -906,7 +974,17 @@ export function coneSprite() {
 
 /* ---------- Superviviente ---------- */
 
-const GUN_LEN = { pistol: 23, smg: 30, shotgun: 33, rifle: 38, ar: 35, autoshotgun: 35, sniper: 47, lmg: 42, bazooka: 48 };
+const GUN_LEN = {
+  pistol: 23,
+  smg: 30,
+  shotgun: 33,
+  rifle: 38,
+  ar: 35,
+  autoshotgun: 35,
+  sniper: 47,
+  lmg: 42,
+  bazooka: 48,
+};
 
 const GUNS = {
   pistol: (g, r) => {
@@ -1006,7 +1084,17 @@ const GUNS = {
 };
 
 // Largo de cada arma dibujada desde su culata (para la boca del cañón en el brazo del robot).
-export const GUN_REACH = { pistol: 12, smg: 22, shotgun: 30, rifle: 36, ar: 30, autoshotgun: 30, sniper: 46, lmg: 37, bazooka: 51 };
+export const GUN_REACH = {
+  pistol: 12,
+  smg: 22,
+  shotgun: 30,
+  rifle: 36,
+  ar: 30,
+  autoshotgun: 30,
+  sniper: 46,
+  lmg: 37,
+  bazooka: 51,
+};
 
 // El arma del jugador, más grande, empezando en el origen (brazo del robot).
 export function drawGunScaled(g, p, scale) {
@@ -1032,9 +1120,21 @@ export function drawGunIcon(g, id) {
 // Partes que el jugador puede recolorear; el primer color de cada lista es el original.
 export const LOOK_PARTS = [
   { id: 'skin', name: 'Piel', colors: ['#c7a184', '#e8c4a2', '#a87b5a', '#8a5a3c', '#5e3b26', '#3f281b'] },
-  { id: 'hair', name: 'Pelo', colors: ['#2d2219', '#0f0d0c', '#6b4424', '#b0793d', '#d9c27a', '#9a9a96', '#b8392e', '#3e6bb0'] },
-  { id: 'scarf', name: 'Pañuelo', colors: ['#8c3b2e', '#2f3a32', '#3f566b', '#c99a2e', '#d8d2c4', '#1c1c1c', '#7a3f8c', '#d06a2a'] },
-  { id: 'jacket', name: 'Chaqueta', colors: ['#6b4f3a', '#4c5236', '#3f566b', '#2c2c2e', '#7d2f2a', '#8a7a5a', '#5b6b7a', '#c75f43'] },
+  {
+    id: 'hair',
+    name: 'Pelo',
+    colors: ['#2d2219', '#0f0d0c', '#6b4424', '#b0793d', '#d9c27a', '#9a9a96', '#b8392e', '#3e6bb0'],
+  },
+  {
+    id: 'scarf',
+    name: 'Pañuelo',
+    colors: ['#8c3b2e', '#2f3a32', '#3f566b', '#c99a2e', '#d8d2c4', '#1c1c1c', '#7a3f8c', '#d06a2a'],
+  },
+  {
+    id: 'jacket',
+    name: 'Chaqueta',
+    colors: ['#6b4f3a', '#4c5236', '#3f566b', '#2c2c2e', '#7d2f2a', '#8a7a5a', '#5b6b7a', '#c75f43'],
+  },
   { id: 'pants', name: 'Pantalón', colors: ['#2c3038', '#3c412a', '#4a3a2c', '#1a1a1c', '#596270', '#6b5a44'] },
   { id: 'pack', name: 'Mochila', colors: ['#4c5236', '#6b4f3a', '#2c2c2e', '#3f566b', '#7d2f2a', '#8a6a3a'] },
 ];
@@ -1060,7 +1160,10 @@ export function cleanLook(o) {
 // En línea viaja como código corto: un dígito por parte (índice del color en su lista)
 // y al final el del sombrero (los códigos viejos sin él quedan sin sombrero).
 export function lookCode(look) {
-  return LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('') + Math.max(0, HAT_IDS.indexOf(look && look.hat));
+  return (
+    LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('') +
+    Math.max(0, HAT_IDS.indexOf(look && look.hat))
+  );
 }
 export function lookFromCode(code) {
   const s = typeof code === 'string' ? code : '';
@@ -1126,7 +1229,12 @@ function drawHat(g, id, r) {
     circ(g, x - r * 0.02, 0, r * 0.54, '#3c4529');
     circ(g, x - r * 0.02, 0, r * 0.46, '#4f5a34', null);
     g.fillStyle = '#3a4226';
-    for (const [dx, dy, rr] of [[-0.18, -0.2, 0.12], [0.16, 0.14, 0.1], [-0.12, 0.22, 0.08], [0.2, -0.16, 0.07]]) {
+    for (const [dx, dy, rr] of [
+      [-0.18, -0.2, 0.12],
+      [0.16, 0.14, 0.1],
+      [-0.12, 0.22, 0.08],
+      [0.2, -0.16, 0.07],
+    ]) {
       g.beginPath();
       g.arc(x + dx * r, dy * r, rr * r, 0, TAU);
       g.fill();

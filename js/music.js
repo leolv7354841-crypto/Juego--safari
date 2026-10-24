@@ -61,7 +61,12 @@ export class Music {
     lfo.connect(lg);
     lg.connect(filt.frequency);
     lfo.start();
-    for (const [f, type, v] of [[55, 'sawtooth', 0.09], [55.4, 'sawtooth', 0.08], [82.4, 'triangle', 0.08], [110.2, 'sine', 0.05]]) {
+    for (const [f, type, v] of [
+      [55, 'sawtooth', 0.09],
+      [55.4, 'sawtooth', 0.08],
+      [82.4, 'triangle', 0.08],
+      [110.2, 'sine', 0.05],
+    ]) {
       const o = c.createOscillator();
       o.type = type;
       o.frequency.value = f;
@@ -189,7 +194,7 @@ export class Music {
     if (beat === 4 || beat === 12) this.snare(t, this.horde);
     this.hat(t, beat % 2 === 0 ? 0.06 : 0.03, this.horde);
     const ost = [55, 55, 65.4, 55, 73.4, 55, 65.4, 49];
-    if (s % 2 === 0) this.bass(ost[(s / 2) % 8 | 0], t, 0.1, 0.2, this.horde);
+    if (s % 2 === 0) this.bass(ost[((s / 2) % 8) | 0], t, 0.1, 0.2, this.horde);
     if (s % 32 === 0) this.brass(s % 64 === 0 ? 110 : 98, t, this.horde);
   }
 

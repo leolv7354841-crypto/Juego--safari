@@ -56,7 +56,15 @@ export function cleanAct(raw: any): Act | null {
   if (k === 'throw') {
     tx = raw.tx;
     ty = raw.ty;
-    if (typeof tx !== 'number' || typeof ty !== 'number' || !Number.isFinite(tx) || !Number.isFinite(ty) || Math.abs(tx) > 1e5 || Math.abs(ty) > 1e5) return null;
+    if (
+      typeof tx !== 'number' ||
+      typeof ty !== 'number' ||
+      !Number.isFinite(tx) ||
+      !Number.isFinite(ty) ||
+      Math.abs(tx) > 1e5 ||
+      Math.abs(ty) > 1e5
+    )
+      return null;
   }
   return { s, k, kind, tx, ty };
 }

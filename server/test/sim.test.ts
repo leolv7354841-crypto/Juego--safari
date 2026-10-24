@@ -11,7 +11,10 @@ const aimAt = (sim: ServerSim, id: string) => {
 };
 
 test('disparar según la entrada mata zombis y la baja es de quien disparó', () => {
-  const sim = new ServerSim(42, [{ id: 'a', idx: 1, name: 'Ana' }, { id: 'b', idx: 2, name: 'Beto' }]);
+  const sim = new ServerSim(42, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
   let seq = 0;
   for (let i = 0; i < 60 * 12; i++) {
     sim.push('a', [{ s: ++seq, mx: 0, my: 0, f: IN_FIRE, a: aimAt(sim, 'a'), w: -1 }]);
@@ -85,7 +88,10 @@ test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida'
 });
 
 test('cada jugador elige sus mejoras (también a mitad de oleada) y compra con su propio dinero', () => {
-  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }, { id: 'b', idx: 2, name: 'Beto' }]);
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
   const a = sim.slots.get('a')!;
   const b = sim.slots.get('b')!;
   // una baja de Ana: experiencia para los dos, dinero sólo para ella
@@ -232,6 +238,9 @@ test('el gordo revienta en ácido que quema, y los cohetes estallan', () => {
   const z = sim.horde.list[0];
   z.lastOwner = 'a';
   sim.game.rocketHit(z, z.x, z.y, { owner: 'a', dx: 1, dy: 0 });
-  assert.ok(sim.horde.list.every((o: any) => o.dead || o.hp < o.maxHp), 'la explosión los alcanzó');
+  assert.ok(
+    sim.horde.list.every((o: any) => o.dead || o.hp < o.maxHp),
+    'la explosión los alcanzó',
+  );
   assert.ok(a.kills > 0, 'las bajas son de quien disparó');
 });

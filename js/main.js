@@ -1,5 +1,21 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT } from './config.js';
+import {
+  xpForLevel,
+  BOUNTY,
+  SHOP,
+  SHOP_ORDER,
+  BUILD_ORDER,
+  THROWABLES,
+  WEAPONS,
+  WEAPON_ORDER,
+  SELL_RATE,
+  GOLDEN,
+  MONEY_LOSS,
+  DROPS,
+  WORLD_SIZE,
+  ROCKET,
+  ROBOT,
+} from './config.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
 import { Coop } from './coop.js';
@@ -22,21 +38,40 @@ import { Sfx } from './audio.js';
 import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
-const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
+const CROWN_SVG =
+  '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
 
 // Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
 // de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
-const SHORT = { pistol: 'Pis', smg: 'Smg', shotgun: 'Esc', rifle: 'Rif', ar: 'Fus', autoshotgun: 'EscA', sniper: 'Fra', lmg: 'Amet', bazooka: 'Baz' };
+const SHORT = {
+  pistol: 'Pis',
+  smg: 'Smg',
+  shotgun: 'Esc',
+  rifle: 'Rif',
+  ar: 'Fus',
+  autoshotgun: 'EscA',
+  sniper: 'Fra',
+  lmg: 'Amet',
+  bazooka: 'Baz',
+};
 const ITEM_ICONS = {
-  molotov: '<svg viewBox="0 0 12 12"><ellipse cx="5" cy="7.5" rx="3.2" ry="3.4" fill="#7a9660" stroke="#141612" stroke-width=".8"/><rect x="4" y="2" width="2" height="3" fill="#7a9660" stroke="#141612" stroke-width=".6"/><circle cx="5" cy="1.6" r="1.5" fill="#ff9a30"/></svg>',
-  grenade: '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
+  molotov:
+    '<svg viewBox="0 0 12 12"><ellipse cx="5" cy="7.5" rx="3.2" ry="3.4" fill="#7a9660" stroke="#141612" stroke-width=".8"/><rect x="4" y="2" width="2" height="3" fill="#7a9660" stroke="#141612" stroke-width=".6"/><circle cx="5" cy="1.6" r="1.5" fill="#ff9a30"/></svg>',
+  grenade:
+    '<svg viewBox="0 0 12 12"><ellipse cx="5.5" cy="7" rx="4" ry="4" fill="#5a6b3c" stroke="#141612"/><rect x="7" y="1.5" width="3" height="3" fill="#d9783a"/></svg>',
   wood: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#7a5634" stroke="#141612"/><path d="M2 2l8 8" stroke="#4a3220" stroke-width="1.5"/></svg>',
-  metal: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#8a8f93" stroke="#141612"/><path d="M2 10l8-8" stroke="#c9cdd0"/></svg>',
-  fence: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3.5" width="11" height="5" fill="#3c4146" stroke="#141612"/><path d="M2 4l3 4M5 4l3 4M8 4l3 4" stroke="#9aa1a8" stroke-width=".8"/><rect x="0.5" y="3.5" width="2" height="5" fill="#c7a24a"/></svg>',
-  sandbag: '<svg viewBox="0 0 12 12"><ellipse cx="3.5" cy="6" rx="3" ry="2.5" fill="#8a7d5c" stroke="#141612" stroke-width=".8"/><ellipse cx="8.5" cy="6" rx="3" ry="2.5" fill="#7f7354" stroke="#141612" stroke-width=".8"/></svg>',
-  concrete: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3" width="11" height="6" fill="#8c8a84" stroke="#141612"/><rect x="0.5" y="3" width="11" height="2" fill="#a3a19a"/></svg>',
-  turret: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#3d4246" stroke="#141612"/><circle cx="6" cy="6" r="3" fill="#5c6268"/><rect x="6" y="5" width="5.5" height="2" fill="#1e2124"/></svg>',
-  spikes: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#4a4740" stroke="#141612"/><path d="M3 5l1-2 1 2M7 5l1-2 1 2M3 10l1-2 1 2M7 10l1-2 1 2" fill="#b8b2a4"/></svg>',
+  metal:
+    '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#8a8f93" stroke="#141612"/><path d="M2 10l8-8" stroke="#c9cdd0"/></svg>',
+  fence:
+    '<svg viewBox="0 0 12 12"><rect x="0.5" y="3.5" width="11" height="5" fill="#3c4146" stroke="#141612"/><path d="M2 4l3 4M5 4l3 4M8 4l3 4" stroke="#9aa1a8" stroke-width=".8"/><rect x="0.5" y="3.5" width="2" height="5" fill="#c7a24a"/></svg>',
+  sandbag:
+    '<svg viewBox="0 0 12 12"><ellipse cx="3.5" cy="6" rx="3" ry="2.5" fill="#8a7d5c" stroke="#141612" stroke-width=".8"/><ellipse cx="8.5" cy="6" rx="3" ry="2.5" fill="#7f7354" stroke="#141612" stroke-width=".8"/></svg>',
+  concrete:
+    '<svg viewBox="0 0 12 12"><rect x="0.5" y="3" width="11" height="6" fill="#8c8a84" stroke="#141612"/><rect x="0.5" y="3" width="11" height="2" fill="#a3a19a"/></svg>',
+  turret:
+    '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#3d4246" stroke="#141612"/><circle cx="6" cy="6" r="3" fill="#5c6268"/><rect x="6" y="5" width="5.5" height="2" fill="#1e2124"/></svg>',
+  spikes:
+    '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#4a4740" stroke="#141612"/><path d="M3 5l1-2 1 2M7 5l1-2 1 2M3 10l1-2 1 2M7 10l1-2 1 2" fill="#b8b2a4"/></svg>',
   mine: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#4a5236" stroke="#141612"/><circle cx="6" cy="6" r="1.4" fill="#ff5a3a"/></svg>',
   wire: '<svg viewBox="0 0 12 12"><path d="M0 6l2-3 2 6 2-6 2 6 2-6 2 3" fill="none" stroke="#c9c4b6" stroke-width="1.2"/></svg>',
 };
@@ -99,7 +134,13 @@ class Game {
     this.online = new Online(this);
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
-    this.ash = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), v: rand(0.004, 0.012), p: rand(0, TAU) }));
+    this.ash = Array.from({ length: 70 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      s: rand(0.6, 1.8),
+      v: rand(0.004, 0.012),
+      p: rand(0, TAU),
+    }));
     this.state = 'menu';
     this.time = 0;
     this.menuT = 0;
@@ -213,17 +254,21 @@ class Game {
     this.setState('menu');
     const cur = this.accounts.current;
     this.$('acct-name').textContent = cur ? cur.name : 'Sin cuenta';
-    this.$('acct-best').textContent = cur && cur.best ? `Tu récord: oleada ${cur.best.wave} · ${cur.best.kills} bajas` : '';
+    this.$('acct-best').textContent =
+      cur && cur.best ? `Tu récord: oleada ${cur.best.wave} · ${cur.best.kills} bajas` : '';
     const save = storage.get(this.accounts.saveKey(), null) || storage.get(this.accounts.checkKey(), null);
     this.$('btn-continue').hidden = !save;
     if (save) {
-      this.$('btn-continue').textContent = save.dstate === 'active' ? `Continuar · ronda ${save.wave}` : `Continuar · ronda ${save.wave + 1}`;
+      this.$('btn-continue').textContent =
+        save.dstate === 'active' ? `Continuar · ronda ${save.wave}` : `Continuar · ronda ${save.wave + 1}`;
     }
     this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
     this.$('btn-start').classList.toggle('primary', !save);
     this.refreshHall();
     const best = storage.get('dz-best', null);
-    this.$('best').textContent = best ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}` : '';
+    this.$('best').textContent = best
+      ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}`
+      : '';
   }
 
   start(freshWorld) {
@@ -286,7 +331,12 @@ class Game {
       dstate: ds,
       queue,
       waveSize: this.director.waveSize,
-      zombies: ds === 'active' ? this.horde.list.filter((z) => !z.dead && z.type !== 'golden').map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)]) : [],
+      zombies:
+        ds === 'active'
+          ? this.horde.list
+              .filter((z) => !z.dead && z.type !== 'golden')
+              .map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)])
+          : [],
       seed: this.world.seedBase,
       wave: this.director.wave,
       time: this.time,
@@ -351,14 +401,30 @@ class Game {
     p.y = sp.y;
     p.hp = Math.min(sp.hp, p.stats.maxHp);
     p.stamina = sp.stamina;
-    p.weapons = sp.weapons.filter((w) => WEAPONS[w.id]).map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
+    p.weapons = sp.weapons
+      .filter((w) => WEAPONS[w.id])
+      .map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
     p.wi = Math.min(sp.wi, p.weapons.length - 1);
     p.shotsFired = sp.shotsFired;
     p.shotsHit = sp.shotsHit;
     p.damageTaken = sp.damageTaken;
     for (const b of d.blocks) {
       if (!SHOP[b.kind]) continue;
-      const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0, cd: 0, ang: 0 };
+      const o = {
+        k: 0,
+        x: b.x,
+        y: b.y,
+        w: b.w,
+        h: b.h,
+        low: true,
+        block: true,
+        kind: b.kind,
+        hp: b.hp,
+        max: SHOP[b.kind].hp,
+        hitT: 0,
+        cd: 0,
+        ang: 0,
+      };
       this.structures.blocks.push(o);
       this.world.addDynamic(o);
     }
@@ -395,7 +461,11 @@ class Game {
     this.input.setRun(false);
     this.setState('play');
     this.updateHud(true);
-    this.toast(d.dstate === 'active' ? `Progreso cargado · ronda ${d.wave} en curso` : `Progreso cargado · ronda ${d.wave} superada`);
+    this.toast(
+      d.dstate === 'active'
+        ? `Progreso cargado · ronda ${d.wave} en curso`
+        : `Progreso cargado · ronda ${d.wave} superada`,
+    );
     this.saveT = 0;
     return true;
   }
@@ -770,7 +840,14 @@ class Game {
   // Mejor marca de la cuenta: oleada alcanzada y bajas.
   recordScore() {
     if (this.state === 'menu') return;
-    if (this.accounts.recordScore({ wave: this.director.wave, kills: this.totalKills(), time: Math.round(this.time), level: this.level })) {
+    if (
+      this.accounts.recordScore({
+        wave: this.director.wave,
+        kills: this.totalKills(),
+        time: Math.round(this.time),
+        level: this.level,
+      })
+    ) {
       this.toast('Nuevo récord de tu cuenta');
     }
   }
@@ -819,7 +896,19 @@ class Game {
       nm.textContent = (id === st.ownerId ? '★ ' : '') + m.name + (id === room.sessionId ? ' (tú)' : '');
       const tag = document.createElement('span');
       tag.className = 'tg';
-      tag.textContent = !m.connected ? 'reconectando…' : st.phase === 'playing' ? (m.inGame ? (m.alive ? 'jugando' : 'caído') : 'esperando') : id === st.ownerId ? 'propietario' : m.ready ? 'listo' : 'no listo';
+      tag.textContent = !m.connected
+        ? 'reconectando…'
+        : st.phase === 'playing'
+          ? m.inGame
+            ? m.alive
+              ? 'jugando'
+              : 'caído'
+            : 'esperando'
+          : id === st.ownerId
+            ? 'propietario'
+            : m.ready
+              ? 'listo'
+              : 'no listo';
       li.append(nm, tag);
       list.appendChild(li);
     }
@@ -832,9 +921,17 @@ class Game {
     this.$('btn-ol-start').hidden = !owner || !lobbyLike;
     const waitingFor = rows.filter(([id, m]) => id !== st.ownerId && m.connected && !m.ready).length;
     this.$('btn-ol-start').disabled = waitingFor > 0;
-    this.$('btn-ol-start').textContent = waitingFor ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}` : 'Iniciar partida';
+    this.$('btn-ol-start').textContent = waitingFor
+      ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
+      : 'Iniciar partida';
     this.$('btn-ol-lobby').hidden = !owner || phase !== 'finished';
-    const ph = { waiting: 'Esperando jugadores', loading: 'Cargando…', playing: 'Partida en curso', finished: 'Partida terminada' }[phase] || '';
+    const ph =
+      {
+        waiting: 'Esperando jugadores',
+        loading: 'Cargando…',
+        playing: 'Partida en curso',
+        finished: 'Partida terminada',
+      }[phase] || '';
     this.$('ol-phase').textContent = ph;
     const res = this.$('ol-results');
     const r = ol.results;
@@ -907,7 +1004,8 @@ class Game {
     u.searchParams.set('sala', room.roomId);
     const text = u.toString();
     const done = () => this.onlineStatus('Invitación copiada: ' + text);
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => this.onlineStatus(text));
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(done, () => this.onlineStatus(text));
     else this.onlineStatus(text);
   }
 
@@ -929,7 +1027,9 @@ class Game {
     this.$('coop-choose').hidden = false;
     this.$('coop-wait').hidden = true;
     this.$('coop-code-in').value = '';
-    this.coopStatus(this.coop.net.available ? '' : 'El cooperativo necesita internet y un navegador con conexión directa (WebRTC).');
+    this.coopStatus(
+      this.coop.net.available ? '' : 'El cooperativo necesita internet y un navegador con conexión directa (WebRTC).',
+    );
   }
 
   coopStatus(text, bad = false) {
@@ -941,13 +1041,15 @@ class Game {
   coopError(err) {
     const m = String((err && err.message) || err);
     if (m === 'cancelado') return;
-    const msg = {
-      'no-existe': 'No existe una sala con ese código (o ya caducó).',
-      llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
-      permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
-      tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
-      directa: 'No se pudo conectar directo entre los celulares. Prueben los dos en la misma red Wi‑Fi o con otra red (algunas redes móviles lo bloquean).',
-    }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
+    const msg =
+      {
+        'no-existe': 'No existe una sala con ese código (o ya caducó).',
+        llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
+        permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
+        tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
+        directa:
+          'No se pudo conectar directo entre los celulares. Prueben los dos en la misma red Wi‑Fi o con otra red (algunas redes móviles lo bloquean).',
+      }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
     this.coopStatus(msg, true);
     this.$('coop-choose').hidden = false;
     this.$('coop-wait').hidden = true;
@@ -1109,7 +1211,12 @@ class Game {
     const target = { podium: this.$('board-podium'), list: this.$('board-list'), me: null, max: 50 };
     if (tab === 'global') this.renderBoard(null, target, 'Cargando…');
     const rows = await this.boardRows(tab);
-    if (this.state === 'board') this.renderBoard(rows, target, tab === 'global' ? 'Todavía no hay récords globales.' : 'Todavía no hay récords. ¡Termina una oleada!');
+    if (this.state === 'board')
+      this.renderBoard(
+        rows,
+        target,
+        tab === 'global' ? 'Todavía no hay récords globales.' : 'Todavía no hay récords. ¡Termina una oleada!',
+      );
   }
 
   syncBoardTabs(prefix, tab) {
@@ -1248,10 +1355,12 @@ class Game {
       </div>`;
     });
     // munición sin límite para cada arma que tengas
-    const ammo = p.weapons.filter((w) => w.reserve !== Infinity).map((w) => {
-      const d = w.def;
-      const mag = p.magSize(d);
-      return `<div class="shop-item">
+    const ammo = p.weapons
+      .filter((w) => w.reserve !== Infinity)
+      .map((w) => {
+        const d = w.def;
+        const mag = p.magSize(d);
+        return `<div class="shop-item">
         <canvas class="shop-ic" data-gun="${w.id}" width="96" height="96"></canvas>
         <div class="shop-txt"><b>${d.rocket ? 'Cohetes' : 'Balas'} · ${d.name}</b><span>${d.rocket ? `1 cohete por $${d.ammoPrice}` : `Cargador de ${mag} balas por $${d.ammoPrice}`}. Sin límite de reserva.</span><small>Reserva: ${w.reserve} ${d.rocket ? 'cohetes' : 'balas'}</small></div>
         <div class="buy-col">
@@ -1259,7 +1368,7 @@ class Game {
           ${buyBtn(`data-ammo="${w.id}" data-n="10"`, d.ammoPrice * 10, `+10 · $${d.ammoPrice * 10}`, ' sm')}
         </div>
       </div>`;
-    });
+      });
     const gear = SHOP_ORDER.map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
@@ -1274,7 +1383,9 @@ class Game {
       <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
       <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
       <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
-    this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
+    this.$('shop-items')
+      .querySelectorAll('canvas[data-ic]')
+      .forEach((c) => this.drawShopIcon(c, c.dataset.ic));
     const rc = this.$('shop-items').querySelector('canvas[data-robot]');
     if (rc) {
       const g = rc.getContext('2d');
@@ -1286,13 +1397,15 @@ class Game {
       g.setTransform(0.95, 0, 0, 0.95, 0, 0);
       demo.draw(g, this.player, 0);
     }
-    this.$('shop-items').querySelectorAll('canvas[data-gun]').forEach((c) => {
-      const g = c.getContext('2d');
-      g.setTransform(2.1, 0, 0, 2.1, 4, 48);
-      g.shadowColor = 'rgba(230,224,210,0.85)';
-      g.shadowBlur = 3;
-      drawGunIcon(g, c.dataset.gun);
-    });
+    this.$('shop-items')
+      .querySelectorAll('canvas[data-gun]')
+      .forEach((c) => {
+        const g = c.getContext('2d');
+        g.setTransform(2.1, 0, 0, 2.1, 4, 48);
+        g.shadowColor = 'rgba(230,224,210,0.85)';
+        g.shadowBlur = 3;
+        drawGunIcon(g, c.dataset.gun);
+      });
   }
 
   robotShopItem() {
@@ -1307,9 +1420,10 @@ class Game {
     } else {
       const cost = rb.repairCost;
       const poor = this.money < cost;
-      btn = cost > 0
-        ? `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="repair" ${poor ? 'disabled' : ''}>Reparar $${cost}</button>`
-        : '<button class="btn buy" disabled>Listo</button>';
+      btn =
+        cost > 0
+          ? `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="repair" ${poor ? 'disabled' : ''}>Reparar $${cost}</button>`
+          : '<button class="btn buy" disabled>Listo</button>';
       info = rb.broken ? 'DESTRUIDO: repáralo para volver a usarlo' : `Vida ${Math.ceil(rb.hp)} / ${ROBOT.hp}`;
     }
     return `<div class="shop-item hot">
@@ -1375,8 +1489,19 @@ class Game {
     const h = def.h;
     const s = Math.min(44 / w, 44 / h, 1);
     g.setTransform(1.6 * s, 0, 0, 1.6 * s, 1.6 * (30 - (w * s) / 2), 1.6 * (30 - (h * s) / 2));
-    if (def.ground) this.structures.drawGround.call({ scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
-    else this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
+    if (def.ground)
+      this.structures.drawGround.call(
+        { scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
+        g,
+        { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 },
+      );
+    else
+      this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, {
+        x0: -1e4,
+        y0: -1e4,
+        x1: 1e4,
+        y1: 1e4,
+      });
   }
 
   buy(k) {
@@ -1497,7 +1622,9 @@ class Game {
     const best = storage.get('dz-best', null);
     const record = !best || this.time > best.time;
     if (record) storage.set('dz-best', { time: this.time, kills: total, wave: this.director.wave });
-    this.$('over-best').textContent = record ? 'Nuevo récord personal' : `Récord: ${fmtTime(best.time)} · ${best.kills} bajas`;
+    this.$('over-best').textContent = record
+      ? 'Nuevo récord personal'
+      : `Récord: ${fmtTime(best.time)} · ${best.kills} bajas`;
   }
 
   /* ---------- interfaz ---------- */
@@ -1550,7 +1677,9 @@ class Game {
     on('btn-look', () => this.showLook());
     on('btn-look-done', () => this.setState('menu'));
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
-    on('btn-look-random', () => this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }));
+    on('btn-look-random', () =>
+      this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }),
+    );
     on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
     on('btn-leaderboard', () => this.showBoard());
     on('btn-coop', () => this.showCoop());
@@ -1726,7 +1855,16 @@ class Game {
     const rl = p.reloadT > 0 ? 1 - p.reloadT / p.reloadDur : 0;
     this.set('rl', $('reload-fill'), 'width', `${(rl * 100).toFixed(0)}%`);
     const inv = this.inv;
-    const isig = BUILD_ORDER.map((k) => inv[k]).join() + '|' + inv.grenade + '|' + inv.molotov + '|' + this.buildSel + '|' + this.money;
+    const isig =
+      BUILD_ORDER.map((k) => inv[k]).join() +
+      '|' +
+      inv.grenade +
+      '|' +
+      inv.molotov +
+      '|' +
+      this.buildSel +
+      '|' +
+      this.money;
     if (this.cache.inv !== isig) {
       this.cache.inv = isig;
       // granadas siempre visibles; de las estructuras sólo las que tienes (son muchas)
@@ -1737,7 +1875,9 @@ class Game {
       for (const k of BUILD_ORDER) {
         if (!inv[k]) continue;
         const cls = `it${k === this.buildSel ? ' on' : ''}`;
-        items.push(`<button class="${cls}" data-k="${k}" title="${SHOP[k].name}">${ITEM_ICONS[k]}<b>${inv[k]}</b></button>`);
+        items.push(
+          `<button class="${cls}" data-k="${k}" title="${SHOP[k].name}">${ITEM_ICONS[k]}<b>${inv[k]}</b></button>`,
+        );
       }
       items.push(`<span class="it money" title="Dinero">$<b id="money">${this.money}</b></span>`);
       $('inv').innerHTML = items.join('');
@@ -1752,7 +1892,10 @@ class Game {
     if (this.cache.slots !== sig) {
       this.cache.slots = sig;
       $('slots').innerHTML = p.weapons
-        .map((x, i) => `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`)
+        .map(
+          (x, i) =>
+            `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`,
+        )
         .join('');
     }
     const prep = this.director.state === 'waiting' && p.alive;
@@ -1854,8 +1997,7 @@ class Game {
       else if (this.state === 'look') {
         this.updateMenu(dt);
         this.drawLookPreview(dt);
-      }
-      else if (this.state === 'levelup') {
+      } else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
         if (s) this.chooseUpgrade(s - 1);
       } else if (this.state === 'pause') {
@@ -1933,7 +2075,8 @@ class Game {
     this.emitFires(dt);
     // gemidos y pasos según cuántos zombis hay cerca (con tope para no saturar)
     const nc = this.horde.nearCount;
-    if (this.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05))) this.sfx.groan(Math.min(3, 0.5 + nc / 10));
+    if (this.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
+      this.sfx.groan(Math.min(3, 0.5 + nc / 10));
     this.stepT -= dt;
     if (nc > 0 && this.stepT <= 0) {
       this.sfx.footstep(Math.min(1, nc / 20));
@@ -1941,7 +2084,8 @@ class Game {
     }
     this.music.setDanger(p.alive ? this.horde.danger : 0, dt);
     // muerto en cooperativo: la cámara sigue suave a tu compañero hasta que revivas
-    if (!p.alive && this.coop.peer && this.coop.peer.alive) this.camera.update(dt, this.coop.peer.x, this.coop.peer.y, false);
+    if (!p.alive && this.coop.peer && this.coop.peer.alive)
+      this.camera.update(dt, this.coop.peer.x, this.coop.peer.y, false);
     else {
       const look = this.input.mode === 'mouse' ? 50 : 24;
       this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
@@ -1997,7 +2141,8 @@ class Game {
     this.decals.draw(ctx, v);
     this.structures.drawBlocks(ctx, v);
     this.pickups.draw(ctx, v, this.time);
-    if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0) this.structures.drawGhost(ctx, this, this.buildSel, this.time);
+    if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0)
+      this.structures.drawGhost(ctx, this, this.buildSel, this.time);
     this.horde.draw(ctx, v, base, 'small');
     this.structures.drawFires(ctx, v, this.time);
     this.structures.drawStuck(ctx, this.time);
@@ -2076,7 +2221,12 @@ class Game {
       ctx.strokeStyle = 'rgba(217,120,58,0.9)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      for (const [sx, sy] of [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ]) {
         ctx.moveTo(tg.x + sx * s, tg.y + sy * s * 0.45);
         ctx.lineTo(tg.x + sx * s, tg.y + sy * s);
         ctx.lineTo(tg.x + sx * s * 0.45, tg.y + sy * s);
@@ -2120,7 +2270,12 @@ class Game {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(a);
-      ctx.fillStyle = zb.type === 'golden' ? 'rgba(240,192,64,0.95)' : zb.type === 'giant' ? 'rgba(217,120,58,0.9)' : 'rgba(230,224,210,0.75)';
+      ctx.fillStyle =
+        zb.type === 'golden'
+          ? 'rgba(240,192,64,0.95)'
+          : zb.type === 'giant'
+            ? 'rgba(217,120,58,0.9)'
+            : 'rgba(230,224,210,0.75)';
       ctx.beginPath();
       ctx.moveTo(s, 0);
       ctx.lineTo(-s * 0.6, -s * 0.8);
@@ -2139,7 +2294,10 @@ class Game {
     const gap = (6 + (p.bloom + p.weapon.def.spread) * 60) * this.dpr;
     const len = 7 * this.dpr;
     ctx.lineWidth = 2 * this.dpr;
-    for (const [col, lw] of [['rgba(0,0,0,0.6)', 4], ['#e6e0d2', 2]]) {
+    for (const [col, lw] of [
+      ['rgba(0,0,0,0.6)', 4],
+      ['#e6e0d2', 2],
+    ]) {
       ctx.strokeStyle = col;
       ctx.lineWidth = lw * this.dpr;
       ctx.beginPath();
@@ -2190,7 +2348,10 @@ function boot() {
     new Game();
   } catch (err) {
     console.error(err);
-    document.body.insertAdjacentHTML('beforeend', `<p style="position:fixed;inset:auto 16px 16px;color:#e6e0d2;font:16px sans-serif">No se pudo iniciar el juego: ${String(err.message || err)}</p>`);
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `<p style="position:fixed;inset:auto 16px 16px;color:#e6e0d2;font:16px sans-serif">No se pudo iniciar el juego: ${String(err.message || err)}</p>`,
+    );
   }
 }
 
@@ -2198,4 +2359,3 @@ if (document.fonts && document.fonts.ready) {
   // esperar a la fuente evita textos con tipografía de respaldo en los techos
   Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]).then(boot);
 } else boot();
-

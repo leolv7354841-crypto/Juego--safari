@@ -23,7 +23,7 @@ export function countTick(ms: number) {
   const now = performance.now();
   if (now - acc.at >= 1000) {
     const secs = (now - acc.at) / 1000;
-    STATS.hz = Math.round((acc.n / secs) / Math.max(1, STATS.simRooms) * 10) / 10;
+    STATS.hz = Math.round((acc.n / secs / Math.max(1, STATS.simRooms)) * 10) / 10;
     STATS.tickMs = Math.round((acc.ms / acc.n) * 100) / 100;
     STATS.tickMax = Math.round(acc.max * 100) / 100;
     acc = { n: 0, ms: 0, max: 0, at: now };

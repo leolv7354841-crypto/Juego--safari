@@ -5,7 +5,18 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN, SHOP, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE } from './config.js';
+import {
+  NET,
+  WEAPONS,
+  WEAPON_ORDER,
+  ZOMBIES,
+  GOLDEN,
+  SHOP,
+  SHOP_ORDER,
+  BUILD_ORDER,
+  ROBOT,
+  PLAYER_BASE,
+} from './config.js';
 import { Player } from './player.js';
 import { Robot } from './robot.js';
 import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
@@ -19,7 +30,18 @@ const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
 const PEER_N = 15;
 // mismo orden que STAT_KEYS en server/src/sim/ServerSim.ts
-const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
+const STAT_KEYS = [
+  'maxHp',
+  'armor',
+  'dmgMult',
+  'rateMult',
+  'maxStamina',
+  'staminaRegenMult',
+  'speedMult',
+  'ammoMult',
+  'pierce',
+  'reloadMult',
+];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
@@ -32,7 +54,8 @@ export function explainOnline(err) {
   if (m === 'origen') return 'Esta página no tiene permiso para usar el servidor (ALLOWED_ORIGINS).';
   if (/not found/i.test(m)) return 'No existe una sala con ese código (o ya se cerró).';
   if (/locked|full/i.test(m)) return `La sala está llena (máximo ${NET.maxPlayers} jugadores).`;
-  if (m === 'servidor-lleno') return 'El servidor está lleno: todas las salas están ocupadas. Únete a la sala de un amigo o prueba en unos minutos.';
+  if (m === 'servidor-lleno')
+    return 'El servidor está lleno: todas las salas están ocupadas. Únete a la sala de un amigo o prueba en unos minutos.';
   if (m === 'sin-servidor') return 'No hay servidor configurado (NET.server en js/config.js o ?servidor=wss://…).';
   return 'No se pudo contactar con el servidor. Revisa tu conexión y vuelve a intentarlo en un momento.';
 }
@@ -70,7 +93,9 @@ export class Online {
   }
 
   get me() {
-    return this.room && this.room.state && this.room.state.members ? this.room.state.members.get(this.room.sessionId) : null;
+    return this.room && this.room.state && this.room.state.members
+      ? this.room.state.members.get(this.room.sessionId)
+      : null;
   }
 
   get isOwner() {
@@ -145,7 +170,8 @@ export class Online {
 
   remember() {
     try {
-      if (this.room) sessionStorage.setItem(SAVE, JSON.stringify({ token: this.room.reconnectionToken, at: Date.now() }));
+      if (this.room)
+        sessionStorage.setItem(SAVE, JSON.stringify({ token: this.room.reconnectionToken, at: Date.now() }));
     } catch {
       /* sin almacenamiento: sólo se pierde la vuelta tras recargar */
     }
@@ -238,10 +264,13 @@ export class Online {
     g.setupMenu();
     g.showOnline();
     const why =
-      code === KICKED ? 'El servidor te sacó por mandar datos no válidos.'
-      : code === IDLE ? 'La sala se cerró por llevar mucho rato sin partida.'
-      : this.shutdown ? 'El servidor se reinició: vuelve a crear la sala en un momento.'
-      : 'Se perdió la conexión con la sala y no se pudo reconectar.';
+      code === KICKED
+        ? 'El servidor te sacó por mandar datos no válidos.'
+        : code === IDLE
+          ? 'La sala se cerró por llevar mucho rato sin partida.'
+          : this.shutdown
+            ? 'El servidor se reinició: vuelve a crear la sala en un momento.'
+            : 'Se perdió la conexión con la sala y no se pudo reconectar.';
     g.onlineStatus(why, true);
   }
 
@@ -446,7 +475,8 @@ export class Online {
     g.decals.update(dt);
     g.emitFires(dt);
     const nc = this.nearCount;
-    if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05))) g.sfx.groan(Math.min(3, 0.5 + nc / 10));
+    if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
+      g.sfx.groan(Math.min(3, 0.5 + nc / 10));
     g.stepT -= dt;
     if (nc > 0 && g.stepT <= 0) {
       g.sfx.footstep(Math.min(1, nc / 20));
@@ -520,7 +550,8 @@ export class Online {
       z.anim += Math.hypot(z.x - ox, z.y - oy) / (z.r * 0.55);
       z.hitT -= dt;
       z.lunge = Math.max(0, z.lunge - dt * 4);
-      z.tilt = (z.wounded ? Math.sin(g.time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(g.time * 23 + z.wob) * 0.28 : 0);
+      z.tilt =
+        (z.wounded ? Math.sin(g.time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(g.time * 23 + z.wob) * 0.28 : 0);
       if (z.burn > 0) {
         z.fireFx -= dt;
         if (z.fireFx <= 0) {
@@ -583,10 +614,20 @@ export class Online {
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], ts);
     const pk = s.pk || [];
     g.pickups.list = [];
-    for (let i = 0; i + 3 < pk.length; i += 4) g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
+    for (let i = 0; i + 3 < pk.length; i += 4)
+      g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
     const b = s.b || [];
     this.remoteBullets = [];
-    for (let i = 0; i + 4 < b.length; i += 5) this.remoteBullets.push({ x: b[i], y: b[i + 1], dx: b[i + 2] / 100, dy: b[i + 3] / 100, rocket: !!b[i + 4], trail: 22, age: 0 });
+    for (let i = 0; i + 4 < b.length; i += 5)
+      this.remoteBullets.push({
+        x: b[i],
+        y: b[i + 1],
+        dx: b[i + 2] / 100,
+        dy: b[i + 3] / 100,
+        rocket: !!b[i + 4],
+        trail: 22,
+        age: 0,
+      });
     if (Array.isArray(s.fx)) for (const e of s.fx) this.replay(e);
     if (Array.isArray(s.tt) && s.tt.length) g.toast(String(s.tt[s.tt.length - 1]));
     if (s.dg) this.diag = s.dg;
@@ -685,13 +726,24 @@ export class Online {
     const ec = Array.isArray(s.ec) ? s.ec : [];
     // el dinero ya llegó en st (applyStats): aquí sólo se usa para saber si redibujar la tienda
     const rb = g.robot;
-    const shopSig = g.money + '|' + p.weapons.map((w) => w.id + ':' + w.reserve).join() + '|' + SHOP_ORDER.map((k) => g.inv[k]).join() + '|' + rb.owned + Math.ceil(rb.hp);
+    const shopSig =
+      g.money +
+      '|' +
+      p.weapons.map((w) => w.id + ':' + w.reserve).join() +
+      '|' +
+      SHOP_ORDER.map((k) => g.inv[k]).join() +
+      '|' +
+      rb.owned +
+      Math.ceil(rb.hp);
     g.level = Math.max(1, ec[0] | 0);
     g.xp = Math.max(0, ec[1] | 0);
     g.xpNeed = Math.max(1, ec[2] | 0);
     g.pendingLevels = Math.max(0, ec[3] | 0);
     if (Array.isArray(s.ps)) STAT_KEYS.forEach((k, i) => Number.isFinite(s.ps[i]) && (p.stats[k] = s.ps[i]));
-    const up = Array.isArray(s.up) && s.up.length > 1 ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) } : null;
+    const up =
+      Array.isArray(s.up) && s.up.length > 1
+        ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) }
+        : null;
     this.up = up && up.ids.length ? up : null;
     // fin de oleada: tienda y mejoras; si empieza la siguiente con la tienda abierta, se cierra
     if (this.lastDs === 'active' && s.ds === 'waiting') {
@@ -739,7 +791,16 @@ export class Online {
     const st = g.structures;
     const gr = Array.isArray(s.gr) ? s.gr : [];
     st.grenades = [];
-    for (let i = 0; i + 5 < gr.length; i += 6) st.grenades.push({ x: gr[i], y: gr[i + 1], h: gr[i + 2], rot: gr[i + 3] / 100, kind: gr[i + 4] ? 'molotov' : 'grenade', t: gr[i + 5] ? 2 : 0, dur: 1 });
+    for (let i = 0; i + 5 < gr.length; i += 6)
+      st.grenades.push({
+        x: gr[i],
+        y: gr[i + 1],
+        h: gr[i + 2],
+        rot: gr[i + 3] / 100,
+        kind: gr[i + 4] ? 'molotov' : 'grenade',
+        t: gr[i + 5] ? 2 : 0,
+        dur: 1,
+      });
     const fi = Array.isArray(s.fi) ? s.fi : [];
     const fires = [];
     for (let i = 0; i + 4 < fi.length; i += 5) {
@@ -749,7 +810,12 @@ export class Online {
         for (let k = 0; k < 16; k++) {
           const a = rand(0, TAU);
           const dd = Math.sqrt(Math.random()) * f.r * 0.85;
-          f.flames.push({ x: f.x + Math.cos(a) * dd, y: f.y + Math.sin(a) * dd * 0.85, s: rand(0.7, 1.25), ph: rand(0, 10) });
+          f.flames.push({
+            x: f.x + Math.cos(a) * dd,
+            y: f.y + Math.sin(a) * dd * 0.85,
+            s: rand(0.7, 1.25),
+            ph: rand(0, 10),
+          });
         }
         this.fireMap.set(f.id, f);
       }
@@ -761,7 +827,16 @@ export class Online {
     st.fires = fires;
     const so = Array.isArray(s.so) ? s.so : [];
     st.stuck = [];
-    for (let i = 0; i + 6 < so.length; i += 7) st.stuck.push({ x: so[i], y: so[i + 1], ang: so[i + 2] / 100, t: so[i + 3] / 100, stick: so[i + 4] / 100, glow: so[i + 5] / 100, kind: so[i + 6] ? 'fat' : 'heavy' });
+    for (let i = 0; i + 6 < so.length; i += 7)
+      st.stuck.push({
+        x: so[i],
+        y: so[i + 1],
+        ang: so[i + 2] / 100,
+        t: so[i + 3] / 100,
+        stick: so[i + 4] / 100,
+        glow: so[i + 5] / 100,
+        kind: so[i + 6] ? 'fat' : 'heavy',
+      });
     const bl = Array.isArray(s.bl) ? s.bl : [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
@@ -772,7 +847,21 @@ export class Online {
         // se puso o se rompió alguna: el mapa local también choca con ellas (para predecir igual)
         this.blkGeo = geo;
         for (const b of st.blocks) g.world.removeDynamic(b);
-        st.blocks = list.map((q) => ({ k: 0, kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, ang: q[6] / 100, low: true, block: true, hitT: 0, cd: 0 }));
+        st.blocks = list.map((q) => ({
+          k: 0,
+          kind: q[0],
+          x: q[1],
+          y: q[2],
+          w: q[3],
+          h: q[4],
+          hp: q[5],
+          max: SHOP[q[0]].hp,
+          ang: q[6] / 100,
+          low: true,
+          block: true,
+          hitT: 0,
+          cd: 0,
+        }));
         for (const b of st.blocks) g.world.addDynamic(b);
         st.relayer();
       } else {
@@ -784,8 +873,12 @@ export class Online {
         });
       }
     }
-    if (Array.isArray(s.wir)) st.wires = s.wir.filter((q) => Array.isArray(q) && SHOP[q[0]] && SHOP[q[0]].ground).map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
-    if (Array.isArray(s.sc)) st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
+    if (Array.isArray(s.wir))
+      st.wires = s.wir
+        .filter((q) => Array.isArray(q) && SHOP[q[0]] && SHOP[q[0]].ground)
+        .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
+    if (Array.isArray(s.sc))
+      st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
   }
 
   // Robots: el propio en game.robot (tienda, barra de vida, dibujo) y los de los demás aparte.
@@ -826,10 +919,11 @@ export class Online {
     const seen = new Set();
     const names = new Map();
     const looks = new Map();
-    if (this.room && this.room.state) this.room.state.members.forEach((m) => {
-      names.set(m.idx, m.name);
-      looks.set(m.idx, m.look || '');
-    });
+    if (this.room && this.room.state)
+      this.room.state.members.forEach((m) => {
+        names.set(m.idx, m.name);
+        looks.set(m.idx, m.look || '');
+      });
     for (let i = 0; i + PEER_N - 1 < pl.length; i += PEER_N) {
       const idx = pl[i];
       seen.add(idx);
@@ -887,9 +981,32 @@ export class Online {
         const def = ZOMBIES[type];
         const sets = zombieSprites()[type];
         o = {
-          id, type, def, r: def.radius, mass: def.mass, si: id % sets.length, spr: sets[id % sets.length] || sets[0], x, y,
-          angle: ang, anim: 0, flash: 0, hitT: 0, hitJolt: 0, lunge: 0, spawnT: 0, tilt: 0, air: 0, swell: 0, burn: 0,
-          bs: 'walk', life: 99, dead: false, wob: rand(0, 100), fireFx: 0, it: new Interp([2]),
+          id,
+          type,
+          def,
+          r: def.radius,
+          mass: def.mass,
+          si: id % sets.length,
+          spr: sets[id % sets.length] || sets[0],
+          x,
+          y,
+          angle: ang,
+          anim: 0,
+          flash: 0,
+          hitT: 0,
+          hitJolt: 0,
+          lunge: 0,
+          spawnT: 0,
+          tilt: 0,
+          air: 0,
+          swell: 0,
+          burn: 0,
+          bs: 'walk',
+          life: 99,
+          dead: false,
+          wob: rand(0, 100),
+          fireFx: 0,
+          it: new Interp([2]),
         };
         this.zs.set(id, o);
       }
@@ -935,7 +1052,11 @@ export class Online {
           const c = args[0] || {};
           const sets = zombieSprites()[c.type];
           if (!sets) return;
-          g.decals.corpse({ type: c.type, spr: sets[c.si] || sets[0], x: c.x, y: c.y, r: c.r, angle: c.a, burnt: c.burnt }, args[1], args[2]);
+          g.decals.corpse(
+            { type: c.type, spr: sets[c.si] || sets[0], x: c.x, y: c.y, r: c.r, angle: c.a, burnt: c.burnt },
+            args[1],
+            args[2],
+          );
         } else g.decals[n](...args);
       }
     } catch {
@@ -976,14 +1097,20 @@ export class Online {
       const d = this.diag;
       el.textContent = [
         `RTT (aplicación): ${Math.round(this.rtt)} ms · variación del RTT: ${Math.round(this.jitter)} ms`,
-        d ? `Servidor: ${d.hz} pasos/s (objetivo ${NET.tickHz}) · paso ${d.ms} ms, máx ${d.mx} ms · descartados ${d.skip}` : 'Servidor: esperando datos…',
-        d ? `Salas activas: ${d.rooms} · jugadores conectados: ${d.players} · CPU del servidor: ${d.cpu}% de un núcleo` : '',
+        d
+          ? `Servidor: ${d.hz} pasos/s (objetivo ${NET.tickHz}) · paso ${d.ms} ms, máx ${d.mx} ms · descartados ${d.skip}`
+          : 'Servidor: esperando datos…',
+        d
+          ? `Salas activas: ${d.rooms} · jugadores conectados: ${d.players} · CPU del servidor: ${d.cpu}% de un núcleo`
+          : '',
         `Fotos recibidas: ${per}/s (envío ${NET.snapHz}/s) · retraso de dibujo ${NET.interpDelay} ms`,
         `Datos: ↓ ${kin.toFixed(1)} KB/s · ↑ ${kout.toFixed(1)} KB/s (WebSocket, sin cabeceras TCP/TLS)`,
         `Correcciones: ${c.n}/s · media ${c.avg.toFixed(1)} px · máx ${c.max.toFixed(1)} px · saltos ${c.snaps}`,
         `Entradas sin confirmar: ${this.pred ? this.pred.pending.length : 0} · FPS ${fps}`,
         'Pérdida de paquetes: no se mide (WebSocket va sobre TCP y la oculta con reenvíos).',
-      ].filter(Boolean).join('\n');
+      ]
+        .filter(Boolean)
+        .join('\n');
     }
     if (this.reconnecting) return 'Reconectando…';
     return `En línea · RTT ${Math.round(this.rtt)} ms (±${Math.round(this.jitter)}) · ${per} act/s · ${fps} FPS`;
