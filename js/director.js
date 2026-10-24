@@ -48,8 +48,8 @@ export class Director {
     for (let i = 0; i < bulls; i++) q.splice(randInt(Math.floor(q.length * 0.15), q.length), 0, 'bull');
     this.queue = q;
     this.waveSize = q.length;
-    this.interval = Math.max(0.3, 1.5 - w * 0.08);
-    this.spawnT = 0.5;
+    this.waveT = 0;
+    this.spawnT = 0.3;
     this.state = 'active';
     this.straggleT = 0;
     game.banner(`Oleada ${w}`, w === 3 ? 'Llegan los toros: esquiva sus embestidas' : w === 11 ? 'Llegan los super blindados' : heavies ? 'Super blindados en la horda' : w === 1 ? 'Velocistas y policías SWAT' : fats ? 'Cuidado con los gordos' : 'Sobrevive');
@@ -71,10 +71,14 @@ export class Director {
       return;
     }
     const alive = game.horde.list.length;
+    // toda la cola sale en los primeros WAVES.spawnTime s: cada ráfaga pone al día lo que toca
+    this.waveT = (this.waveT || 0) + dt;
     this.spawnT -= dt;
-    if (this.queue.length && this.spawnT <= 0 && alive < (this.coop ? COOP_MAX_ALIVE : MAX_ALIVE)) {
-      this.spawnGroup(game);
-      this.spawnT = this.interval * rand(0.7, 1.3);
+    if (this.queue.length && this.spawnT <= 0) {
+      this.spawnT = WAVES.burst;
+      const due = Math.ceil(this.waveSize * Math.min(1, this.waveT / WAVES.spawnTime)) - (this.waveSize - this.queue.length);
+      const room = (this.coop ? COOP_MAX_ALIVE : MAX_ALIVE) - alive;
+      if (due > 0 && room > 0) this.spawnGroup(game, Math.min(due, room));
     }
     // la ronda termina al eliminar al último zombi; la siguiente espera al jugador
     if (!this.queue.length && alive === 0) {
@@ -85,54 +89,80 @@ export class Director {
     if (!this.queue.length && alive <= 5) this.herdStragglers(dt, game);
   }
 
+  // Lo que ve cada jugador vivo: caja { x, y, hw, hh }. El de este equipo usa su cámara real;
+  // para los demás (cooperativo, servidor) no sabemos su pantalla y se usa WAVES.view.
+  views(game) {
+    const [vw, vh] = WAVES.view;
+    const out = [];
+    if (game.targets) {
+      for (const p of game.targets) if (p.alive) out.push({ x: p.x, y: p.y, hw: vw, hh: vh });
+      return out;
+    }
+    const cam = game.camera;
+    const p = game.player;
+    if (p && p.alive) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
+    const peer = game.coop && game.coop.isHost && game.coop.peer;
+    if (peer && peer.alive) out.push({ x: peer.x, y: peer.y, hw: vw, hh: vh });
+    if (!out.length && p) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
+    return out;
+  }
+
+  // ¿Algún jugador vería un círculo de radio r en (x, y)? (con margen por la cámara que sigue a la mira)
+  seen(views, x, y, r) {
+    const m = r + 40;
+    for (const v of views) if (Math.abs(x - v.x) < v.hw + m && Math.abs(y - v.y) < v.hh + m) return true;
+    return false;
+  }
+
   // Si quedan pocos zombis atascados lejos, los acerca para que la ronda no se trabe.
   herdStragglers(dt, game) {
     this.straggleT = (this.straggleT || 0) + dt;
     if (this.straggleT < WAVES.straggle) return;
     this.straggleT = 0;
-    const p = game.spawnFocus();
-    const cam = game.camera;
-    const radius = Math.hypot(cam.viewW, cam.viewH) / 2 + 60;
+    const views = this.views(game);
     for (const z of game.horde.list) {
-      if (Math.hypot(z.x - p.x, z.y - p.y) < 1100) continue;
+      if (views.some((v) => Math.hypot(z.x - v.x, z.y - v.y) < 1100)) continue;
       for (let t = 0; t < 12; t++) {
-        const a = rand(0, TAU);
-        const x = p.x + Math.cos(a) * radius;
-        const y = p.y + Math.sin(a) * radius;
-        if (x < 80 || y < 80 || x > WORLD_SIZE - 80 || y > WORLD_SIZE - 80) continue;
-        if (game.world.pointBlocked(x, y, z.r + 2)) continue;
-        z.x = x;
-        z.y = y;
+        const c = this.edgePoint(game, rand(60, 160), views);
+        if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
+        if (game.world.pointBlocked(c.x, c.y, z.r + 2) || this.seen(views, c.x, c.y, z.r)) continue;
+        z.x = c.x;
+        z.y = c.y;
         break;
       }
     }
   }
 
-  // Punto al azar sobre el borde de la pantalla (un poco por fuera), por cualquier lado.
-  edgePoint(game, margin) {
-    const cam = game.camera;
-    const p = game.spawnFocus();
-    const hw = cam.viewW / 2 + margin;
-    const hh = cam.viewH / 2 + margin;
+  // Punto al azar justo fuera de la vista de un jugador al azar, por cualquier lado.
+  edgePoint(game, margin, views = this.views(game)) {
+    let v = views[randInt(0, views.length - 1)];
+    if (!v) {
+      const f = game.spawnFocus();
+      v = { x: f.x, y: f.y, hw: WAVES.view[0], hh: WAVES.view[1] };
+    }
+    const hw = v.hw + margin;
+    const hh = v.hh + margin;
     const per = 4 * (hw + hh);
     let t = rand(0, per);
-    if (t < 2 * hw) return { x: p.x - hw + t, y: p.y - hh };
+    if (t < 2 * hw) return { x: v.x - hw + t, y: v.y - hh };
     t -= 2 * hw;
-    if (t < 2 * hh) return { x: p.x + hw, y: p.y - hh + t };
+    if (t < 2 * hh) return { x: v.x + hw, y: v.y - hh + t };
     t -= 2 * hh;
-    if (t < 2 * hw) return { x: p.x + hw - t, y: p.y + hh };
+    if (t < 2 * hw) return { x: v.x + hw - t, y: v.y + hh };
     t -= 2 * hw;
-    return { x: p.x - hw, y: p.y + hh - t };
+    return { x: v.x - hw, y: v.y + hh - t };
   }
 
-  // Cada tanda se reparte en grupitos por todas las orillas de la pantalla.
-  spawnGroup(game) {
+  // Cada ráfaga (n zombis) se reparte en grupitos por las orillas, siempre fuera de la vista de todos.
+  // Lo que no quepa sale en la siguiente ráfaga.
+  spawnGroup(game, n) {
     const world = game.world;
-    let left = Math.min(this.queue.length, randInt(14, 22 + this.wave * 3));
+    const views = this.views(game);
+    let left = Math.min(this.queue.length, n);
     let tries = 0;
     while (left > 0 && this.queue.length && tries < 40) {
       tries++;
-      const c = this.edgePoint(game, rand(40, 160));
+      const c = this.edgePoint(game, rand(70, 180), views);
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
       if (world.pointBlocked(c.x, c.y, 18) || !world.reachable(c.x, c.y)) continue;
       const cluster = Math.min(left, randInt(2, 5));
@@ -142,7 +172,7 @@ export class Director {
         for (let t = 0; t < 6; t++) {
           const x = c.x + rand(-45, 45);
           const y = c.y + rand(-45, 45);
-          if (world.pointBlocked(x, y, r + 2) || !world.reachable(x, y)) continue;
+          if (world.pointBlocked(x, y, r + 2) || !world.reachable(x, y) || this.seen(views, x, y, r)) continue;
           game.horde.spawn(type, x, y, this.hpMult, this.speedMult);
           this.queue.shift();
           left--;
@@ -153,9 +183,9 @@ export class Director {
     if (left <= 0 || !this.queue.length) return;
     // si el jugador está encerrado por barricadas no hay ruta: aparecer igualmente en las orillas
     for (let attempt = 0; attempt < 12 && left > 0 && this.queue.length; attempt++) {
-      const c = this.edgePoint(game, rand(40, 160));
+      const c = this.edgePoint(game, rand(70, 180), views);
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (world.pointBlocked(c.x, c.y, 26)) continue;
+      if (world.pointBlocked(c.x, c.y, 26) || this.seen(views, c.x, c.y, 26)) continue;
       game.horde.spawn(this.queue.shift(), c.x, c.y, this.hpMult, this.speedMult);
       left--;
     }

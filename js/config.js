@@ -114,31 +114,31 @@ export const ZOMBIES = {
   // de pasos avanza con la distancia recorrida, así que se acelera sola y no patinan.
   normal: {
     hp: 42, speed: [60, 88], radius: 13, damage: 8, attackRate: 0.9,
-    xp: 3, mass: 1, reach: 7, frames: 6, turn: 4,
+    xp: 2, mass: 1, reach: 7, frames: 6, turn: 4,
   },
-  // Policía SWAT: como un normal, con escudo antidisturbios; aguanta 8 veces más.
+  // Policía SWAT: como un normal (misma velocidad), con escudo antidisturbios; aguanta 8 veces más.
   swat: {
-    hp: 42 * 8, speed: [28, 38], radius: 14, damage: 10, attackRate: 0.9,
-    xp: 30, mass: 2.5, reach: 8, frames: 6, turn: 3.5,
+    hp: 42 * 8, speed: [60, 88], radius: 14, damage: 10, attackRate: 0.9,
+    xp: 20, mass: 2.5, reach: 8, frames: 6, turn: 3.5,
   },
   sprinter: {
     hp: 26, speed: [88, 104], radius: 11, damage: 6, attackRate: 1.3,
-    xp: 6, mass: 0.8, reach: 6, frames: 6, turn: 7,
+    xp: 4, mass: 0.8, reach: 6, frames: 6, turn: 7,
   },
   // Super blindado: un gordo con armadura militar completa. Desde la oleada 11; 50 veces la vida de un normal.
   // Da super golpes: 30 de daño, te avienta y destroza estructuras (blockDmg por golpe).
   heavy: {
     hp: 42 * 50, speed: [19, 25], radius: 22, damage: 30, attackRate: 0.7,
-    xp: 75, mass: 6, reach: 9, frames: 6, turn: 2.5, blockDmg: 260, punch: 1000,
+    xp: 50, mass: 6, reach: 9, frames: 6, turn: 2.5, blockDmg: 260, punch: 1000,
   },
   // Toro: zombi musculoso que embiste al verte (ver BULL).
   bull: {
     hp: 42 * 7, speed: [52, 62], radius: 17, damage: 14, attackRate: 0.8,
-    xp: 24, mass: 5, reach: 8, frames: 6, turn: 3.5,
+    xp: 16, mass: 5, reach: 8, frames: 6, turn: 3.5,
   },
   fat: {
     hp: 130, speed: [21, 27], radius: 21, damage: 14, attackRate: 0.75,
-    xp: 12, mass: 4, reach: 8, frames: 6, turn: 3,
+    xp: 8, mass: 4, reach: 8, frames: 6, turn: 3,
   },
   // Zombi dorado: poco común, huye de ti y desaparece si no lo matas a tiempo.
   golden: {
@@ -156,14 +156,17 @@ export const ZOMBIES = {
 //   nv1 51 · nv2 89 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
 export const xpForLevel = (lvl) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
 
-// Dinero por cada zombi eliminado. Triple que antes (y triple xp en ZOMBIES): las oleadas traen
-// un tercio de zombis (WAVES.count), así que por ronda se gana lo mismo que antes.
-export const BOUNTY = { normal: 3, sprinter: 9, swat: 30, fat: 15, heavy: 75, bull: 45, giant: 10, golden: 0 };
+// Dinero por cada zombi eliminado. El doble que antes (y doble xp en ZOMBIES): las oleadas traen
+// la mitad de zombis (WAVES.count), así que por ronda se gana lo mismo que antes.
+export const BOUNTY = { normal: 2, sprinter: 6, swat: 20, fat: 10, heavy: 50, bull: 30, giant: 10, golden: 0 };
 
-// Tamaño y ritmo de las oleadas: rondas de un tercio de lo que duraban.
+// Tamaño y ritmo de las oleadas: rondas cortas.
 // count: fracción de zombis por oleada (se aplica igual en solitario, cooperativo y en línea, ver NET.crowd)
 // hp / speed: vida y velocidad base de los zombis de oleada · straggle: s antes de acercar a los rezagados
-export const WAVES = { count: 1 / 3, hp: 0.9, speed: 1.1, straggle: 3 };
+// spawnTime: toda la oleada aparece en estos s (en ráfagas cada burst s), salvo que se llegue al tope de vivos
+// view: media caja (px) que se da por vista de los demás jugadores (cubre celular vertical y pantalla ancha);
+// nadie aparece dentro de la vista de ningún jugador vivo
+export const WAVES = { count: 0.5, hp: 0.9, speed: 1.2, straggle: 3, spawnTime: 10, burst: 0.4, view: [680, 520] };
 
 // Embestida del toro: te ve, escarba y carga en línea recta.
 // hit: daño al jugador · long/short: daño de la embestida larga y corta contra estructuras.

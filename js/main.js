@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER, WAVES } from './config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './abilities.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
@@ -391,7 +391,7 @@ class Game {
       }
       dir.queue = q;
       dir.waveSize = d.waveSize || q.length;
-      dir.interval = Math.max(0.3, 1.5 - d.wave * 0.08);
+      dir.waveT = WAVES.spawnTime * (1 - q.length / dir.waveSize);
       dir.spawnT = 1;
       for (const [t, x, y, hp] of d.zombies || []) {
         if (!this.horde.sprites[t]) continue;
@@ -725,7 +725,7 @@ class Game {
     for (let i = 0; i < 20; i++) {
       const c = d.edgePoint(this, rand(60, 140));
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y)) continue;
+      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y) || d.seen(d.views(this), c.x, c.y, 16)) continue;
       this.horde.spawn('golden', c.x, c.y, 1, 1);
       this.sfx.goldenSpawn();
       this.toast('¡Apareció un zombi dorado! Atrápalo antes de que escape');
