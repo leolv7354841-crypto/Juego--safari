@@ -53,6 +53,8 @@ jobs:
       - run: npm ci
       - name: Biome (formato y reglas)
         run: npm run lint
+      - name: Tipos (checkJs)
+        run: npm run typecheck
       - name: Pruebas del núcleo
         run: npm test
 
