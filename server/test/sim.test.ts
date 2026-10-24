@@ -83,3 +83,49 @@ test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida'
   assert.ok(i >= 0 && i % 2 === 0, 'el gordo herido está en zh');
   assert.equal(zh[i + 1], 40);
 });
+
+test('entre oleadas cada jugador elige sus mejoras y compra con su propio dinero', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }, { id: 'b', idx: 2, name: 'Beto' }]);
+  const a = sim.slots.get('a')!;
+  const b = sim.slots.get('b')!;
+  // una baja de Ana: experiencia para los dos, dinero sólo para ella
+  const z = sim.horde.spawn('normal', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
+  z.lastOwner = 'a';
+  sim.killZombie(z);
+  assert.ok(a.money > 0, 'Ana cobra la baja');
+  assert.equal(b.money, 0, 'Beto no cobra');
+  assert.equal(a.xp, b.xp, 'la experiencia es del equipo');
+  // sube de nivel: las mejoras se ofrecen sólo entre oleadas
+  sim.addXp(a, a.xpNeed);
+  assert.equal(a.pending, 1);
+  sim.director.state = 'active';
+  sim.offerUpgrades();
+  sim.director.state = 'waiting';
+  sim.offerUpgrades();
+  assert.ok(a.choices.length > 0, 'hay mejoras para elegir');
+  assert.ok(sim.snapshot('a', 0).up, 'llegan en la foto');
+  assert.equal(sim.pick('a', 0, a.choiceN + 1), false, 'una tanda vieja o falsa no vale');
+  const before = JSON.stringify(a.p.stats) + a.p.weapons.length + a.p.hp;
+  assert.ok(sim.pick('a', 0, a.choiceN));
+  assert.equal(a.pending, 0);
+  assert.notEqual(JSON.stringify(a.p.stats) + a.p.weapons.length + a.p.hp, before, 'la mejora se aplicó');
+  assert.ok(!sim.snapshot('a', 0).up, 'sin más mejoras pendientes');
+  // tienda: sin dinero no compra; con dinero sí, y sólo entre oleadas
+  assert.equal(sim.shop('b', 'gun', 'smg', 0), false);
+  b.money = 10000;
+  sim.director.state = 'active';
+  assert.equal(sim.shop('b', 'gun', 'shotgun', 0), false, 'en plena oleada no se compra');
+  sim.director.state = 'waiting';
+  assert.ok(sim.shop('b', 'gun', 'shotgun', 0));
+  assert.ok(b.p.has('shotgun'));
+  const w = b.p.weapons.find((x: any) => x.id === 'shotgun');
+  const res = w.reserve;
+  assert.ok(sim.shop('b', 'ammo', 'shotgun', 10));
+  assert.ok(w.reserve > res, 'compró munición');
+  assert.equal(sim.shop('b', 'ammo', 'shotgun', 7), false, 'cantidad no permitida');
+  assert.ok(sim.shop('b', 'sell', 'shotgun', 0));
+  assert.ok(!b.p.has('shotgun'));
+  assert.equal(sim.shop('b', 'sell', 'pistol', 0), false, 'la pistola no se vende');
+  assert.equal(sim.shop('b', 'gun', '__proto__', 0), false);
+  assert.equal(sim.snapshot('b', 0).st[7], b.money, 'el dinero va en la foto');
+});

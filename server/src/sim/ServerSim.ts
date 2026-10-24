@@ -14,7 +14,8 @@ import { Player } from '../../../js/player.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, BOUNTY } from '../../../js/config.js';
+import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, xpForLevel } from '../../../js/config.js';
+import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
 import type { Cmd } from '../validate.ts';
 
@@ -28,6 +29,9 @@ const AUTO_NEXT = 45;
 // pasos sin entrada en los que se repite la última (luego, quieto)
 const STARVE = 6;
 const r100 = (v: number) => Math.round(v * 100);
+const UPGRADE_BY_ID = new Map<string, any>(UPGRADES.map((u: any) => [u.id, u]));
+// estadísticas del jugador que cambian con las mejoras (el cliente las necesita para predecir)
+export const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
 
 type Fx = { e: unknown[]; x?: number; y?: number; by: string | null };
 
@@ -46,6 +50,15 @@ export type Slot = {
   dropped: number;
   starve: number;
   toasts: string[];
+  // nivel propio: cada uno elige sus mejoras (y compra en la tienda con su dinero)
+  level: number;
+  xp: number;
+  xpNeed: number;
+  pending: number;
+  taken: Record<string, number>;
+  // mejoras ofrecidas ahora (ids) y su número de tanda, para no aplicar una elección vieja
+  choices: string[];
+  choiceN: number;
 };
 
 export class ServerSim {
@@ -88,7 +101,8 @@ export class ServerSim {
       this.world.collide(p, p.r, true);
       p.field = this.newField();
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
-      this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [] });
+      this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [],
+        level: 1, xp: 0, xpNeed: xpForLevel(1), pending: 0, taken: {}, choices: [], choiceN: 0 });
     });
   }
 
@@ -241,8 +255,10 @@ export class ServerSim {
     const by = this.slots.get(z.lastOwner);
     if (by) {
       by.kills++;
-      by.money += BOUNTY[z.type] || 0;
+      by.money += BOUNTY[z.type as keyof typeof BOUNTY] || 0;
     }
+    // la experiencia es del equipo (todos suben de nivel juntos)
+    for (const s of this.slots.values()) this.addXp(s, z.def.xp);
     if (z.type === 'golden') {
       // recompensa única del zombi dorado para quien lo mató (como en solitario)
       if (by) {
@@ -267,6 +283,72 @@ export class ServerSim {
       else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
       g.sfx.kill(z.type === 'fat' || z.type === 'heavy');
     }
+  }
+
+  addXp(s: Slot, n: number) {
+    s.xp += n;
+    while (s.xp >= s.xpNeed) {
+      s.xp -= s.xpNeed;
+      s.level++;
+      s.xpNeed = xpForLevel(s.level);
+      s.pending++;
+    }
+  }
+
+  /* ---------- mejoras y tienda (entre oleadas, como en el cooperativo) ---------- */
+
+  // Ofrece la siguiente tanda de mejoras a quien tenga niveles sin elegir.
+  offerUpgrades() {
+    for (const s of this.slots.values()) {
+      if (s.choices.length || s.pending <= 0 || !s.p.alive) continue;
+      const ups = rollUpgrades(s.p, s.level - s.pending + 1, s.taken);
+      if (!ups.length) {
+        s.pending = 0;
+        continue;
+      }
+      s.choices = ups.map((u: any) => u.id);
+      s.choiceN++;
+    }
+  }
+
+  pick(id: string, i: number, n: number) {
+    const s = this.slots.get(id);
+    if (!s || n !== s.choiceN || !s.choices[i]) return false;
+    const u = UPGRADE_BY_ID.get(s.choices[i]);
+    if (!u) return false;
+    u.apply(s.p);
+    s.taken[u.id] = (s.taken[u.id] || 0) + 1;
+    s.pending--;
+    s.choices = [];
+    if (u.weapon) s.toasts.push(`${u.name} equipada`);
+    return true;
+  }
+
+  // Compra o venta en la tienda: sólo entre oleadas y con el dinero que lleva el servidor.
+  shop(id: string, k: string, wid: string, n: number) {
+    const s = this.slots.get(id);
+    const d = Object.hasOwn(WEAPONS, wid) ? (WEAPONS as any)[wid] : null;
+    if (!s || !d || !s.p.alive || this.director.state !== 'waiting') return false;
+    const p = s.p;
+    if (k === 'gun') {
+      if (p.has(wid) || s.money < d.price) return false;
+      s.money -= d.price;
+      p.unlock(wid);
+      s.toasts.push(`${d.name} comprada`);
+    } else if (k === 'sell') {
+      if (wid === 'pistol' || !p.removeWeapon(wid)) return false;
+      const gain = Math.round(d.price * SELL_RATE);
+      s.money += gain;
+      s.toasts.push(`${d.name} vendida: +$${gain}`);
+    } else if (k === 'ammo') {
+      const w = p.weapons.find((x: any) => x.id === wid);
+      if (!w || w.reserve === Infinity || (n !== 1 && n !== 10)) return false;
+      const cost = d.ammoPrice * n;
+      if (s.money < cost) return false;
+      s.money -= cost;
+      w.reserve += p.magSize(d) * n;
+    } else return false;
+    return true;
   }
 
   // Un jugador recoge un objeto (mismas reglas que en solitario; el aviso es sólo para él).
@@ -393,6 +475,7 @@ export class ServerSim {
       }
     }
     if (d.state === 'waiting') {
+      this.offerUpgrades();
       this.waitT += TICK;
       if (this.waitT > AUTO_NEXT) this.nextRound();
     }
@@ -491,7 +574,10 @@ export class ServerSim {
       pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
       b: this.bullets.list.flatMap((b: any) => (b.owner !== id && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
       w: d.wave, ds: d.state, tm: Math.round(this.time), kl: this.totalKills(), lft: d.queue.length + this.horde.list.length,
+      ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
+      ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
     };
+    if (s.choices.length) snap.up = [s.choiceN, ...s.choices];
     if (fx.length) snap.fx = fx;
     if (s.toasts.length) {
       snap.tt = s.toasts.slice(0, 4);

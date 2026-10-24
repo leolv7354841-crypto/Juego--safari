@@ -19,7 +19,7 @@ import { Director } from './director.js';
 import { Lighting } from './lighting.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
-import { drawSurvivor, drawGunIcon, LOOK_PARTS, DEFAULT_LOOK, cleanLook } from './sprites.js';
+import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
 const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
@@ -700,7 +700,8 @@ class Game {
     this.sfx.level();
     const lvl = this.level - this.pendingLevels + 1;
     this.$('level-kicker').textContent = `Nivel ${lvl} alcanzado`;
-    this.choices = rollUpgrades(this.player, lvl, this.taken);
+    // en línea las ofrece el servidor (es quien aplica la mejora)
+    this.choices = this.online.active ? this.online.upChoices() : rollUpgrades(this.player, lvl, this.taken);
     const wrap = this.$('cards');
     wrap.classList.remove('ready');
     wrap.innerHTML = '';
@@ -724,6 +725,14 @@ class Game {
     if (this.state !== 'levelup' || performance.now() < this.levelReadyAt) return;
     const u = this.choices[i];
     if (!u) return;
+    if (this.online.active) {
+      // la siguiente tanda (si quedan niveles) llega con la próxima foto del servidor
+      this.online.pickUpgrade(i);
+      this.taken[u.id] = (this.taken[u.id] || 0) + 1;
+      this.input.reset();
+      this.last = performance.now();
+      return this.setState('play');
+    }
     u.apply(this.player);
     this.taken[u.id] = (this.taken[u.id] || 0) + 1;
     this.pendingLevels--;
@@ -1006,6 +1015,22 @@ class Game {
       row.append(lbl, sw);
       box.appendChild(row);
     }
+    const row = document.createElement('div');
+    row.className = 'look-row';
+    const lbl = document.createElement('span');
+    lbl.textContent = 'Sombrero';
+    const sw = document.createElement('div');
+    sw.className = 'look-sw look-hats';
+    for (const h of HATS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = h.name;
+      b.classList.toggle('on', this.look.hat === h.id);
+      b.addEventListener('click', () => this.setLook({ ...this.look, hat: h.id }));
+      sw.appendChild(b);
+    }
+    row.append(lbl, sw);
+    box.appendChild(row);
   }
 
   setLook(look) {
@@ -1180,7 +1205,6 @@ class Game {
   }
 
   openShop() {
-    if (this.online.active) return;
     this.shopPending = false;
     this.input.reset();
     this.setState('shop');
@@ -1229,7 +1253,8 @@ class Game {
         </div>
       </div>`;
     });
-    const gear = SHOP_ORDER.map((k) => {
+    // en línea todavía no se construye ni se lanza nada: sólo armas y munición
+    const gear = this.online.active ? [] : SHOP_ORDER.map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
       return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
@@ -1241,8 +1266,9 @@ class Game {
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
       <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
+      ${this.online.active ? '<p class="shop-empty">En línea, las defensas, granadas, molotovs y el robot no están disponibles todavía.</p>' : `
       <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
-      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
+      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
     const rc = this.$('shop-items').querySelector('canvas[data-robot]');
     if (rc) {
@@ -1292,6 +1318,7 @@ class Game {
     const d = WEAPONS[id];
     const p = this.player;
     if (!d || p.has(id) || this.money < d.price) return;
+    if (this.online.active) return this.online.buy('gun', id);
     this.money -= d.price;
     p.unlock(id);
     this.sfx.buy();
@@ -1302,7 +1329,9 @@ class Game {
   sellWeapon(id) {
     const p = this.player;
     const d = WEAPONS[id];
-    if (!d || id === 'pistol' || !p.removeWeapon(id)) return;
+    if (!d || id === 'pistol') return;
+    if (this.online.active) return p.has(id) && this.online.buy('sell', id);
+    if (!p.removeWeapon(id)) return;
     const gain = Math.round(d.price * SELL_RATE);
     this.money += gain;
     this.sfx.buy();
@@ -1316,6 +1345,7 @@ class Game {
     if (!w || w.reserve === Infinity) return;
     const cost = w.def.ammoPrice * n;
     if (this.money < cost) return;
+    if (this.online.active) return this.online.buy('ammo', id, n);
     this.money -= cost;
     w.reserve += p.magSize(w.def) * n;
     this.sfx.buy();
@@ -1507,7 +1537,8 @@ class Game {
     on('btn-account', () => this.showAccount());
     on('btn-look', () => this.showLook());
     on('btn-look-done', () => this.setState('menu'));
-    on('btn-look-random', () => this.setLook(Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[Math.floor(Math.random() * q.colors.length)]]))));
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    on('btn-look-random', () => this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }));
     on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
     on('btn-leaderboard', () => this.showBoard());
     on('btn-coop', () => this.showCoop());

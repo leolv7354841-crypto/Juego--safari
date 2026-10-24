@@ -395,6 +395,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .look-sw { display: flex; flex-wrap: wrap; gap: 6px; }
 .look-sw button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.6); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
 .look-sw button.on { box-shadow: 0 0 0 2px var(--ink); }
+.look-hats button { width: auto; border-radius: 14px; padding: 0 10px; background: rgba(255,255,255,0.06); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; }
 .look-actions { display: flex; gap: 8px; margin-bottom: 10px; }
 .look-actions .btn { flex: 1; }
 #btn-look-done { width: 100%; }

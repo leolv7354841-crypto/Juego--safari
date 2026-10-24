@@ -1038,22 +1038,104 @@ export const LOOK_PARTS = [
   { id: 'pants', name: 'Pantalón', colors: ['#2c3038', '#3c412a', '#4a3a2c', '#1a1a1c', '#596270', '#6b5a44'] },
   { id: 'pack', name: 'Mochila', colors: ['#4c5236', '#6b4f3a', '#2c2c2e', '#3f566b', '#7d2f2a', '#8a6a3a'] },
 ];
-export const DEFAULT_LOOK = Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[0]]));
+// Sombreros: el primero es ninguno. Se dibujan encima de la cabeza (drawHat).
+export const HATS = [
+  { id: 'none', name: 'Nada' },
+  { id: 'cap', name: 'Gorra' },
+  { id: 'cowboy', name: 'Vaquero' },
+  { id: 'beanie', name: 'Gorro' },
+  { id: 'helmet', name: 'Casco' },
+];
+const HAT_IDS = HATS.map((h) => h.id);
+export const DEFAULT_LOOK = { ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[0]])), hat: 'none' };
 
-// Acepta sólo colores de las listas (llega también de la red en cooperativo).
+// Acepta sólo colores y sombreros de las listas (llega también de la red en cooperativo).
 export function cleanLook(o) {
   const out = {};
   for (const q of LOOK_PARTS) out[q.id] = o && q.colors.includes(o[q.id]) ? o[q.id] : q.colors[0];
+  out.hat = o && HAT_IDS.includes(o.hat) ? o.hat : 'none';
   return out;
 }
 
-// En línea viaja como código corto: un dígito por parte (índice del color en su lista).
+// En línea viaja como código corto: un dígito por parte (índice del color en su lista)
+// y al final el del sombrero (los códigos viejos sin él quedan sin sombrero).
 export function lookCode(look) {
-  return LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('');
+  return LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('') + Math.max(0, HAT_IDS.indexOf(look && look.hat));
 }
 export function lookFromCode(code) {
   const s = typeof code === 'string' ? code : '';
-  return Object.fromEntries(LOOK_PARTS.map((q, i) => [q.id, q.colors[Number(s[i])] || q.colors[0]]));
+  const out = Object.fromEntries(LOOK_PARTS.map((q, i) => [q.id, q.colors[Number(s[i])] || q.colors[0]]));
+  out.hat = HAT_IDS[Number(s[LOOK_PARTS.length])] || 'none';
+  return out;
+}
+
+// Vista cenital: la cabeza mira hacia +x, centrada en (r*0.02, 0) con radio r*0.44.
+function drawHat(g, id, r) {
+  const x = r * 0.02;
+  if (id === 'cap') {
+    // visera hacia delante, copa con costuras y botón
+    g.fillStyle = '#26406a';
+    g.beginPath();
+    g.ellipse(x + r * 0.38, 0, r * 0.42, r * 0.36, 0, -Math.PI / 2, Math.PI / 2);
+    g.fill();
+    g.lineWidth = 1.2;
+    g.strokeStyle = OUT;
+    g.stroke();
+    circ(g, x, 0, r * 0.46, '#3a5a8c');
+    g.strokeStyle = 'rgba(0,0,0,0.3)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (const a of [0.9, 2.2, 3.5, 4.8]) {
+      g.moveTo(x, 0);
+      g.lineTo(x + Math.cos(a) * r * 0.44, Math.sin(a) * r * 0.44);
+    }
+    g.stroke();
+    circ(g, x, 0, r * 0.08, '#26406a', OUT, 1);
+  } else if (id === 'cowboy') {
+    // ala ancha, copa con hendidura y cinta
+    ell(g, x - r * 0.02, 0, r * 0.74, r * 0.66, 0, '#8a6440');
+    g.strokeStyle = 'rgba(0,0,0,0.22)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(x - r * 0.02, 0, r * 0.62, r * 0.55, 0, 0, TAU);
+    g.stroke();
+    ell(g, x, 0, r * 0.52, r * 0.44, 0, '#3a2a1c', null);
+    ell(g, x, 0, r * 0.46, r * 0.38, 0, '#a07650');
+    g.strokeStyle = shade('#a07650', 0.7);
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(x - r * 0.3, 0);
+    g.lineTo(x + r * 0.3, 0);
+    g.stroke();
+  } else if (id === 'beanie') {
+    // gorro de lana: doblez, punto acanalado y pompón
+    circ(g, x - r * 0.02, 0, r * 0.48, '#7d2f2a');
+    circ(g, x - r * 0.04, 0, r * 0.36, '#94403a', null);
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * TAU;
+      g.moveTo(x - r * 0.04 + Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12);
+      g.lineTo(x - r * 0.04 + Math.cos(a) * r * 0.35, Math.sin(a) * r * 0.35);
+    }
+    g.stroke();
+    circ(g, x - r * 0.04, 0, r * 0.14, '#d8d2c4', OUT, 1);
+  } else if (id === 'helmet') {
+    // casco militar con borde, manchas de camuflaje y brillo
+    circ(g, x - r * 0.02, 0, r * 0.54, '#3c4529');
+    circ(g, x - r * 0.02, 0, r * 0.46, '#4f5a34', null);
+    g.fillStyle = '#3a4226';
+    for (const [dx, dy, rr] of [[-0.18, -0.2, 0.12], [0.16, 0.14, 0.1], [-0.12, 0.22, 0.08], [0.2, -0.16, 0.07]]) {
+      g.beginPath();
+      g.arc(x + dx * r, dy * r, rr * r, 0, TAU);
+      g.fill();
+    }
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    g.beginPath();
+    g.ellipse(x + r * 0.12, -r * 0.14, r * 0.16, r * 0.09, -0.6, 0, TAU);
+    g.fill();
+  }
 }
 
 export function drawSurvivor(g, p, time) {
@@ -1143,6 +1225,7 @@ export function drawSurvivor(g, p, time) {
   g.lineTo(-r * 0.7, 2 + Math.sin(time * 9 + 1) * 2);
   g.closePath();
   g.fill();
+  if (L.hat && L.hat !== 'none') drawHat(g, L.hat, r);
   if (p.hurtT > 0) {
     g.globalAlpha = Math.min(1, p.hurtT * 4) * 0.6;
     circ(g, 0, 0, r * 1.05, '#c8443a', null);

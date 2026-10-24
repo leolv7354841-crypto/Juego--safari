@@ -250,10 +250,12 @@ están listos). Fases: esperando → cargando → jugando → finalizada (con re
 propietario se va, la sala pasa al más antiguo. Una sala vacía se borra a los 30 s, y una sala
 sin partida (esperando o en resultados) se cierra a los 20 minutos para liberar su cupo.
 
-**Reglas del modo en línea (fase 1).** Para no romper nada, en línea por ahora **no hay tienda,
-construcciones, granadas, molotovs, robot ni mejoras de nivel** (siguen igual en solitario y en el
-cooperativo directo); el dinero se gana como en solitario (recompensas por zombi y el dorado), aunque todavía no hay
-tienda donde gastarlo. Se conservan armas de cajas, munición y botiquines.
+**Reglas del modo en línea (fase 1).** Como en el cooperativo, cada uno tiene su dinero, armas y
+mejoras, y la experiencia es del equipo: el dinero se gana como en solitario (recompensas por zombi y
+el dorado, para quien lo mata) y **entre oleadas** cada uno elige sus mejoras de nivel y luego se abre
+la tienda (comprar y vender armas, munición). En línea por ahora **no hay construcciones, granadas,
+molotovs ni robot** (siguen igual en solitario y en el cooperativo directo). Se conservan armas de
+cajas, munición y botiquines.
 Zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra (y 1,4 veces su vida, como en el
 cooperativo). Si caes, revives al terminar la oleada junto a un compañero; la partida termina cuando
 caen todos. La siguiente oleada la inicia cualquiera (o empieza sola a los 45 s). El zombi dorado

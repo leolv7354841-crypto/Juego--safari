@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, client, sleep, waitFor, serverRoom, cut, inbox } from './helpers.ts';
 import { CONFIG } from '../src/config.ts';
+import { WEAPONS } from '../../js/config.js';
 import { STATS } from '../src/stats.ts';
 import { IDLE } from '../src/rooms/DeadZoneRoom.ts';
 
@@ -294,4 +295,38 @@ test('/health responde con métricas', async () => {
   assert.ok('rooms' in j && 'players' in j);
   assert.equal(j.maxRooms, CONFIG.maxRooms);
   assert.equal(j.maxPlayers, CONFIG.maxPlayers);
+});
+
+test('entre oleadas llegan las mejoras y la tienda funciona por la red', async () => {
+  const [owner] = await fill(1);
+  const got = inbox(owner);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading');
+  owner.send('loaded');
+  await waitFor(() => owner.state.phase === 'playing');
+  const room = serverRoom(owner.roomId);
+  const sim = room.sim;
+  const slot = sim.slots.get(owner.sessionId);
+  // fin de oleada simulado: un nivel por elegir y dinero para gastar
+  sim.director.state = 'waiting';
+  sim.addXp(slot, slot.xpNeed);
+  slot.money = 500;
+  const last = () => got.snap[got.snap.length - 1];
+  await waitFor(() => last()?.up, 3000, 'mejoras en la foto');
+  const up = last().up;
+  assert.deepEqual([last().st[7], last().ec[0]], [500, 2]);
+  owner.send('pick', { i: 0, n: up[0] });
+  await waitFor(() => slot.pending === 0 && !last().up, 3000, 'mejora aplicada');
+  assert.equal(slot.taken[up[1]], 1);
+  // un arma que las mejoras nunca dan (la mejora elegida al azar puede ser el subfusil)
+  owner.send('buy', { k: 'gun', id: 'ar', n: 0 });
+  await waitFor(() => last().wp.some((w: any) => w[0] === 'ar'), 3000, 'fusil comprado');
+  assert.equal(last().st[7], 500 - WEAPONS.ar.price);
+  // basura: se ignora sin tirar nada
+  owner.send('buy', { k: 'gun', id: { x: 1 } });
+  owner.send('pick', { i: 'a' });
+  owner.send('buy', { k: 'gun', id: 'constructor', n: 0 });
+  await sleep(200);
+  assert.equal(slot.money, 500 - WEAPONS.ar.price);
+  await leaveAll([owner]);
 });

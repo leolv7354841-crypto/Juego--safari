@@ -27,7 +27,7 @@ function newCode() {
 }
 
 // strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
-type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
+type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; shop: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
 const STRIKE_FORGET = 10;
 const STRIKE_KICK = 200;
 
@@ -79,6 +79,15 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     this.onMessage('next', (c) => this.admin(c, () => {
       if (this.phase === 'playing' && this.sim && this.member(c)?.inGame) this.sim.nextRound();
     }));
+    // elegir mejora y comprar: el servidor comprueba nivel, dinero y momento (entre oleadas)
+    this.onMessage('pick', (c, m) => this.shopMsg(c, () => {
+      if (!m || !Number.isInteger(m.i) || !Number.isInteger(m.n)) return this.strike(c, 'mejora mal formada');
+      this.sim!.pick(c.sessionId, m.i, m.n);
+    }));
+    this.onMessage('buy', (c, m) => this.shopMsg(c, () => {
+      if (!m || typeof m.k !== 'string' || typeof m.id !== 'string') return this.strike(c, 'compra mal formada');
+      this.sim!.shop(c.sessionId, m.k, m.id, Number(m.n) | 0);
+    }));
     this.onMessage('in', (c, m) => this.input(c, m));
     this.onMessage('p', (c, m) => {
       const l = this.limits.get(c.sessionId);
@@ -127,6 +136,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       inp: new Bucket(90, 60),
       cmds: new Bucket(80, 40), // entradas sueltas por segundo (60 Hz + margen)
       adm: new Bucket(3, 6), // listo, iniciar, siguiente…
+      shop: new Bucket(8, 16), // compras y mejoras (clics seguidos en la tienda)
       ping: new Bucket(4, 4),
       strikes: 0,
       strikeAt: performance.now(),
@@ -204,6 +214,13 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     const l = this.limits.get(c.sessionId);
     if (!l) return;
     if (!l.adm.take()) return this.strike(c, 'demasiados mensajes');
+    fn();
+  }
+
+  shopMsg(c: Client, fn: () => void) {
+    const l = this.limits.get(c.sessionId);
+    if (!l || !this.sim || this.phase !== 'playing' || !this.member(c)?.inGame) return;
+    if (!l.shop.take()) return this.strike(c, 'demasiadas compras');
     fn();
   }
 

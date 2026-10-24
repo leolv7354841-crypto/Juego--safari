@@ -11,11 +11,14 @@ import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD,
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
+import { UPGRADES } from './upgrades.js';
 import { rand, TAU, angleTo } from './util.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
 const PEER_N = 14;
+// mismo orden que STAT_KEYS en server/src/sim/ServerSim.ts
+const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
@@ -310,8 +313,10 @@ export class Online {
     this.remoteBullets = [];
     this.clock = new ServerClock();
     this.wantReload = false;
+    this.up = null;
+    this.upDone = 0;
+    this.lastDs = '';
     this.playing = true;
-    g.$('btn-round-shop').hidden = true;
     g.input.reset();
     g.input.setRun(false);
     g.setState('play');
@@ -325,7 +330,7 @@ export class Online {
     this.peers.clear();
     this.zs.clear();
     this.remoteBullets = [];
-    g.$('btn-round-shop').hidden = false;
+    this.up = null;
     g.$('net-diag').hidden = true;
   }
 
@@ -412,6 +417,11 @@ export class Online {
       g.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
     }
     g.music.setDanger(p.alive ? this.danger : 0, dt);
+    // entre oleadas: primero las mejoras que ofrece el servidor, luego la tienda
+    if (p.alive && g.director.state === 'waiting') {
+      if (this.up && this.up.n !== this.upDone) return g.openLevelUp();
+      if (g.shopPending) return g.openShop();
+    }
     const alivePeer = !p.alive && [...this.peers.values()].find((q) => q.alive && !q.away);
     if (alivePeer) g.camera.update(dt, alivePeer.x, alivePeer.y, false);
     else {
@@ -507,6 +517,7 @@ export class Online {
     const d = g.director;
     d.wave = s.w | 0;
     d.state = s.ds;
+    this.applyEconomy(s);
     // el reloj local avanza solo (animaciones); sólo se corrige si se aleja del servidor
     const tm = Number(s.tm);
     if (Number.isFinite(tm) && Math.abs(tm - g.time) > 2) g.time = tm;
@@ -547,8 +558,11 @@ export class Online {
     p.stats.maxHp = Number(st[1]) || 100;
     p.alive = alive;
     this.myKills = st[6] | 0;
-    const money = st[7] | 0;
-    if (money > g.money) {
+    const money = Math.max(0, st[7] | 0);
+    // en la tienda el dinero cambia por compras y ventas: no son ganancias
+    if (g.state === 'shop') {
+      if (money < g.money) g.sfx.buy();
+    } else if (money > g.money) {
       g.moneyEarned += money - g.money;
       // como en solitario: sólo la recompensa del dorado salta en pantalla
       if (money - g.money >= GOLDEN.rewardMin) {
@@ -573,6 +587,53 @@ export class Online {
     p.reloadT = (Number(st[4]) || 0) / 100;
     p.reloadProg = (Number(st[5]) || 0) / 100;
     p.reloadDur = p.weapon.def.reload / p.stats.reloadMult;
+  }
+
+  // Nivel, mejoras ofrecidas y estadísticas (todo lo decide el servidor).
+  applyEconomy(s) {
+    const g = this.game;
+    const p = g.player;
+    const ec = Array.isArray(s.ec) ? s.ec : [];
+    // el dinero ya llegó en st (applyStats): aquí sólo se usa para saber si redibujar la tienda
+    const shopSig = g.money + '|' + p.weapons.map((w) => w.id + ':' + w.reserve).join();
+    g.level = Math.max(1, ec[0] | 0);
+    g.xp = Math.max(0, ec[1] | 0);
+    g.xpNeed = Math.max(1, ec[2] | 0);
+    g.pendingLevels = Math.max(0, ec[3] | 0);
+    if (Array.isArray(s.ps)) STAT_KEYS.forEach((k, i) => Number.isFinite(s.ps[i]) && (p.stats[k] = s.ps[i]));
+    const up = Array.isArray(s.up) && s.up.length > 1 ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) } : null;
+    this.up = up && up.ids.length ? up : null;
+    // fin de oleada: tienda y mejoras; si empieza la siguiente con la tienda abierta, se cierra
+    if (this.lastDs === 'active' && s.ds === 'waiting') {
+      g.shopPending = true;
+      g.sfx.level();
+    } else if (this.lastDs === 'waiting' && s.ds === 'active') {
+      g.shopPending = false;
+      if (g.state === 'shop' || g.state === 'levelup') {
+        g.input.reset();
+        g.setState('play');
+        g.toast('¡Empezó la oleada!');
+      }
+    }
+    this.lastDs = s.ds;
+    // la compra se confirmó (o cambió el dinero): la tienda abierta se vuelve a dibujar
+    if (g.state === 'shop' && shopSig !== this.shopSig) g.renderShop();
+    this.shopSig = shopSig;
+  }
+
+  // Las mejoras que ofrece ahora el servidor (para la pantalla de subir de nivel).
+  upChoices() {
+    return this.up ? this.up.ids.map((id) => UPGRADES.find((u) => u.id === id)) : [];
+  }
+
+  pickUpgrade(i) {
+    if (!this.up) return;
+    this.upDone = this.up.n;
+    this.send('pick', { i, n: this.up.n });
+  }
+
+  buy(k, id, n = 0) {
+    this.send('buy', { k, id, n });
   }
 
   applyPeers(pl, ts) {
