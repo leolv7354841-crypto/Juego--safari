@@ -13,9 +13,11 @@
     "server:load": "npm run load --prefix server",
     "test": "node --test test/*.test.js",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "e2e": "playwright test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.2"
+    "@biomejs/biome": "2.6.2",
+    "@playwright/test": "1.64.1"
   }
 }
