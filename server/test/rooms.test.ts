@@ -112,7 +112,7 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   guest.send('ready', 'raro');
   await sleep(300);
   assert.equal(slot.queue.length, 0, 'nada inválido llegó a la cola');
-  assert.ok(room.limits.get(guest.sessionId).strikes >= bad.length - 1);
+  assert.ok(room.limits.get(guest.sessionId).bad >= bad.length - 1);
   // una entrada buena con dirección exagerada se recorta a longitud 1
   guest.send('in', { i: [[1, 5, 5, 0, 0, -1]] });
   await waitFor(() => slot.ack === 1 || slot.queue.length === 1, 2000, 'entrada buena');
@@ -124,6 +124,25 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   assert.equal(serverRoom(owner.roomId) !== undefined, true);
   assert.equal(owner.state.members.size, before, 'sigue en la sala (puede reconectar)');
   await leaveAll([owner, guest]);
+});
+
+test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', async () => {
+  const [owner] = await fill(1);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading');
+  owner.send('loaded');
+  await waitFor(() => owner.state.phase === 'playing');
+  const l = serverRoom(owner.roomId).limits.get(owner.sessionId);
+  // un mensaje por fotograma durante 3 s, como js/online.js (antes, a partir de 2 s, eran faltas)
+  const t0 = performance.now();
+  for (let seq = 1, next = t0; performance.now() - t0 < 3000; seq++) {
+    owner.send('in', { i: [[seq, 0.5, 0, 0, 0, -1]] });
+    next += 1000 / 60;
+    await sleep(Math.max(0, next - performance.now()));
+  }
+  await sleep(100);
+  assert.equal(l.bad, 0, 'sin faltas');
+  await leaveAll([owner]);
 });
 
 test('desconexión y reconexión sin duplicados', async () => {

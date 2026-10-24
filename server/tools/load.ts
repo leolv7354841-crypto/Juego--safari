@@ -23,13 +23,14 @@ const PLAN = arg('rooms', '5x4').split(',').map((s) => s.split('x').map(Number) 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const TAU = Math.PI * 2;
 
-type Bot = { room: any; name: string; snaps: number; bytes: number; rtts: number[]; jit: number; last: number; seq: number; me: number[] | null; target: number | null; alive: boolean; kills: number; t0: number };
+type Bot = { room: any; name: string; left: number; snaps: number; bytes: number; rtts: number[]; jit: number; last: number; seq: number; me: number[] | null; target: number | null; alive: boolean; kills: number; t0: number };
 
 async function bot(room: any, name: string): Promise<Bot> {
-  const b: Bot = { room, name, snaps: 0, bytes: 0, rtts: [], jit: 0, last: 0, seq: 0, me: null, target: null, alive: true, kills: 0, t0: Date.now() };
+  const b: Bot = { room, name, left: 0, snaps: 0, bytes: 0, rtts: [], jit: 0, last: 0, seq: 0, me: null, target: null, alive: true, kills: 0, t0: Date.now() };
   const ws = room.connection.transport.ws;
   ws.addEventListener('message', (e: any) => (b.bytes += e.data.byteLength || e.data.length || 0));
   room.onMessage('*', () => {});
+  room.onLeave((code: number) => (b.left = code));
   room.onMessage('snap', (s: any) => {
     b.snaps++;
     b.me = s.me;
@@ -123,6 +124,8 @@ async function scenario(rooms: number, per: number) {
   console.log(`servidor: ${avg(ok.map((t) => t.tickHz)).toFixed(1)} pasos/s por sala (objetivo 60) · paso medio ${avg(ok.map((t) => t.tickMs)).toFixed(2)} ms · peor ${Math.max(...ok.map((t) => t.tickMaxMs)).toFixed(2)} ms · descartados ${ok.length ? ok[ok.length - 1].skippedTicks : '?'}`);
   console.log(`CPU del proceso servidor: media ${avg(ok.map((t) => t.cpuPercent)).toFixed(1)} % de un núcleo · máx ${Math.max(...ok.map((t) => t.cpuPercent)).toFixed(1)} % · memoria ${ok.length ? ok[ok.length - 1].rssMb : '?'} MB`);
   console.log(`bajas de los bots: ${bots.reduce((a, b) => a + b.kills, 0)} · vivos al final: ${bots.filter((b) => b.alive).length}/${bots.length}`);
+  const out = bots.filter((b) => b.left);
+  console.log(out.length ? `DESCONECTADOS: ${out.length} (códigos ${[...new Set(out.map((b) => b.left))].join(', ')}; 4100 = expulsado por el servidor)` : 'desconectados: 0');
   await Promise.all(bots.map((b) => Promise.race([b.room.leave().catch(() => {}), sleep(1000)])));
   await sleep(1500);
 }

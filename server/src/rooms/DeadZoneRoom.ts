@@ -26,7 +26,10 @@ function newCode() {
   }
 }
 
-type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; ping: Bucket; strikes: number };
+// strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
+type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
+const STRIKE_FORGET = 10;
+const STRIKE_KICK = 200;
 
 export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   maxClients = CONFIG.maxPlayers;
@@ -120,11 +123,14 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     this.state.members.set(client.sessionId, m);
     if (!this.state.ownerId) this.state.ownerId = client.sessionId;
     this.limits.set(client.sessionId, {
-      inp: new Bucket(45, 30), // mensajes de entrada por segundo
+      // mensajes de entrada por segundo: el navegador manda uno por fotograma con entradas (~60)
+      inp: new Bucket(90, 60),
       cmds: new Bucket(80, 40), // entradas sueltas por segundo (60 Hz + margen)
       adm: new Bucket(3, 6), // listo, iniciar, siguiente…
       ping: new Bucket(4, 4),
       strikes: 0,
+      strikeAt: performance.now(),
+      bad: 0,
     });
     STATS.players++;
     this.joined = true;
@@ -185,9 +191,13 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   strike(c: Client, why: string) {
     const l = this.limits.get(c.sessionId);
     if (!l) return;
-    l.strikes++;
-    if (l.strikes === 1 || l.strikes % 50 === 0) console.warn(`[sala ${this.roomId}] ${c.sessionId}: ${why} (${l.strikes})`);
-    if (l.strikes > 200) c.leave(KICKED);
+    // sólo expulsa a quien manda basura de forma sostenida, no por tirones sueltos de la red
+    const now = performance.now();
+    l.strikes = Math.max(0, l.strikes - ((now - l.strikeAt) / 1000) * STRIKE_FORGET) + 1;
+    l.strikeAt = now;
+    l.bad++;
+    if (l.bad === 1 || l.bad % 50 === 0) console.warn(`[sala ${this.roomId}] ${c.sessionId}: ${why} (${l.bad})`);
+    if (l.strikes > STRIKE_KICK) c.leave(KICKED);
   }
 
   admin(c: Client, fn: () => void) {
