@@ -1,9 +1,11 @@
-import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT, ABILITY } from './config.js';
+import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT, ABILITY, START_WEAPON, ZOMBIE_SPEED, WAVES } from './config.js';
 import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
+// px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
+export const WALK = PLAYER_BASE.walk * ((ZOMBIE_SPEED[0] + ZOMBIE_SPEED[1]) / 2) * WAVES.speed;
 const GUN_TIP = { pistol: 22.5, smg: 29.7, shotgun: 32.8, rifle: 38.1, ar: 35, autoshotgun: 35, sniper: 46, lmg: 41, bazooka: 46 };
 
 export class Player {
@@ -38,7 +40,7 @@ export class Player {
     this.exhausted = false;
     this.running = false;
     this.sinceRun = 10;
-    this.weapons = [this.makeWeapon('pistol')];
+    this.weapons = [this.makeWeapon(START_WEAPON)];
     this.wi = 0;
     this.fireCd = 0;
     this.reloadT = 0;
@@ -89,10 +91,10 @@ export class Player {
     return true;
   }
 
-  // Quita un arma (vender). La pistola no se puede quitar.
+  // Quita un arma (vender). El arma inicial no se puede quitar.
   removeWeapon(id) {
     const i = this.weapons.findIndex((w) => w.id === id);
-    if (i <= 0 || id === 'pistol') return false;
+    if (i < 0 || id === START_WEAPON) return false;
     this.weapons.splice(i, 1);
     if (this.wi === i) this.wi = 0;
     else if (this.wi > i) this.wi--;
@@ -146,7 +148,8 @@ export class Player {
     this.hp -= real;
     this.damageTaken += real;
     this.hurtT = 0.3;
-    game.camera.shake(0.28);
+    // el temblor es de quien recibe el golpe (en cooperativo el anfitrión también simula al invitado)
+    if (this === game.player) game.camera.shake(0.28);
     game.hurtFlash = Math.min(1, game.hurtFlash + 0.5);
     game.sfx.hurt();
     if (this.hp <= 0) {
@@ -192,7 +195,7 @@ export class Player {
     if (this.exhausted && this.stamina > st.maxStamina * 0.3) this.exhausted = false;
 
     // --- movimiento ---
-    let speed = PLAYER_BASE.walkSpeed * st.speedMult;
+    let speed = WALK * st.speedMult;
     if (this.running) speed *= PLAYER_BASE.runMult;
     if (this.exhausted) speed *= 0.85;
     if (this.boostT > 0) {
@@ -347,8 +350,11 @@ export class Player {
     this.flashT = 0.05;
     this.kx -= ca * d.knock * 0.5;
     this.ky -= sa * d.knock * 0.5;
-    game.camera.shake(d.shake);
-    game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    // la cámara sólo se mueve con los disparos propios
+    if (this === game.player) {
+      game.camera.shake(d.shake);
+      game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    }
     game.muzzle = 1;
     game.muzzleX = sx;
     game.muzzleY = sy;

@@ -203,7 +203,7 @@ export class ServerSim {
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => {
         g.particles.dust(x, y, 18);
-        g.camera.shake(0.35);
+        g.camera.shake(0.35, x, y);
         g.sfx.punch();
       },
       onGiantStep: (z: any) => {
@@ -235,7 +235,13 @@ export class ServerSim {
     let x: number | undefined;
     let y: number | undefined;
     let packed: unknown[] = args;
-    if (tag === 'd' && n === 'corpse') {
+    // temblor: sólo los que tienen lugar (cada cliente lo apaga con la distancia a su cámara);
+    // los de un jugador (su golpe, su muerte) los pone su propio cliente
+    if (tag === 'c' && (typeof args[1] !== 'number' || typeof args[2] !== 'number')) return;
+    if (tag === 'c') {
+      x = args[1];
+      y = args[2];
+    } else if (tag === 'd' && n === 'corpse') {
       const z = args[0];
       x = z.x;
       y = z.y;
@@ -304,7 +310,7 @@ export class ServerSim {
     if (z.type === 'fat') this.structures.queueDeathBlast(z.type, z.x, z.y);
     const r = Math.random();
     if (z.type === 'giant') {
-      g.camera.shake(0.5);
+      g.camera.shake(0.5, z.x, z.y);
       g.particles.ring(z.x, z.y, z.r, '170,160,140');
       this.pickups.drop('crate', z.x, z.y);
       this.pickups.drop('med', z.x + 24, z.y);
@@ -368,12 +374,12 @@ export class ServerSim {
     if (!d) return false;
     const p = s.p;
     if (k === 'gun') {
-      if (p.has(wid) || s.money < d.price) return false;
+      if (!d.price || p.has(wid) || s.money < d.price) return false;
       s.money -= d.price;
       p.unlock(wid);
       s.toasts.push(`${d.name} comprada`);
     } else if (k === 'sell') {
-      if (wid === 'pistol' || !p.removeWeapon(wid)) return false;
+      if (!d.price || !p.removeWeapon(wid)) return false;
       const gain = Math.round(d.price * SELL_RATE);
       s.money += gain;
       s.toasts.push(`${d.name} vendida: +$${gain}`);

@@ -958,7 +958,7 @@ export class Online {
       if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
       else if (tag === 't' && n === 'shot') this.turretShot(Number(args[0]), Number(args[1]), Number(args[2]));
       else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
-      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0));
+      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0), Number(args[1]), Number(args[2]));
       else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
       else if (tag === 'd' && DECAL_SYNC.includes(n)) {
         if (n === 'corpse') {

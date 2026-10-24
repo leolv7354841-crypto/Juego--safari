@@ -80,9 +80,10 @@ export class Director {
       const room = MAX_ALIVE - alive;
       if (due > 0 && room > 0) this.spawnGroup(game, Math.min(due, room));
     }
-    // la ronda termina al eliminar al último zombi (el dorado no cuenta: sigue huyendo hasta
-    // que lo atrapes o escape); la siguiente espera al jugador
+    // la ronda termina al eliminar al último zombi (el dorado no cuenta); la siguiente espera al jugador
     if (!this.queue.length && !game.horde.list.some((z) => z.type !== 'golden' && !z.dead)) {
+      // el dorado que quede escapa con la oleada
+      for (const z of game.horde.list) if (z.type === 'golden' && !z.dead) game.onGoldenExpired(z);
       this.state = 'waiting';
       game.onWaveCleared();
       return;

@@ -3,9 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/netcode.js';
-import { ABILITY, BOUNTY } from '../../js/config.js';
+import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/config.js';
 import { UPGRADES } from '../../js/upgrades.js';
 import { cooldownOf } from '../../js/abilities.js';
+import { WALK } from '../../js/player.js';
 import { cleanAct, cleanClass } from '../src/validate.ts';
 
 const aimAt = (sim: ServerSim, id: string) => {
@@ -64,7 +65,7 @@ test('una entrada no puede mover más rápido que el juego', () => {
     sim.step();
   }
   const moved = Math.hypot(p.x - x0, p.y - y0);
-  assert.ok(moved < 118 * 1.75 * 1.05, `avanzó ${moved.toFixed(1)} px en 1 s`);
+  assert.ok(moved < WALK * PLAYER_BASE.runMult * 1.05, `avanzó ${moved.toFixed(1)} px en 1 s`);
 });
 
 test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida', () => {
@@ -133,7 +134,7 @@ test('cada jugador elige sus mejoras (también a mitad de oleada) y compra con s
   assert.equal(sim.shop('b', 'ammo', 'shotgun', 7), false, 'cantidad no permitida');
   assert.ok(sim.shop('b', 'sell', 'shotgun', 0));
   assert.ok(!b.p.has('shotgun'));
-  assert.equal(sim.shop('b', 'sell', 'pistol', 0), false, 'la pistola no se vende');
+  assert.equal(sim.shop('b', 'sell', 'smg', 0), false, 'el arma inicial no se vende');
   assert.equal(sim.shop('b', 'gun', '__proto__', 0), false);
   assert.equal(sim.snapshot('b', 0).st[7], b.money, 'el dinero va en la foto');
 });

@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER, WAVES } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER, WAVES, START_WEAPON, CAMERA } from './config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './abilities.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
@@ -55,8 +55,16 @@ class Camera {
     this.viewW = 800;
     this.viewH = 600;
   }
-  shake(a) {
-    this.trauma = Math.min(1, this.trauma + a);
+  // Temblor de fuerza a (0..1). Con lugar (x, y) se apaga con la distancia a la cámara; sin lugar
+  // es algo que le pasa a este jugador (su golpe, su muerte). La fuente más fuerte manda y las demás
+  // suman poco, así que muchos golpes seguidos no dejan la cámara temblando al tope.
+  shake(a, x, y) {
+    if (typeof x === 'number' && typeof y === 'number') {
+      const d = Math.hypot(x - this.x, y - this.y);
+      a *= clamp(1 - (d - CAMERA.near) / (CAMERA.far - CAMERA.near), 0, 1);
+    }
+    if (!(a > 0)) return;
+    this.trauma = Math.min(1, Math.max(this.trauma, a) + a * CAMERA.stack * (1 - this.trauma));
   }
   kick(x, y) {
     this.kx += x;
@@ -70,7 +78,7 @@ class Camera {
     const k = Math.exp(-dt * 16);
     this.kx *= k;
     this.ky *= k;
-    const s = this.trauma * this.trauma * 16;
+    const s = this.trauma * this.trauma * CAMERA.shake;
     this.sx = rand(-s, s) + this.kx;
     this.sy = rand(-s, s) + this.ky;
   }
@@ -359,7 +367,10 @@ class Game {
     p.y = sp.y;
     p.hp = Math.min(sp.hp, p.stats.maxHp);
     p.stamina = sp.stamina;
-    p.weapons = sp.weapons.filter((w) => WEAPONS[w.id]).map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
+    // (partidas viejas: la pistola se cambia por el arma inicial, que siempre tiene balas infinitas)
+    p.weapons = sp.weapons.filter((w) => WEAPONS[w.id] && w.id !== 'pistol' && w.id !== START_WEAPON).map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
+    p.weapons.unshift(p.makeWeapon(START_WEAPON));
+    p.weapons.sort((a, b) => WEAPON_ORDER.indexOf(a.id) - WEAPON_ORDER.indexOf(b.id));
     p.wi = Math.min(sp.wi, p.weapons.length - 1);
     p.shotsFired = sp.shotsFired;
     p.shotsHit = sp.shotsHit;
@@ -461,7 +472,7 @@ class Game {
     const hasGuns = p.weapons.length > 1 || this.coop.active;
     const r = Math.random();
     if (z.type === 'giant') {
-      this.camera.shake(0.5);
+      this.camera.shake(0.5, z.x, z.y);
       this.particles.ring(z.x, z.y, z.r, '170,160,140');
       this.pickups.drop('crate', z.x, z.y);
       this.pickups.drop('med', z.x + 24, z.y);
@@ -621,7 +632,7 @@ class Game {
   // Super golpe del blindado (al jugador o a una estructura).
   onSuperPunch(z, x, y) {
     this.particles.dust(x, y, 18);
-    this.camera.shake(0.35);
+    this.camera.shake(0.35, x, y);
     this.sfx.punch();
   }
 
@@ -1321,7 +1332,7 @@ class Game {
       return `<button class="btn buy${extra}${poor ? ' poor' : ''}" ${attrs} ${poor ? 'disabled' : ''}>${label}</button>`;
     };
     // armas: de la más barata a la más potente
-    const guns = WEAPON_ORDER.filter((id) => id !== 'pistol').map((id) => {
+    const guns = WEAPON_ORDER.filter((id) => WEAPONS[id].price).map((id) => {
       const d = WEAPONS[id];
       const owned = p.has(id);
       return `<div class="shop-item${owned ? ' owned' : ''}">
@@ -1354,7 +1365,7 @@ class Game {
     });
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
-      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
+      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}
       <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
       <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
@@ -1405,7 +1416,7 @@ class Game {
   buyWeapon(id) {
     const d = WEAPONS[id];
     const p = this.player;
-    if (!d || p.has(id) || this.money < d.price) return;
+    if (!d || !d.price || p.has(id) || this.money < d.price) return;
     if (this.online.active) return this.online.buy('gun', id);
     this.money -= d.price;
     p.unlock(id);
@@ -1417,7 +1428,7 @@ class Game {
   sellWeapon(id) {
     const p = this.player;
     const d = WEAPONS[id];
-    if (!d || id === 'pistol') return;
+    if (!d || !d.price) return;
     if (this.online.active) return p.has(id) && this.online.buy('sell', id);
     if (!p.removeWeapon(id)) return;
     const gain = Math.round(d.price * SELL_RATE);

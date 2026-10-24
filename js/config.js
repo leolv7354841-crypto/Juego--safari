@@ -12,7 +12,9 @@ export const MAX_ALIVE = 1000;
 export const PLAYER_BASE = {
   radius: 14,
   maxHp: 100,
-  walkSpeed: 118,
+  // velocidad al caminar en múltiplos de lo que camina un zombi normal en la primera oleada
+  // (ZOMBIE_SPEED × WAVES.speed): 1,25 → unos 166 px/s. Corriendo, por runMult.
+  walk: 1.25,
   runMult: 1.75,
   maxStamina: 100,
   staminaDrain: 30,
@@ -21,7 +23,16 @@ export const PLAYER_BASE = {
   mass: 4,
 };
 
+// Temblor de cámara. shake: px máximos con el temblor al tope (la mitad del original, 16).
+// Un temblor con lugar (explosión, cornada…) es completo hasta near px de la cámara y se apaga en far.
+// stack: cuánto suma un temblor sobre otro (la fuente más fuerte manda; no se acumulan hasta el tope).
+export const CAMERA = { shake: 8, near: 200, far: 1000, stack: 0.25 };
+
+// Arma con la que se empieza: balas infinitas, no se vende ni está en la tienda.
+export const START_WEAPON = 'smg';
+
 // rate = disparos por segundo, range = distancia máxima en px del mundo.
+// La pistola ya no se usa (el arma inicial es START_WEAPON); se deja por partidas guardadas viejas.
 export const WEAPONS = {
   pistol: {
     id: 'pistol', name: 'Pistola', damage: 24, rate: 3.4, mag: 12,
@@ -31,10 +42,10 @@ export const WEAPONS = {
   },
   smg: {
     id: 'smg', name: 'Subfusil', damage: 14, rate: 11, mag: 32,
-    reserve: 128, reserveMax: Infinity, pickup: 64, reload: 1.5,
+    reserve: Infinity, reserveMax: Infinity, pickup: 0, reload: 1.5,
     spread: 0.09, bloom: 0.022, pellets: 1, speed: 1000, range: 520,
     knock: 30, shake: 0.03, pierce: 0, len: 15,
-    price: 120, ammoPrice: 6, desc: 'Ráfagas rápidas para contener a la horda.',
+    desc: 'Ráfagas rápidas para contener a la horda.',
   },
   shotgun: {
     id: 'shotgun', name: 'Escopeta', damage: 17, rate: 1.25, mag: 6,
@@ -106,7 +117,7 @@ export const ABILITY = {
 };
 export const CLASS_ORDER = ['bomber', 'berserker', 'booster'];
 // cajas de armas (las básicas); las mejores se compran
-export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
+export const CRATE_WEAPONS = ['shotgun', 'rifle'];
 
 // Unidad de velocidad: la del zombi normal en px/s (al azar entre los dos; 1,5 veces la de antes,
 // [60, 88]). En ZOMBIES, speed es un múltiplo de esta unidad y nunca menos de 1: ningún tipo es

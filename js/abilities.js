@@ -114,7 +114,7 @@ export const Abilities = {
     if (!fired.length) return;
     p.flashT = 0.05;
     p.recoil = 1;
-    game.camera.shake(0.05);
+    if (p === game.player) game.camera.shake(0.05);
     game.particles.muzzleSmoke(ox, oy, p.angle);
     // invitado en cooperativo: las balas que de verdad hacen daño las crea el anfitrión
     if (game.coop && game.coop.isGuest) game.coop.sendShot(ox, oy, fired, d, p.stats);

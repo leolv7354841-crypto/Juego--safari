@@ -674,7 +674,7 @@ export class Horde {
         game.onZombieHit(z, p);
         p.kx += z.cdx * BULL.throw;
         p.ky += z.cdy * BULL.throw;
-        game.camera.shake(0.75);
+        game.camera.shake(0.75, p.x, p.y);
         game.particles.dust(p.x, p.y, 14);
         game.sfx.bullHit();
         z.bs = 'recover';
@@ -739,7 +739,7 @@ export class Horde {
       const long = z.bs === 'charge';
       game.structures.damageBlock(game, block, long ? BULL.long : BULL.short);
       game.particles.dust(z.x + z.cdx * z.r, z.y + z.cdy * z.r, long ? 26 : 12);
-      game.camera.shake(long ? 0.35 : 0.12);
+      game.camera.shake(long ? 0.35 : 0.12, z.x, z.y);
       game.sfx.bullSlam(long);
       z.ramBlock = block;
       z.bs = block.hp > 0 ? 'ram' : 'recover';

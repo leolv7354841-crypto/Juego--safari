@@ -280,6 +280,8 @@ export class Coop {
   // Los efectos visuales lejos del compañero no se mandan (no los vería y gastan conexión).
   nearPeer(tag, n, args) {
     const q = this.peer;
+    // temblor: sólo los que tienen lugar (los del anfitrión, como sus golpes, son sólo suyos)
+    if (tag === 'c') return typeof args[1] === 'number' && typeof args[2] === 'number' && (!q || (Math.abs(args[1] - q.x) < VIEW && Math.abs(args[2] - q.y) < VIEW));
     if (!q || (tag !== 'p' && tag !== 'd')) return true;
     const o = n === 'corpse' ? args[0] : null;
     const x = o ? o.x : args[0];
@@ -613,7 +615,7 @@ export class Coop {
     try {
       if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
       else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
-      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0));
+      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0), Number(args[1]), Number(args[2]));
       else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
       else if (tag === 'd' && DECAL_SYNC.includes(n)) {
         if (n === 'corpse') {

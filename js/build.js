@@ -19,12 +19,6 @@ export function turretBullet(x, y, a, owner = null) {
 }
 
 // Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
-function nearestPlayer(game, x, y) {
-  let best = Infinity;
-  for (const p of game.targets || [game.player]) best = Math.min(best, Math.hypot(p.x - x, p.y - y));
-  return best;
-}
-
 export class Structures {
   constructor() {
     this.blocks = [];
@@ -214,7 +208,7 @@ export class Structures {
       this.missiles.splice(i, 1);
       this.explode(game, m, M.radius, M.power, 1.5);
       game.particles.ring(m.x, m.y, M.radius * 0.3, '255,190,120');
-      game.camera.shake(0.9);
+      game.camera.shake(0.9, m.x, m.y);
     }
   }
 
@@ -328,7 +322,7 @@ export class Structures {
         }
         game.sfx.gore();
         this.explode(game, { x: cx, y: cy, owner: r.owner }, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
-        game.camera.shake(0.9);
+        game.camera.shake(0.9, cx, cy);
       } else {
         // super blindado: lo revienta de un solo tiro
         if (!z.dead) {
@@ -398,7 +392,7 @@ export class Structures {
     if (this.fires.length > 8) this.fires.shift();
     game.particles.shatter(x, y);
     game.sfx.molotov();
-    game.camera.shake(0.12);
+    game.camera.shake(0.12, x, y);
   }
 
   updateFires(dt, game) {
@@ -468,7 +462,7 @@ export class Structures {
     game.decals.acid(x, y, R * 0.75);
     for (let i = 0; i < 4; i++) game.decals.acid(x + rand(-R, R) * 0.6, y + rand(-R, R) * 0.6, rand(14, 26));
     game.sfx.acid();
-    game.camera.shake(0.2 * clamp(1 - nearestPlayer(game, x, y) / 500, 0, 1));
+    game.camera.shake(0.2, x, y);
     for (const p of game.targets || [game.player]) if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
     if (game.coop && game.coop.isHost) game.coop.acidAt(x, y, R);
   }
@@ -497,7 +491,7 @@ export class Structures {
         z.lastDy = (dy / n) * (2 + 3 * f);
       }
     }
-    game.camera.shake(0.45 + 0.5 * clamp(1 - nearestPlayer(game, x, y) / 600, 0, 1));
+    game.camera.shake(0.95, x, y);
     // cohete: bola de fuego corta y luego humo; granada: explosión clásica
     if (fling) game.particles.rocketImpact(x, y, R);
     else game.particles.explosion(x, y, R);
