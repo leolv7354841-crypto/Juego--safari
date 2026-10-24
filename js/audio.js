@@ -77,6 +77,8 @@ export const RELOAD_STEPS = {
 
 export class Sfx {
   constructor() {
+    /** @type {(() => void) | undefined} lo asigna Game para arrancar la música */
+    this.onReady;
     this.ctx = null;
     this.muted = storage.get('dz-muted', false);
     this.last = {};

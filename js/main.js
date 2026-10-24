@@ -1,3 +1,4 @@
+// @ts-check
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
 import {
   xpForLevel,
@@ -110,10 +111,13 @@ class Camera {
   }
 }
 
+/** @param {EventTarget | null} t @param {string} sel @returns {HTMLElement | null} */
+const closest = (t, sel) => /** @type {HTMLElement} */ (t).closest(sel);
+
 class Game {
   constructor() {
     this.root = document.getElementById('game');
-    this.canvas = document.getElementById('view');
+    this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('view'));
     this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.input = new Input(this.root, this.canvas);
     this.input.onModeChange = (m) => this.root.classList.toggle('touch', m === 'touch');
@@ -147,6 +151,7 @@ class Game {
     this.muzzle = 0;
     this.hurtFlash = 0;
     this.cache = {};
+    /** @type {(id: string) => any} */
     this.$ = (id) => document.getElementById(id);
     this.look = cleanLook(storage.get('dz-look', null));
     this.bindUi();
@@ -1746,25 +1751,25 @@ class Game {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
     });
     this.$('shop-items').addEventListener('click', (e) => {
-      const sell = e.target.closest('[data-sell]');
+      const sell = closest(e.target, '[data-sell]');
       if (sell) return this.sellWeapon(sell.dataset.sell);
-      const g = e.target.closest('[data-gun-buy]');
+      const g = closest(e.target, '[data-gun-buy]');
       if (g) return this.buyWeapon(g.dataset.gunBuy);
-      const a = e.target.closest('[data-ammo]');
+      const a = closest(e.target, '[data-ammo]');
       if (a) return this.buyAmmo(a.dataset.ammo, Number(a.dataset.n));
-      const rbt = e.target.closest('[data-robot-act]');
+      const rbt = closest(e.target, '[data-robot-act]');
       if (rbt) return rbt.dataset.robotAct === 'buy' ? this.buyRobot() : this.repairRobot();
-      const b = e.target.closest('[data-buy]');
+      const b = closest(e.target, '[data-buy]');
       if (b) this.buy(b.dataset.buy);
     });
     this.$('inv').addEventListener('pointerdown', (e) => {
-      const b = e.target.closest('[data-k]');
+      const b = closest(e.target, '[data-k]');
       if (!b) return;
       e.preventDefault();
       this.buildSel = b.dataset.k;
     });
     this.$('slots').addEventListener('pointerdown', (e) => {
-      const b = e.target.closest('.slot');
+      const b = closest(e.target, '.slot');
       if (!b) return;
       e.preventDefault();
       this.player.select(Number(b.dataset.i));
@@ -2294,10 +2299,12 @@ class Game {
     const gap = (6 + (p.bloom + p.weapon.def.spread) * 60) * this.dpr;
     const len = 7 * this.dpr;
     ctx.lineWidth = 2 * this.dpr;
-    for (const [col, lw] of [
+    /** @type {[string, number][]} */
+    const rings = [
       ['rgba(0,0,0,0.6)', 4],
       ['#e6e0d2', 2],
-    ]) {
+    ];
+    for (const [col, lw] of rings) {
       ctx.strokeStyle = col;
       ctx.lineWidth = lw * this.dpr;
       ctx.beginPath();

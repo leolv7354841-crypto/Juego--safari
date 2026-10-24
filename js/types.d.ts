@@ -125,9 +125,10 @@ export interface GameHost {
   muzzle: number;
   camera: { viewW: number; viewH: number; shake(n: number): void; kick(...a: any[]): void; [k: string]: any };
   coop: { isHost: boolean; isGuest: boolean; active: boolean; peer: any; [k: string]: any };
-  particles: Record<string, (...a: any[]) => any>;
-  decals: Record<string, (...a: any[]) => any>;
-  sfx: Record<string, (...a: any[]) => any>;
+  // any: lo cumplen las clases Particles/Sfx/Decals y las grabadoras del servidor
+  particles: any;
+  decals: any;
+  sfx: any;
   input: any;
   mouseWorld(): Vec;
   spawnFocus(): Vec;
@@ -148,4 +149,11 @@ export interface GameHost {
   banner(title: string, sub?: string): void;
   toast(msg: string): void;
   [k: string]: any;
+}
+
+declare global {
+  interface Window {
+    __deadzone?: unknown;
+    DZ_VERSION?: string;
+  }
 }

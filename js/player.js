@@ -62,6 +62,8 @@ export class Player {
     this.shotsFired = 0;
     this.shotsHit = 0;
     this.damageTaken = 0;
+    /** @type {any} aspecto del personaje (lo pone Game; ver cleanLook) */
+    this.look;
     /** @type {boolean | undefined} compañero de cooperativo (lo pone coop.js) */
     this.remote;
     /** @type {boolean | undefined} dentro del robot (lo pone main.js / el servidor) */
