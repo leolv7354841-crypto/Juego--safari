@@ -5,8 +5,9 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN } from './config.js';
+import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN, SHOP, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE } from './config.js';
 import { Player } from './player.js';
+import { Robot } from './robot.js';
 import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
@@ -16,7 +17,7 @@ import { rand, TAU, angleTo } from './util.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
-const PEER_N = 14;
+const PEER_N = 15;
 // mismo orden que STAT_KEYS en server/src/sim/ServerSim.ts
 const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -46,6 +47,9 @@ export class Online {
     this.seed = 0;
     this.peers = new Map();
     this.zs = new Map();
+    // robots de los demás (el propio es game.robot) y fuegos ya vistos (para no rehacer sus llamas)
+    this.robots = new Map();
+    this.fireMap = new Map();
     this.remoteBullets = [];
     this.clock = new ServerClock();
     this.batch = [];
@@ -310,6 +314,9 @@ export class Online {
     this.lastQ = 0;
     this.peers.clear();
     this.zs.clear();
+    this.robots.clear();
+    this.fireMap.clear();
+    this.blkGeo = '';
     this.remoteBullets = [];
     this.clock = new ServerClock();
     this.wantReload = false;
@@ -329,9 +336,13 @@ export class Online {
     this.playing = false;
     this.peers.clear();
     this.zs.clear();
+    this.robots.clear();
+    this.fireMap.clear();
     this.remoteBullets = [];
     this.up = null;
+    g.setAcid(0);
     g.$('net-diag').hidden = true;
+    g.$('btn-upgrade').hidden = true;
   }
 
   // Cada fotograma (también en pausa): reloj, ping y entradas a paso fijo.
@@ -381,21 +392,39 @@ export class Online {
     this.batch.push([cmd.s, cmd.mx, cmd.my, cmd.f, cmd.a, cmd.w]);
   }
 
-  // Reemplaza a game.update() mientras se juega en línea.
+  // ¿Hay una tanda de mejoras del servidor sin elegir?
+  get upReady() {
+    return !!(this.up && this.up.n !== this.upDone);
+  }
+
+  // Reemplaza a game.update() mientras se juega en línea. Con otra pantalla encima (mejoras,
+  // tienda, pausa) el mundo sigue moviéndose detrás: la partida no se detiene por nadie.
   update(dt) {
     const g = this.game;
     const inp = g.input;
     const p = g.player;
-    if (inp.consume('pause')) return g.pause();
-    if (inp.consume('reload')) this.wantReload = true;
-    for (const k of ['build', 'cycleBuild', 'grenade', 'molotov', 'robot']) if (inp.consume(k)) g.toast('No disponible en línea todavía');
-    if (inp.consume('nextRound')) g.startNextRound();
+    const live = g.state === 'play';
+    if (live) {
+      if (inp.consume('pause')) return g.pause();
+      if (inp.consume('reload')) this.wantReload = true;
+      if (p.alive) {
+        if (inp.consume('build')) g.tryBuild();
+        if (inp.consume('cycleBuild')) g.cycleBuild();
+        if (inp.consume('grenade')) g.tryGrenade();
+        if (inp.consume('molotov')) g.tryGrenade('molotov');
+        if (inp.consume('robot')) g.toggleRobot();
+        // a mitad de oleada la mejora se abre cuando él quiere (U o el botón)
+        if (inp.consume('upgrade') && this.upReady) return g.openLevelUp();
+      }
+      if (inp.consume('nextRound')) g.startNextRound();
+    }
     g.time += dt;
     // la mira y el disparo se ven al instante (las balas propias son de adorno: el daño es del servidor)
-    if (p.alive) p.act(dt, g, inp.move());
+    if (live && p.alive) p.act(dt, g, inp.move());
     this.pred.decay(dt);
     p.x = this.phys.x + this.pred.ox;
     p.y = this.phys.y + this.pred.oy;
+    this.followRobot(g.robot, p, dt);
     const now = performance.now();
     const rt = this.clock.now(now) - NET.interpDelay;
     this.placePeers(rt, dt);
@@ -406,6 +435,13 @@ export class Online {
       b.age += dt;
     }
     g.bullets.update(dt, g);
+    const st = g.structures;
+    st.time = g.time;
+    for (const f of st.fires) f.t += dt;
+    for (const q of st.blasts) q.t -= dt;
+    for (const q of st.scorches) q.t += dt;
+    for (const b of st.blocks) b.hitT -= dt;
+    for (const w of st.wires) w.hitT -= dt;
     g.particles.update(dt);
     g.decals.update(dt);
     g.emitFires(dt);
@@ -417,9 +453,12 @@ export class Online {
       g.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
     }
     g.music.setDanger(p.alive ? this.danger : 0, dt);
-    // entre oleadas: primero las mejoras que ofrece el servidor, luego la tienda
-    if (p.alive && g.director.state === 'waiting') {
-      if (this.up && this.up.n !== this.upDone) return g.openLevelUp();
+    // a mitad de oleada sólo se avisa de la mejora (botón); entre oleadas se abre sola y luego la tienda
+    const upBtn = g.$('btn-upgrade');
+    const showUp = live && p.alive && this.upReady && g.director.state !== 'waiting';
+    if (upBtn.hidden === showUp) upBtn.hidden = !showUp;
+    if (live && p.alive && g.director.state === 'waiting') {
+      if (this.upReady) return g.openLevelUp();
       if (g.shopPending) return g.openShop();
     }
     const alivePeer = !p.alive && [...this.peers.values()].find((q) => q.alive && !q.away);
@@ -447,7 +486,21 @@ export class Online {
       q.flashT -= dt;
       q.hurtT -= dt;
       q.recoil = Math.max(0, q.recoil - dt * 8);
+      if (q.inRobot) this.followRobot(this.robots.get(q.idx), q, dt);
     }
+  }
+
+  // El robot pilotado va donde va su piloto (el propio, con la posición predicha).
+  followRobot(rb, p, dt) {
+    if (!rb) return;
+    rb.hitT -= dt;
+    if (!rb.owned || !rb.piloted || !p.inRobot) return;
+    const moved = Math.hypot(p.x - rb.x, p.y - rb.y);
+    rb.x = p.x;
+    rb.y = p.y;
+    rb.angle = p.angle;
+    if (moved > 0.2) rb.legAngle = angleTo(rb.legAngle, p.legAngle, dt * 6);
+    rb.walk += Math.min(moved, 20) * 0.045;
   }
 
   placeZombies(rt, dt, p) {
@@ -517,13 +570,16 @@ export class Online {
     const d = g.director;
     d.wave = s.w | 0;
     d.state = s.ds;
+    this.applyInventory(s);
     this.applyEconomy(s);
+    this.applyStructures(s);
     // el reloj local avanza solo (animaciones); sólo se corrige si se aleja del servidor
     const tm = Number(s.tm);
     if (Number.isFinite(tm) && Math.abs(tm - g.time) > 2) g.time = tm;
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
     this.applyPeers(s.pl || [], ts);
+    this.applyRobots(s.rb || []);
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], ts);
     const pk = s.pk || [];
     g.pickups.list = [];
@@ -541,12 +597,37 @@ export class Online {
     const st = Array.isArray(s.st) ? s.st : [];
     const hp = Number(st[0]) || 0;
     const alive = !!st[2];
+    const acid = (Number(st[8]) || 0) / 10;
     if (alive && p.alive && hp < p.hp - 0.5) {
-      // golpe confirmado por el servidor
+      // golpe confirmado por el servidor (o la quemadura del ácido)
       p.hurtT = 0.3;
-      g.hurtFlash = Math.min(1, g.hurtFlash + 0.5);
-      g.camera.shake(0.28);
-      g.sfx.hurt();
+      if (acid > 0 && p.hp - hp <= 2.5) {
+        g.hurtFlash = Math.min(1, g.hurtFlash + 0.15);
+        g.sfx.sizzle();
+      } else {
+        g.hurtFlash = Math.min(1, g.hurtFlash + 0.5);
+        g.camera.shake(0.28);
+        g.sfx.hurt();
+      }
+    }
+    // ácido del gordo: la vista se nubla mientras quema
+    if (acid > 0 && !(g.acidT > 0)) {
+      g.hurtFlash = Math.min(1, g.hurtFlash + 0.3);
+      g.sfx.sizzle();
+      g.toast('¡Ácido! Te estás quemando');
+    }
+    g.setAcid(alive ? acid : 0);
+    // dentro del robot el cuerpo es el del robot (la predicción tiene que chocar igual que el servidor)
+    const inRobot = !!st[9];
+    if (inRobot !== !!p.inRobot) {
+      p.inRobot = inRobot;
+      p.r = inRobot ? ROBOT.radius : PLAYER_BASE.radius;
+      p.mass = inRobot ? ROBOT.mass : PLAYER_BASE.mass;
+    }
+    // cada golpe de zombi cuesta dinero (lo cobra el servidor)
+    if (Number(s.ml) > 0) {
+      g.moneyPop(`-$${s.ml | 0}`, 'loss');
+      g.sfx.moneyLost();
     }
     if (p.alive && !alive) {
       g.camera.shake(0.6);
@@ -589,13 +670,22 @@ export class Online {
     p.reloadDur = p.weapon.def.reload / p.stats.reloadMult;
   }
 
+  // Barricadas, trampas y lanzables que tiene sin usar (los cuenta el servidor).
+  applyInventory(s) {
+    const g = this.game;
+    if (!Array.isArray(s.iv)) return;
+    SHOP_ORDER.forEach((k, i) => (g.inv[k] = Math.max(0, s.iv[i] | 0)));
+    if (g.inv[g.buildSel] <= 0) g.buildSel = BUILD_ORDER.find((k) => g.inv[k] > 0) || g.buildSel;
+  }
+
   // Nivel, mejoras ofrecidas y estadísticas (todo lo decide el servidor).
   applyEconomy(s) {
     const g = this.game;
     const p = g.player;
     const ec = Array.isArray(s.ec) ? s.ec : [];
     // el dinero ya llegó en st (applyStats): aquí sólo se usa para saber si redibujar la tienda
-    const shopSig = g.money + '|' + p.weapons.map((w) => w.id + ':' + w.reserve).join();
+    const rb = g.robot;
+    const shopSig = g.money + '|' + p.weapons.map((w) => w.id + ':' + w.reserve).join() + '|' + SHOP_ORDER.map((k) => g.inv[k]).join() + '|' + rb.owned + Math.ceil(rb.hp);
     g.level = Math.max(1, ec[0] | 0);
     g.xp = Math.max(0, ec[1] | 0);
     g.xpNeed = Math.max(1, ec[2] | 0);
@@ -636,6 +726,102 @@ export class Online {
     this.send('buy', { k, id, n });
   }
 
+  // Construir, lanzar o subir al robot: el servidor lo hace al llegar a la última entrada que
+  // mandamos (s), así ocurre donde se veía el jugador y hacia donde apuntaba.
+  act(k, extra = {}) {
+    if (!this.pred) return;
+    this.send('act', { s: this.pred.seq, k, ...extra });
+  }
+
+  // Granadas en el aire, fuego, cohetes clavados, explosiones; barricadas y trampas cuando cambian.
+  applyStructures(s) {
+    const g = this.game;
+    const st = g.structures;
+    const gr = Array.isArray(s.gr) ? s.gr : [];
+    st.grenades = [];
+    for (let i = 0; i + 5 < gr.length; i += 6) st.grenades.push({ x: gr[i], y: gr[i + 1], h: gr[i + 2], rot: gr[i + 3] / 100, kind: gr[i + 4] ? 'molotov' : 'grenade', t: gr[i + 5] ? 2 : 0, dur: 1 });
+    const fi = Array.isArray(s.fi) ? s.fi : [];
+    const fires = [];
+    for (let i = 0; i + 4 < fi.length; i += 5) {
+      let f = this.fireMap.get(fi[i]);
+      if (!f) {
+        f = { id: fi[i], x: fi[i + 1], y: fi[i + 2], r: 82, tick: 0, flames: [] };
+        for (let k = 0; k < 16; k++) {
+          const a = rand(0, TAU);
+          const dd = Math.sqrt(Math.random()) * f.r * 0.85;
+          f.flames.push({ x: f.x + Math.cos(a) * dd, y: f.y + Math.sin(a) * dd * 0.85, s: rand(0.7, 1.25), ph: rand(0, 10) });
+        }
+        this.fireMap.set(f.id, f);
+      }
+      f.t = fi[i + 3] / 100;
+      f.life = fi[i + 4] / 100;
+      fires.push(f);
+    }
+    for (const id of this.fireMap.keys()) if (!fires.some((f) => f.id === id)) this.fireMap.delete(id);
+    st.fires = fires;
+    const so = Array.isArray(s.so) ? s.so : [];
+    st.stuck = [];
+    for (let i = 0; i + 6 < so.length; i += 7) st.stuck.push({ x: so[i], y: so[i + 1], ang: so[i + 2] / 100, t: so[i + 3] / 100, stick: so[i + 4] / 100, glow: so[i + 5] / 100, kind: so[i + 6] ? 'fat' : 'heavy' });
+    const bl = Array.isArray(s.bl) ? s.bl : [];
+    st.blasts = [];
+    for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
+    if (Array.isArray(s.blk)) {
+      const list = s.blk.filter((q) => Array.isArray(q) && SHOP[q[0]] && !SHOP[q[0]].ground && !SHOP[q[0]].consumable);
+      const geo = list.map((q) => q.slice(0, 5).join()).join('|');
+      if (geo !== this.blkGeo) {
+        // se puso o se rompió alguna: el mapa local también choca con ellas (para predecir igual)
+        this.blkGeo = geo;
+        for (const b of st.blocks) g.world.removeDynamic(b);
+        st.blocks = list.map((q) => ({ k: 0, kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, ang: q[6] / 100, low: true, block: true, hitT: 0, cd: 0 }));
+        for (const b of st.blocks) g.world.addDynamic(b);
+        st.relayer();
+      } else {
+        list.forEach((q, i) => {
+          const b = st.blocks[i];
+          if (q[5] < b.hp) b.hitT = 0.12;
+          b.hp = q[5];
+          b.ang = q[6] / 100;
+        });
+      }
+    }
+    if (Array.isArray(s.wir)) st.wires = s.wir.filter((q) => Array.isArray(q) && SHOP[q[0]] && SHOP[q[0]].ground).map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
+    if (Array.isArray(s.sc)) st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
+  }
+
+  // Robots: el propio en game.robot (tienda, barra de vida, dibujo) y los de los demás aparte.
+  applyRobots(rb) {
+    const g = this.game;
+    const myIdx = this.me ? this.me.idx : -1;
+    const seen = new Set();
+    for (let i = 0; i + 7 < rb.length; i += 8) {
+      const idx = rb[i];
+      let r = g.robot;
+      if (idx !== myIdx) {
+        seen.add(idx);
+        r = this.robots.get(idx);
+        if (!r) {
+          r = new Robot();
+          this.robots.set(idx, r);
+        }
+      }
+      const piloted = !!rb[i + 7];
+      // pilotado, sigue a su piloto en cada fotograma (ver followRobot)
+      if (!piloted || !r.piloted || !r.owned) {
+        r.x = rb[i + 1];
+        r.y = rb[i + 2];
+        r.angle = rb[i + 3] / 100;
+        r.legAngle = rb[i + 4] / 100;
+        r.walk = rb[i + 5] / 100;
+      }
+      if (r.owned && rb[i + 6] < r.hp) r.hitT = 0.2;
+      r.owned = true;
+      r.hp = rb[i + 6];
+      r.piloted = piloted;
+    }
+    // el propio sólo llega si está cerca: lejos se conserva lo último que se vio
+    for (const idx of this.robots.keys()) if (!seen.has(idx)) this.robots.delete(idx);
+  }
+
   applyPeers(pl, ts) {
     const seen = new Set();
     const names = new Map();
@@ -674,6 +860,9 @@ export class Online {
       q.speedNow = pl[i + 11];
       q.hp = pl[i + 12];
       q.away = !!pl[i + 13];
+      q.idx = idx;
+      q.inRobot = !!pl[i + 14];
+      q.r = q.inRobot ? ROBOT.radius : PLAYER_BASE.radius;
     }
     for (const idx of this.peers.keys()) if (!seen.has(idx)) this.peers.delete(idx);
   }
@@ -807,10 +996,14 @@ export class Online {
     const g = this.game;
     ctx.font = '700 11px sans-serif';
     ctx.textAlign = 'center';
+    // robots estacionados de los demás (los pilotados se dibujan con su piloto)
+    for (const r of this.robots.values()) if (!r.piloted) r.draw(ctx, null, g.time);
     for (const q of this.peers.values()) {
       if (!q.alive) continue;
       if (q.away) ctx.globalAlpha = 0.45;
-      drawSurvivor(ctx, q, g.time);
+      const r = q.inRobot && this.robots.get(q.idx);
+      if (r) r.draw(ctx, q, g.time);
+      else drawSurvivor(ctx, q, g.time);
       const name = q.away ? `${q.name} (reconectando)` : q.name;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillText(name, q.x + 1, q.y - q.r - 13);

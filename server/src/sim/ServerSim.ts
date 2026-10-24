@@ -11,13 +11,15 @@ import { Bullets } from '../../../js/bullets.js';
 import { Director } from '../../../js/director.js';
 import { Pickups } from '../../../js/pickups.js';
 import { Player } from '../../../js/player.js';
+import { Structures, ACID } from '../../../js/build.js';
+import { Robot } from '../../../js/robot.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, xpForLevel } from '../../../js/config.js';
+import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, xpForLevel } from '../../../js/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
-import type { Cmd } from '../validate.ts';
+import type { Cmd, Act } from '../validate.ts';
 
 const FX_MAX = 300;
 // entradas que se guardan como mucho por jugador (las más viejas se tiran)
@@ -28,6 +30,10 @@ const BACKLOG = 4;
 const AUTO_NEXT = 45;
 // pasos sin entrada en los que se repite la última (luego, quieto)
 const STARVE = 6;
+// acciones (construir, lanzar, robot) que esperan a que el servidor llegue a su entrada
+const ACTS_MAX = 8;
+// fotos entre envíos de barricadas y trampas mientras sólo cambia su vida
+const STRUCT_EVERY = 6;
 const r100 = (v: number) => Math.round(v * 100);
 const UPGRADE_BY_ID = new Map<string, any>(UPGRADES.map((u: any) => [u.id, u]));
 // estadísticas del jugador que cambian con las mejoras (el cliente las necesita para predecir)
@@ -59,6 +65,18 @@ export type Slot = {
   // mejoras ofrecidas ahora (ids) y su número de tanda, para no aplicar una elección vieja
   choices: string[];
   choiceN: number;
+  // barricadas, trampas y lanzables comprados (sin usar), su robot y el ácido que lo quema
+  inv: Record<string, number>;
+  robot: any;
+  acts: Act[];
+  acidT: number;
+  acidTick: number;
+  // dinero perdido por golpes desde la última foto (para el aviso en su pantalla)
+  lost: number;
+  // última versión de barricadas y trampas que se le mandó
+  stGeo: string;
+  stSent: string;
+  stN: number;
 };
 
 export class ServerSim {
@@ -68,6 +86,7 @@ export class ServerSim {
   bullets: any;
   director: any;
   pickups: any;
+  structures: any;
   slots = new Map<string, Slot>();
   tick = 0;
   time = 0;
@@ -93,6 +112,7 @@ export class ServerSim {
     this.director.coop = true;
     this.director.crowd = NET.crowd[0] + NET.crowd[1] * Math.max(0, players.length - 1);
     this.pickups = new Pickups();
+    this.structures = new Structures();
     this.game = this.makeGame();
     const s = this.world.spawn;
     players.forEach((pl, i) => {
@@ -102,7 +122,8 @@ export class ServerSim {
       p.field = this.newField();
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
       this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [],
-        level: 1, xp: 0, xpNeed: xpForLevel(1), pending: 0, taken: {}, choices: [], choiceN: 0 });
+        level: 1, xp: 0, xpNeed: xpForLevel(1), pending: 0, taken: {}, choices: [], choiceN: 0,
+        inv: Object.fromEntries(SHOP_ORDER.map((k: string) => [k, 0])), robot: new Robot(), acts: [], acidT: 0, acidTick: 0, lost: 0, stGeo: '', stSent: '', stN: 0 });
     });
   }
 
@@ -156,7 +177,7 @@ export class ServerSim {
       sfx: recorder('s', (n) => SFX_SYNC.includes(n)),
       camera: { viewW: 1280, viewH: 760, shake: rec('c', 'shake'), kick: noop },
       coop: { isHost: false, isGuest: false, active: true, peer: null },
-      structures: { wires: [], grenades: [], fires: [], trapAt: () => null, damageBlock: noop, queueDeathBlast: noop, stickRocket: noop, explode: noop },
+      structures: this.structures,
       // el punto al que apunta el jugador que se está moviendo (sale del ángulo que mandó)
       mouseWorld: () => {
         const p = g.player;
@@ -167,10 +188,15 @@ export class ServerSim {
       killZombie: (z: any) => this.killZombie(z),
       collectFor: (p: any, it: any) => this.collectFor(p, it),
       onPlayerDeath: () => this.onPlayerDeath(),
-      onZombieHit: noop,
-      onRobotHit: noop,
-      rocketHit: noop,
-      rocketBlast: noop,
+      onZombieHit: (_z: any, p: any) => this.onZombieHit(p),
+      onRobotHit: (dmg: number, p: any) => this.onRobotHit(dmg, p),
+      applyAcid: (p: any) => this.applyAcid(p),
+      rocketHit: (z: any, x: number, y: number, b: any) => {
+        // en gordos y super blindados el cohete se clava; en el resto estalla al instante
+        if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(g, z, x, y, b);
+        else g.rocketBlast(x, y, b.owner);
+      },
+      rocketBlast: (x: number, y: number, owner: string | null = null) => this.structures.explode(g, { x, y, owner }, ROCKET.radius, ROCKET.power, 1),
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => {
         g.particles.dust(x, y, 18);
@@ -269,6 +295,8 @@ export class ServerSim {
       g.particles.pickupFx(z.x, z.y, '#f0c040');
     }
     g.particles.death(z.x, z.y, z.r);
+    // el gordo revienta en ácido
+    if (z.type === 'fat') this.structures.queueDeathBlast(z.type, z.x, z.y);
     const r = Math.random();
     if (z.type === 'giant') {
       g.camera.shake(0.5);
@@ -295,9 +323,10 @@ export class ServerSim {
     }
   }
 
-  /* ---------- mejoras y tienda (entre oleadas, como en el cooperativo) ---------- */
+  /* ---------- mejoras (en cualquier momento) y tienda (entre oleadas) ---------- */
 
-  // Ofrece la siguiente tanda de mejoras a quien tenga niveles sin elegir.
+  // Ofrece la siguiente tanda de mejoras a quien tenga niveles sin elegir (también a mitad de
+  // oleada: el jugador la abre cuando quiere, porque la partida no se detiene por él).
   offerUpgrades() {
     for (const s of this.slots.values()) {
       if (s.choices.length || s.pending <= 0 || !s.p.alive) continue;
@@ -327,8 +356,11 @@ export class ServerSim {
   // Compra o venta en la tienda: sólo entre oleadas y con el dinero que lleva el servidor.
   shop(id: string, k: string, wid: string, n: number) {
     const s = this.slots.get(id);
+    if (!s || !s.p.alive || this.director.state !== 'waiting') return false;
+    if (k === 'item') return this.buyItem(s, wid);
+    if (k === 'robot') return this.buyRobot(s, wid);
     const d = Object.hasOwn(WEAPONS, wid) ? (WEAPONS as any)[wid] : null;
-    if (!s || !d || !s.p.alive || this.director.state !== 'waiting') return false;
+    if (!d) return false;
     const p = s.p;
     if (k === 'gun') {
       if (p.has(wid) || s.money < d.price) return false;
@@ -349,6 +381,146 @@ export class ServerSim {
       w.reserve += p.magSize(d) * n;
     } else return false;
     return true;
+  }
+
+  // Barricadas, trampas, granadas y molotovs: van a su inventario y los usa cuando quiere.
+  buyItem(s: Slot, k: string) {
+    const it = Object.hasOwn(SHOP, k) ? (SHOP as any)[k] : null;
+    if (!it || s.money < it.price) return false;
+    s.money -= it.price;
+    s.inv[k]++;
+    return true;
+  }
+
+  buyRobot(s: Slot, what: string) {
+    const rb = s.robot;
+    if (what === 'buy') {
+      if (rb.owned || s.money < ROBOT.price) return false;
+      s.money -= ROBOT.price;
+      rb.deploy(s.p, this.world);
+      s.toasts.push('Robot listo: acércate y súbete');
+      return true;
+    }
+    if (what !== 'repair') return false;
+    const cost = rb.repairCost;
+    if (!rb.owned || cost <= 0 || s.money < cost) return false;
+    s.money -= cost;
+    rb.hp = ROBOT.hp;
+    s.toasts.push('Robot reparado');
+    return true;
+  }
+
+  /* ---------- construir, lanzar y el robot (en cualquier momento) ---------- */
+
+  // La acción se hace cuando el servidor llega a la entrada que el jugador acababa de mandar,
+  // así se coloca o se lanza desde donde él se veía y hacia donde apuntaba.
+  act(id: string, a: Act) {
+    const s = this.slots.get(id);
+    if (!s || !s.p.alive || s.acts.length >= ACTS_MAX) return;
+    s.acts.push(a);
+  }
+
+  runActs(s: Slot) {
+    while (s.acts.length && s.acts[0].s <= s.ack) this.doAct(s, s.acts.shift()!);
+  }
+
+  doAct(s: Slot, a: Act) {
+    const g = this.game;
+    const p = s.p;
+    if (!p.alive) return;
+    // todos (también él) ven y oyen lo que hizo: su pantalla no lo predijo
+    g.player = p;
+    this.actor = null;
+    this.toastTo = s.id;
+    try {
+      if (a.k === 'build') {
+        if (!BUILD_ORDER.includes(a.kind) || s.inv[a.kind] <= 0) return;
+        if (this.structures.place(g, a.kind, s.id)) {
+          s.inv[a.kind]--;
+          g.sfx.build();
+        } else s.toasts.push('No cabe ahí');
+      } else if (a.k === 'throw') {
+        if (!THROWABLES.includes(a.kind) || s.inv[a.kind] <= 0) return;
+        s.inv[a.kind]--;
+        if (a.kind === 'molotov') this.structures.throwMolotov(g, a.tx, a.ty, s.id);
+        else this.structures.throwGrenade(g, a.tx, a.ty, s.id);
+      } else if (a.k === 'robot') this.toggleRobot(s);
+    } finally {
+      g.player = null;
+      this.toastTo = null;
+    }
+  }
+
+  // Subirse o bajarse de su robot (las mismas reglas que en solitario).
+  toggleRobot(s: Slot) {
+    const rb = s.robot;
+    const p = s.p;
+    if (!rb.owned) return s.toasts.push('Compra el robot de combate en la tienda');
+    if (rb.piloted) {
+      rb.leave(p, this.world);
+      this.game.sfx.build();
+      return;
+    }
+    if (rb.broken) return s.toasts.push('Robot destruido: repáralo en la tienda');
+    if (!rb.near(p)) return s.toasts.push('Acércate al robot para subirte');
+    rb.board(p);
+    this.game.sfx.punch();
+    this.game.camera.shake(0.2);
+  }
+
+  slotOf(p: any) {
+    for (const s of this.slots.values()) if (s.p === p) return s;
+    return null;
+  }
+
+  // Golpes a quien va en su robot: los aguanta el blindaje hasta que revienta.
+  onRobotHit(dmg: number, p: any) {
+    const s = this.slotOf(p);
+    if (!s) return;
+    const rb = s.robot;
+    this.game.sfx.blockHit('metal');
+    if (!rb.damage(dmg)) return;
+    this.structures.explode(this.game, { x: rb.x, y: rb.y }, 170, 450, 1);
+    rb.leave(p, this.world);
+    rb.hp = 0;
+    s.toasts.push('¡Robot destruido! Repáralo en la tienda');
+  }
+
+  // Cada golpe de zombi cuesta dinero (como en solitario; dentro del robot, no).
+  onZombieHit(p: any) {
+    const s = this.slotOf(p);
+    if (!s || p.inRobot) return;
+    const loss = Math.min(s.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+    if (loss <= 0) return;
+    s.money -= loss;
+    s.lost += loss;
+  }
+
+  // Ácido del gordo: quema unos segundos (vida fija por segundo).
+  applyAcid(p: any) {
+    const s = this.slotOf(p);
+    if (!s || !p.alive || p.inRobot) return;
+    if (!(s.acidT > 0)) s.acidTick = 0;
+    s.acidT = ACID.burn;
+  }
+
+  updateAcid(s: Slot) {
+    if (!(s.acidT > 0)) return;
+    const p = s.p;
+    s.acidTick += TICK;
+    while (s.acidTick >= 1 && p.alive) {
+      s.acidTick -= 1;
+      p.hp -= ACID.dps;
+      p.damageTaken += ACID.dps;
+      p.hurtT = 0.2;
+      this.game.particles.acidBurst(p.x, p.y, 18);
+      if (p.hp <= 0) {
+        p.hp = 0;
+        p.alive = false;
+        this.onPlayerDeath();
+      }
+    }
+    s.acidT = p.alive ? Math.max(0, s.acidT - TICK) : 0;
   }
 
   // Un jugador recoge un objeto (mismas reglas que en solitario; el aviso es sólo para él).
@@ -373,6 +545,7 @@ export class ServerSim {
       s.p.counted = true;
       s.deaths++;
       s.queue.length = 0;
+      s.acts.length = 0;
       this.toastAll(`${s.name} cayó: revive al terminar la oleada`);
     }
   }
@@ -419,6 +592,7 @@ export class ServerSim {
     if (!s) return;
     s.away = away;
     s.queue.length = 0;
+    s.acts.length = 0;
     s.last = { ...s.last, mx: 0, my: 0, f: 0 };
   }
 
@@ -457,8 +631,15 @@ export class ServerSim {
         }
         s.last = cmd;
         this.applyCmd(s, cmd);
+        this.runActs(s);
       }
     }
+    for (const s of live) {
+      // el robot pilotado va donde va su piloto (pisadas, chispas si está dañado)
+      s.robot.update(TICK, s.p, g);
+      this.updateAcid(s);
+    }
+    this.structures.update(TICK, g);
     this.flowT -= TICK;
     if (this.flowT <= 0) {
       for (const s of live) if (s.p.alive) this.world.computeField(s.p.field, s.p.x, s.p.y);
@@ -474,8 +655,8 @@ export class ServerSim {
         else this.goldenT = 5;
       }
     }
+    this.offerUpgrades();
     if (d.state === 'waiting') {
-      this.offerUpgrades();
       this.waitT += TICK;
       if (this.waitT > AUTO_NEXT) this.nextRound();
     }
@@ -554,8 +735,15 @@ export class ServerSim {
       if (q === s) continue;
       const p = q.p;
       pl.push(q.idx, Math.round(p.x), Math.round(p.y), r100(p.angle), r100(p.legAngle), p.running ? 1 : 0, WEAPON_ORDER.indexOf(p.weapon.id),
-        p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow), Math.ceil(p.hp), q.away ? 1 : 0);
+        p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow), Math.ceil(p.hp), q.away ? 1 : 0, p.inRobot ? 1 : 0);
     }
+    // robots de todos (el propio también): estacionados o con su piloto dentro
+    const rb: number[] = [];
+    for (const q of this.slots.values()) {
+      const r = q.robot;
+      if (r.owned && near(r.x, r.y)) rb.push(q.idx, Math.round(r.x), Math.round(r.y), r100(r.angle), r100(r.legAngle), r100(r.walk % TAU), Math.max(0, Math.round(r.hp)), r.piloted ? 1 : 0);
+    }
+    const st = this.structures;
     const fx: unknown[] = [];
     for (const f of this.fx) {
       if (fx.length >= FX_MAX) break;
@@ -568,7 +756,8 @@ export class ServerSim {
     const snap: any = {
       q: ++this.snapN, t: this.tick, ts: Math.round(now), ack: s.ack,
       me: packBody(me),
-      st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills, s.money],
+      st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills, s.money,
+        Math.round(s.acidT * 10), me.inRobot ? 1 : 0],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
       o: [ox, oy], z, zx, zh, pl,
       pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
@@ -576,7 +765,19 @@ export class ServerSim {
       w: d.wave, ds: d.state, tm: Math.round(this.time), kl: this.totalKills(), lft: d.queue.length + this.horde.list.length,
       ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
+      iv: SHOP_ORDER.map((k: string) => s.inv[k]),
+      rb,
+      // granadas en el aire, fuego, cohetes clavados y explosiones (sólo lo cercano)
+      gr: st.grenades.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), Math.round(q.h), r100(q.rot), q.kind === 'molotov' ? 1 : 0, q.t > q.dur ? 1 : 0] : [])),
+      fi: st.fires.flatMap((f: any) => (near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [])),
+      so: st.stuck.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.ang || 0), r100(q.t), r100(q.stick), r100(q.glow), q.kind === 'fat' ? 1 : 0] : [])),
+      bl: st.blasts.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.t)] : [])),
     };
+    this.structSnap(s, snap);
+    if (s.lost) {
+      snap.ml = s.lost;
+      s.lost = 0;
+    }
     if (s.choices.length) snap.up = [s.choiceN, ...s.choices];
     if (fx.length) snap.fx = fx;
     if (s.toasts.length) {
@@ -584,6 +785,24 @@ export class ServerSim {
       s.toasts.length = 0;
     }
     return snap;
+  }
+
+  // Barricadas, trampas y quemaduras del suelo: al momento si se pone o se rompe alguna; si
+  // sólo cambia su vida, cada STRUCT_EVERY fotos (son de todo el mapa).
+  structSnap(s: Slot, snap: any) {
+    const st = this.structures;
+    const sc = st.scorches[st.scorches.length - 1];
+    const geo = st.blocks.map((b: any) => `${b.kind}${b.x},${b.y},${b.w},${b.h}`).join() + '|' + st.wires.map((w: any) => `${w.kind}${w.x},${w.y},${w.w},${w.h}`).join()
+      + '|' + st.scorches.length + (sc ? `,${Math.round(sc.x)},${Math.round(sc.y)}` : '');
+    const full = geo + '|' + st.blocks.map((b: any) => Math.round(b.hp)).join() + '|' + st.wires.map((w: any) => Math.round(w.hp)).join();
+    s.stN++;
+    if (full === s.stSent || (geo === s.stGeo && s.stN < STRUCT_EVERY)) return;
+    s.stGeo = geo;
+    s.stSent = full;
+    s.stN = 0;
+    snap.blk = st.blocks.map((b: any) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]);
+    snap.wir = st.wires.map((w: any) => [w.kind, w.x, w.y, w.w, w.h, Math.round(w.hp)]);
+    snap.sc = st.scorches.map((c: any) => [Math.round(c.x), Math.round(c.y), r100(c.a), Math.round(c.t), c.life]);
   }
 
   // Después de mandar las fotos de esta ronda, los efectos ya enviados se olvidan.

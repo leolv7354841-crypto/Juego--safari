@@ -131,7 +131,7 @@ export class Player {
     }
     // dentro del robot, el daño lo recibe el robot
     if (this.inRobot) {
-      game.onRobotHit(dmg);
+      game.onRobotHit(dmg, this);
       return;
     }
     const real = dmg * (1 - this.stats.armor);

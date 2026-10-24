@@ -13,6 +13,13 @@ const BLAST_R = 140;
 export const ACID = { radius: 105, burn: 5, dps: 2 };
 const near = [];
 
+// Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
+function nearestPlayer(game, x, y) {
+  let best = Infinity;
+  for (const p of game.targets || [game.player]) best = Math.min(best, Math.hypot(p.x - x, p.y - y));
+  return best;
+}
+
 export class Structures {
   constructor() {
     this.blocks = [];
@@ -87,14 +94,15 @@ export class Structures {
     return { x, y, w, h, ok };
   }
 
-  place(game, kind) {
+  // owner: de quién son las bajas de sus minas y torretas (en línea)
+  place(game, kind, owner = null) {
     const pl = this.placement(game, kind);
     if (!pl.ok) return false;
     const def = SHOP[kind];
     if (def.ground) {
-      this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0 });
+      this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0, owner });
     } else {
-      const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0, cd: 0, ang: game.player.angle };
+      const o = { k: 0, x: pl.x, y: pl.y, w: pl.w, h: pl.h, low: true, block: true, kind, hp: def.hp, max: def.hp, hitT: 0, cd: 0, ang: game.player.angle, owner };
       this.blocks.push(o);
       game.world.addDynamic(o);
       this.relayer();
@@ -151,7 +159,7 @@ export class Structures {
       if (z.x + z.r * 0.5 < w.x || z.x - z.r * 0.5 > w.x + w.w || z.y + z.r * 0.5 < w.y || z.y - z.r * 0.5 > w.y + w.h) continue;
       if (w.kind === 'mine') {
         this.wires.splice(i, 1);
-        this.explode(game, { x: w.x + w.w / 2, y: w.y + w.h / 2 }, 115, 280);
+        this.explode(game, { x: w.x + w.w / 2, y: w.y + w.h / 2, owner: w.owner }, 115, 280);
         return null;
       }
       const spikes = w.kind === 'spikes';
@@ -165,7 +173,7 @@ export class Structures {
 
   /* ---------- granadas ---------- */
 
-  throwGrenade(game, tx, ty) {
+  throwGrenade(game, tx, ty, owner = null) {
     const p = game.player;
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -174,7 +182,7 @@ export class Structures {
     const ex = p.x + Math.cos(a) * d;
     const ey = p.y + Math.sin(a) * d;
     const dur = 0.25 + d / 650;
-    this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0 });
+    this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0, owner });
   }
 
   // Los reventones de ácido se encolan: así una cadena de gordos no se pisa a sí misma.
@@ -285,8 +293,8 @@ export class Structures {
 
   /* ---------- molotov ---------- */
 
-  throwMolotov(game, tx, ty) {
-    this.throwGrenade(game, tx, ty);
+  throwMolotov(game, tx, ty, owner = null) {
+    this.throwGrenade(game, tx, ty, owner);
     const g = this.grenades[this.grenades.length - 1];
     g.kind = 'molotov';
     g.fuse = g.dur;
@@ -376,10 +384,8 @@ export class Structures {
     game.decals.acid(x, y, R * 0.75);
     for (let i = 0; i < 4; i++) game.decals.acid(x + rand(-R, R) * 0.6, y + rand(-R, R) * 0.6, rand(14, 26));
     game.sfx.acid();
-    const p = game.player;
-    const pd = Math.hypot(p.x - x, p.y - y);
-    game.camera.shake(0.2 * clamp(1 - pd / 500, 0, 1));
-    if (pd < R + p.r) game.applyAcid();
+    game.camera.shake(0.2 * clamp(1 - nearestPlayer(game, x, y) / 500, 0, 1));
+    for (const p of game.targets || [game.player]) if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
     if (game.coop && game.coop.isHost) game.coop.acidAt(x, y, R);
   }
 
@@ -407,9 +413,7 @@ export class Structures {
         z.lastDy = (dy / n) * (2 + 3 * f);
       }
     }
-    const p = game.player;
-    const pd = Math.hypot(p.x - x, p.y - y);
-    game.camera.shake(0.45 + 0.5 * clamp(1 - pd / 600, 0, 1));
+    game.camera.shake(0.45 + 0.5 * clamp(1 - nearestPlayer(game, x, y) / 600, 0, 1));
     // cohete: bola de fuego corta y luego humo; granada: explosión clásica
     if (fling) game.particles.rocketImpact(x, y, R);
     else game.particles.explosion(x, y, R);
@@ -485,7 +489,7 @@ export class Structures {
     const a = b.ang + rand(-0.04, 0.04);
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    game.bullets.spawn({ x: cx + ca * 20, y: cy + sa * 20, dx: ca, dy: sa, speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null });
+    game.bullets.spawn({ x: cx + ca * 20, y: cy + sa * 20, dx: ca, dy: sa, speed: 1100, life: TURRET_RANGE + 40, dmg: 34, pierce: 1, knock: 40, shot: null, hits: null, owner: b.owner });
     game.particles.muzzleSmoke(cx + ca * 22, cy + sa * 22, a);
     game.sfx.turret();
   }

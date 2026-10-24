@@ -46,6 +46,7 @@ export class Input {
       if (e.code === 'KeyG') this.pressed.grenade = true;
       if (e.code === 'KeyT') this.pressed.molotov = true;
       if (e.code === 'KeyE') this.pressed.robot = true;
+      if (e.code === 'KeyU') this.pressed.upgrade = true;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
       const m = /^Digit([1-9])$/.exec(e.code);

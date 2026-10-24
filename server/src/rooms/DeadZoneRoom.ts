@@ -6,7 +6,7 @@ import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core
 import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanLookCode, cleanCmd, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanCmd, cleanAct, Bucket, type Cmd } from '../validate.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -27,7 +27,7 @@ function newCode() {
 }
 
 // strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
-type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; shop: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
+type Limits = { inp: Bucket; cmds: Bucket; adm: Bucket; shop: Bucket; act: Bucket; ping: Bucket; strikes: number; strikeAt: number; bad: number };
 const STRIKE_FORGET = 10;
 const STRIKE_KICK = 200;
 
@@ -88,6 +88,15 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       if (!m || typeof m.k !== 'string' || typeof m.id !== 'string') return this.strike(c, 'compra mal formada');
       this.sim!.shop(c.sessionId, m.k, m.id, Number(m.n) | 0);
     }));
+    // construir, lanzar y subir al robot: se hacen en el paso de la entrada que indica (s)
+    this.onMessage('act', (c, m) => {
+      const l = this.limits.get(c.sessionId);
+      if (!l || !this.sim || this.phase !== 'playing' || !this.member(c)?.inGame) return;
+      if (!l.act.take()) return this.strike(c, 'demasiadas acciones');
+      const a = cleanAct(m);
+      if (!a) return this.strike(c, 'acción mal formada');
+      this.sim.act(c.sessionId, a);
+    });
     this.onMessage('in', (c, m) => this.input(c, m));
     this.onMessage('p', (c, m) => {
       const l = this.limits.get(c.sessionId);
@@ -137,6 +146,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       cmds: new Bucket(80, 40), // entradas sueltas por segundo (60 Hz + margen)
       adm: new Bucket(3, 6), // listo, iniciar, siguiente…
       shop: new Bucket(8, 16), // compras y mejoras (clics seguidos en la tienda)
+      act: new Bucket(6, 10), // construir, lanzar, robot
       ping: new Bucket(4, 4),
       strikes: 0,
       strikeAt: performance.now(),

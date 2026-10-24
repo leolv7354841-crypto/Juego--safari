@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=a698b64b">
+  <link rel="stylesheet" href="css/style.css?v=4dafb7f0">
   <script id="dz-latest">
     // githack guarda en caché el link con el nombre de la rama y a veces sirve una versión
     // vieja; aquí se pregunta a GitHub cuál es el último cambio y se salta a su link exacto.
@@ -35,7 +35,7 @@
   <!-- version:start -->
   <script id="dz-loader">
     (function () {
-      var v = 'a698b64b';
+      var v = '4dafb7f0';
       var b = '';
       try {
         b = new URLSearchParams(location.search).get('b') || '';
@@ -65,6 +65,7 @@
       <div class="hud-left">
         <div class="hud-row">
           <div class="lvl-badge"><small>NV</small><b id="lvl">1</b></div>
+          <button class="btn-upgrade" id="btn-upgrade" hidden>¡Mejora!<kbd>U</kbd></button>
           <div class="vitals">
             <div class="bar hp" id="hp-bar">
               <div class="fill" id="hp-fill"></div>
@@ -187,7 +188,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión a698b64b</span></p>
+        <p class="ver"><span id="ver">Versión 4dafb7f0</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -285,6 +286,7 @@
               <dt><kbd>G</kbd></dt><dd>Lanzar granada</dd>
               <dt><kbd>T</kbd></dt><dd>Lanzar molotov</dd>
               <dt><kbd>E</kbd></dt><dd>Subir / bajar del robot</dd>
+              <dt><kbd>U</kbd></dt><dd>Elegir mejora a mitad de oleada (en línea)</dd>
               <dt><kbd>Enter</kbd></dt><dd>Iniciar siguiente ronda</dd>
               <dt><kbd>Esc</kbd> o <kbd>P</kbd></dt><dd>Pausa / continuar</dd>
             </dl>

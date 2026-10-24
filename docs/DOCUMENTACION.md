@@ -401,8 +401,6 @@ se garantiza un RTT menor a 50 ms.
 - El cooperativo directo no conecta en algunas redes móviles, porque no hay TURN.
 
 **En línea (fase 1)**
-- Faltan tienda, construcciones, granadas, molotovs, robot y mejoras de nivel.
-- El ácido del gordo no hace daño en línea.
 - No hay compensación de latencia para disparos.
 - Los empujones de los zombis no se predicen en el cliente.
 

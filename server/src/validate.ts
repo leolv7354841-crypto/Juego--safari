@@ -39,6 +39,28 @@ export function cleanCmd(raw: unknown): Cmd | null {
   return { s, mx, my, f, a, w };
 }
 
+// Acción de un jugador ligada a su última entrada (s): construir, lanzar o subir al robot.
+export type Act = { s: number; k: 'build' | 'throw' | 'robot'; kind: string; tx: number; ty: number };
+
+const KIND_RE = /^[a-z]{1,12}$/;
+
+export function cleanAct(raw: any): Act | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const { s, k } = raw;
+  if (!Number.isSafeInteger(s) || s < 0) return null;
+  if (k !== 'build' && k !== 'throw' && k !== 'robot') return null;
+  const kind = k === 'robot' ? '' : raw.kind;
+  if (typeof kind !== 'string' || (k !== 'robot' && !KIND_RE.test(kind))) return null;
+  let tx = 0;
+  let ty = 0;
+  if (k === 'throw') {
+    tx = raw.tx;
+    ty = raw.ty;
+    if (typeof tx !== 'number' || typeof ty !== 'number' || !Number.isFinite(tx) || !Number.isFinite(ty) || Math.abs(tx) > 1e5 || Math.abs(ty) > 1e5) return null;
+  }
+  return { s, k, kind, tx, ty };
+}
+
 // Cubeta de fichas: permite ráfagas cortas y limita el promedio por segundo.
 export class Bucket {
   rate: number;

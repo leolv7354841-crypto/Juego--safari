@@ -468,11 +468,16 @@ class Game {
 
   // Subirse o bajarse del robot (E o el botón ROBOT).
   toggleRobot() {
-    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.toast('En cooperativo el robot es del anfitrión');
     const rb = this.robot;
     const p = this.player;
     if (!rb.owned) return this.toast('Compra el robot de combate en la tienda');
+    // en línea se sube o se baja en el servidor (que repite estas mismas comprobaciones)
+    if (this.online.active) {
+      if (!rb.piloted && rb.broken) return this.toast('Robot destruido: repáralo en la tienda');
+      if (!rb.piloted && !rb.near(p)) return this.toast('Acércate al robot para subirte');
+      return this.online.act('robot');
+    }
     if (rb.piloted) {
       rb.leave(p, this.world);
       this.sfx.build();
@@ -500,6 +505,7 @@ class Game {
   buyRobot() {
     const rb = this.robot;
     if (rb.owned || this.money < ROBOT.price) return;
+    if (this.online.active) return this.online.buy('robot', 'buy');
     this.money -= ROBOT.price;
     rb.deploy(this.player, this.world);
     this.sfx.buy();
@@ -511,6 +517,7 @@ class Game {
     const rb = this.robot;
     const cost = rb.repairCost;
     if (!rb.owned || cost <= 0 || this.money < cost) return;
+    if (this.online.active) return this.online.buy('robot', 'repair');
     this.money -= cost;
     rb.hp = ROBOT.hp;
     this.sfx.build();
@@ -1253,8 +1260,7 @@ class Game {
         </div>
       </div>`;
     });
-    // en línea todavía no se construye ni se lanza nada: sólo armas y munición
-    const gear = this.online.active ? [] : SHOP_ORDER.map((k) => {
+    const gear = SHOP_ORDER.map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
       return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
@@ -1266,9 +1272,8 @@ class Game {
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
       <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. La pistola tiene balas infinitas.</p>'}
-      ${this.online.active ? '<p class="shop-empty">En línea, las defensas, granadas, molotovs y el robot no están disponibles todavía.</p>' : `
       <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
-      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`}`;
+      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
     const rc = this.$('shop-items').querySelector('canvas[data-robot]');
     if (rc) {
@@ -1377,6 +1382,7 @@ class Game {
   buy(k) {
     const it = SHOP[k];
     if (!it || this.money < it.price) return;
+    if (this.online.active) return this.online.buy('item', k);
     this.money -= it.price;
     this.inv[k]++;
     if (!THROWABLES.includes(k) && this.inv[this.buildSel] <= 0) this.buildSel = k;
@@ -1385,7 +1391,6 @@ class Game {
   }
 
   tryBuild() {
-    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.coop.guestBuild();
     if (this.inv[this.buildSel] <= 0) {
       const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
@@ -1394,6 +1399,12 @@ class Game {
         return;
       }
       this.buildSel = next;
+    }
+    // en línea lo coloca el servidor (y descuenta la pieza); aquí sólo se avisa si no cabe
+    if (this.online.active) {
+      if (this.structures.placement(this, this.buildSel).ok) this.online.act('build', { kind: this.buildSel });
+      else this.toast('No cabe ahí');
+      return;
     }
     if (this.structures.place(this, this.buildSel)) {
       this.inv[this.buildSel]--;
@@ -1416,7 +1427,6 @@ class Game {
   }
 
   tryGrenade(kind = 'grenade') {
-    if (this.online.active) return this.toast('No disponible en línea todavía');
     if (this.coop.isGuest) return this.coop.guestThrow(kind);
     if (this.inv[kind] <= 0) {
       this.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
@@ -1437,6 +1447,8 @@ class Game {
       ty = p.y + Math.sin(p.angle) * 220;
     }
     this.inv[kind]--;
+    // en línea la lanza el servidor; la cuenta se corrige con su siguiente foto
+    if (this.online.active) return this.online.act('throw', { kind, tx: Math.round(tx), ty: Math.round(ty) });
     if (kind === 'molotov') this.structures.throwMolotov(this, tx, ty);
     else this.structures.throwGrenade(this, tx, ty);
   }
@@ -1598,6 +1610,9 @@ class Game {
     });
     this.$('acct-form').addEventListener('submit', (e) => this.submitAccount(e));
     on('btn-next-round', () => this.startNextRound());
+    on('btn-upgrade', () => {
+      if (this.state === 'play' && this.online.upReady) this.openLevelUp();
+    });
     on('btn-round-shop', () => {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
     });
@@ -1829,12 +1844,13 @@ class Game {
         if (txt) ns.textContent = txt;
         ns.hidden = false;
       } else ns.hidden = true;
-      if (this.state === 'play') {
-        if (this.online.active) this.online.update(dt);
-        else if (this.coop.isGuest) this.coop.guestUpdate(dt);
+      // en línea el mundo sigue aunque haya otra pantalla encima (mejoras, tienda, pausa)
+      if (this.online.active) this.online.update(dt);
+      else if (this.state === 'play') {
+        if (this.coop.isGuest) this.coop.guestUpdate(dt);
         else this.update(dt);
       }
-      else if (this.state === 'menu') this.updateMenu(dt);
+      if (this.state === 'menu') this.updateMenu(dt);
       else if (this.state === 'look') {
         this.updateMenu(dt);
         this.drawLookPreview(dt);

@@ -623,7 +623,7 @@ export class Horde {
       if (z.bs === 'charge' && p.alive && d < z.r + p.r + 6) {
         // cornada: te lanza por los aires y te quita 40
         p.hurt(BULL.hit, game);
-        game.onZombieHit(z);
+        game.onZombieHit(z, p);
         p.kx += z.cdx * BULL.throw;
         p.ky += z.cdy * BULL.throw;
         game.camera.shake(0.75);
