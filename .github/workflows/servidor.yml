@@ -39,4 +39,6 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           ssh-keyscan -t ed25519 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           ssh -T -i ~/.ssh/deploy -o BatchMode=yes -o ServerAliveInterval=30 "root@$HOST"
-          curl -fsS "https://$HOST/health"
+          # el servidor tarda unos segundos en arrancar tras el reinicio
+          for i in $(seq 1 12); do curl -fsS "https://$HOST/health" && exit 0; sleep 5; done
+          exit 1
