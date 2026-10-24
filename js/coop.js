@@ -8,8 +8,9 @@
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
 import { Net } from './net.js';
 import { Player } from './player.js';
-import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN } from './config.js';
+import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY } from './config.js';
 import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
+import { Abilities } from './abilities.js';
 import { Bullets } from './bullets.js';
 import { rand, angleTo, TAU } from './util.js';
 
@@ -23,7 +24,7 @@ const WINDOW = 6;
 const FX_MAX = 500;
 // efectos que el invitado genera por su cuenta (no hace falta mandarlos)
 export const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
-export const SFX_SYNC = ['shot', 'hit', 'kill', 'stomp', 'explosion', 'acid', 'ricochet', 'blockHit', 'blockBreak', 'build', 'turret', 'goldenSpawn', 'punch', 'bullRoar', 'bullCharge', 'bullHit', 'bullSlam', 'throwBottle', 'molotov', 'crackle', 'burnScream', 'rocketStick', 'rocketArm', 'gore', 'wave'];
+export const SFX_SYNC = ['shot', 'hit', 'kill', 'stomp', 'explosion', 'acid', 'ricochet', 'blockHit', 'blockBreak', 'build', 'turret', 'goldenSpawn', 'punch', 'bullRoar', 'bullCharge', 'bullHit', 'bullSlam', 'throwBottle', 'molotov', 'crackle', 'burnScream', 'rocketStick', 'rocketArm', 'gore', 'wave', 'missile', 'boost'];
 export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
 
 const r100 = (v) => Math.round(v * 100);
@@ -175,6 +176,7 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld();
     g.resetRun();
+    g.player.cls = g.classPick;
     this.mode = 'host';
     this.clock = new Clock();
     this.snapSeq = 0;
@@ -208,6 +210,7 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld(m.seed);
     g.resetRun();
+    g.player.cls = g.classPick;
     this.mode = 'guest';
     this.clock = new Clock();
     this.lastSeq = 0;
@@ -377,6 +380,7 @@ export class Coop {
       fi: st.fires.flatMap((f) => [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)]),
       so: st.stuck.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.ang || 0), r100(q.t), r100(q.stick), r100(q.glow), q.kind === 'fat' ? 1 : 0]),
       bl: st.blasts.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t)]),
+      ms: st.missiles.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)]),
     };
     const rb = g.robot;
     s.rb = rb.owned ? [Math.round(rb.x), Math.round(rb.y), r100(rb.angle), r100(rb.legAngle), r100(rb.walk), Math.round(rb.hp), rb.piloted ? 1 : 0] : 0;
@@ -392,7 +396,8 @@ export class Coop {
 
   packPlayer(p) {
     return [Math.round(p.x), Math.round(p.y), r100(p.angle), r100(p.legAngle), Math.round(p.walkPhase * 10), p.running ? 1 : 0, p.weapon.id, p.weapon.mag,
-      r100(Math.max(0, p.reloadT)), r100(p.reloadProg || 0), p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.inRobot ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow)];
+      r100(Math.max(0, p.reloadT)), r100(p.reloadProg || 0), p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.inRobot ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow),
+      (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0)];
   }
 
   // La mira y las piernas del compañero giran suave hacia lo último recibido.
@@ -449,6 +454,8 @@ export class Coop {
         peer.weapon.mag = m.mag | 0;
         peer.reloadT = Number(m.rl) || 0;
         peer.reloadProg = Number(m.rp) || 0;
+        peer.rageT = m.ab & 1 ? 1 : 0;
+        peer.boostT = m.ab & 2 ? 1 : 0;
         break;
       }
       case 'shot':
@@ -467,6 +474,15 @@ export class Coop {
         this.quiet(() => this.withPlayer(peer, () => (kind === 'molotov' ? g.structures.throwMolotov(g, m.tx, m.ty) : g.structures.throwGrenade(g, m.tx, m.ty))));
         const q = g.structures.grenades[g.structures.grenades.length - 1];
         if (q) q.owner = 'peer';
+        break;
+      }
+      case 'ab': {
+        // misil del Bomber invitado: la espera la lleva su celular; aquí sólo se frena el abuso
+        const now = performance.now();
+        if (now - (this.peerAbAt || -1e9) < (ABILITY.minCooldown - 2) * 1000) break;
+        this.peerAbAt = now;
+        this.syncPeer(m);
+        if (Number.isFinite(m.tx) && Number.isFinite(m.ty)) g.structures.launchMissile(g, peer, m.tx, m.ty, 'peer');
         break;
       }
       case 'dead':
@@ -626,6 +642,7 @@ export class Coop {
       sp: Math.round(p.speedNow), run: p.running ? 1 : 0, al: p.alive ? 1 : 0, hp: Math.ceil(p.hp), mh: p.stats.maxHp,
       na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
       w: w.id, mag: w.mag, rl: r100(Math.max(0, p.reloadT)) / 100, rp: r100(p.reloadProg || 0) / 100,
+      ab: (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
     }, true);
   }
 
@@ -663,6 +680,11 @@ export class Coop {
     }
     g.inv[kind]--;
     this.send({ t: 'throw', kind, tx: Math.round(tx), ty: Math.round(ty), x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
+  }
+
+  guestMissile(tx, ty) {
+    const p = this.game.player;
+    this.send({ t: 'ab', tx: Math.round(tx), ty: Math.round(ty), x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.angle * 1000) / 1000 });
   }
 
   applySnapshot(s) {
@@ -725,6 +747,9 @@ export class Coop {
     const so = s.so || [];
     st.stuck = [];
     for (let i = 0; i + 6 < so.length; i += 7) st.stuck.push({ x: so[i], y: so[i + 1], ang: so[i + 2] / 100, t: so[i + 3] / 100, stick: so[i + 4] / 100, glow: so[i + 5] / 100, kind: so[i + 6] ? 'fat' : 'heavy' });
+    const ms = s.ms || [];
+    st.missiles = [];
+    for (let i = 0; i + 3 < ms.length; i += 4) st.missiles.push({ x: ms[i], y: ms[i + 1], t: ms[i + 2] / 100, dur: ms[i + 3] / 100 });
     const bl = s.bl || [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
@@ -774,6 +799,9 @@ export class Coop {
     if (a[13]) h.hurtT = 0.2;
     h.recoil = a[14] / 100;
     h.speedNow = a[15];
+    // habilidad en curso (para dibujarla): 1 megarráfaga, 2 impulso
+    h.rageT = a[16] & 1 ? 1 : 0;
+    h.boostT = a[16] & 2 ? 1 : 0;
   }
 
   applyZombies(z, t, org, zx) {
@@ -833,6 +861,7 @@ export class Coop {
     if (g.input.consume('pause')) return g.pause();
     if (p.alive) {
       p.update(dt, g);
+      if (g.input.consume('ability')) g.useAbility();
       if (g.input.consume('build')) g.tryBuild();
       if (g.input.consume('cycleBuild')) g.cycleBuild();
       if (g.input.consume('grenade')) g.tryGrenade();
@@ -893,7 +922,10 @@ export class Coop {
       if (b.rocket) g.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
     }
     g.bullets.update(dt, g);
+    // espera de la habilidad y megarráfaga (sus balas reales las crea el anfitrión)
+    Abilities.update(dt, g, p);
     for (const f of g.structures.fires) f.t += dt;
+    for (const m of g.structures.missiles) m.t = Math.min(m.dur, m.t + dt);
     for (const q of g.structures.blasts) q.t -= dt;
     g.particles.update(dt);
     g.decals.update(dt);

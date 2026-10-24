@@ -3,6 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/netcode.js';
+import { ABILITY } from '../../js/config.js';
+import { UPGRADES } from '../../js/upgrades.js';
+import { cooldownOf } from '../../js/abilities.js';
+import { cleanAct, cleanClass } from '../src/validate.ts';
 
 const aimAt = (sim: ServerSim, id: string) => {
   const p = sim.slots.get(id)!.p;
@@ -273,4 +277,100 @@ test('el gordo revienta en ácido que quema, y los cohetes estallan', () => {
   sim.game.rocketHit(z, z.x, z.y, { owner: 'a', dx: 1, dy: 0 });
   assert.ok(sim.horde.list.every((o: any) => o.dead || o.hp < o.maxHp), 'la explosión los alcanzó');
   assert.ok(a.kills > 0, 'las bajas son de quien disparó');
+});
+
+test('clases: la del lobby, la espera de 60 s y la mejora que la baja hasta 20 s', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana', cls: 'booster' }, { id: 'b', idx: 2, name: 'Beto', cls: 'trampa' }]);
+  const a = sim.slots.get('a')!;
+  assert.equal(a.p.cls, 'booster');
+  assert.equal(sim.slots.get('b')!.p.cls, 'bomber', 'clase no válida: la de por defecto');
+  assert.equal(cleanClass('berserker'), 'berserker');
+  assert.equal(cleanClass('x'), '');
+  assert.ok(cleanAct({ s: 3, k: 'ab', tx: 10, ty: 20 }));
+  assert.equal(cleanAct({ s: 3, k: 'ab', tx: 'a', ty: 20 }), null);
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  sim.act('a', { s: seq.n + 1, k: 'ab', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1);
+  assert.ok(a.p.boostT > 0, 'impulso activo');
+  assert.ok(Math.abs(a.p.abCd - ABILITY.cooldown) < 0.1, 'espera de 60 s');
+  assert.equal(sim.snapshot('a', 0)!.ab[0], 2, 'la foto lleva la clase');
+  // mientras espera no se puede volver a usar
+  a.p.boostT = 0;
+  sim.act('a', { s: seq.n + 1, k: 'ab', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1);
+  assert.equal(a.p.boostT, 0, 'en espera: no hace nada');
+  const up = UPGRADES.find((u: any) => u.id === 'abcd')!;
+  let n = 0;
+  while (up.when!(a.p) && n < 20) {
+    up.apply(a.p);
+    n++;
+  }
+  assert.equal(n, 7, '7 mejoras de -15%');
+  assert.equal(cooldownOf(a.p), ABILITY.minCooldown, 'nunca menos de 20 s');
+});
+
+test('booster: inmune, sin perder dinero y 3 veces más rápido', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana', cls: 'booster' }]);
+  const a = sim.slots.get('a')!;
+  const p = a.p;
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  const run = (steps: number) => {
+    for (let i = 0; i < steps; i++) {
+      sim.push('a', [{ s: ++seq.n, mx: 0, my: 1, f: 0, a: 0, w: -1 }]);
+      sim.step();
+    }
+  };
+  const y0 = p.y;
+  run(20);
+  const slow = Math.abs(p.y - y0);
+  sim.act('a', { s: seq.n + 1, k: 'ab', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1);
+  a.money = 100;
+  const hp = p.hp;
+  p.hurt(50, sim.game);
+  sim.onZombieHit(p);
+  sim.applyAcid(p);
+  assert.equal(p.hp, hp, 'no le hacen daño');
+  assert.equal(a.money, 100, 'no pierde dinero');
+  assert.equal(a.acidT, 0, 'ni le cae ácido');
+  const y1 = p.y;
+  run(20);
+  const fast = Math.abs(p.y - y1);
+  // contra paredes puede frenarse: basta con que sea claramente más rápido
+  assert.ok(fast > slow * 1.8 || fast > 200, `más rápido (${slow.toFixed(0)} → ${fast.toFixed(0)})`);
+  idle(sim, 'a', seq, 60 * ABILITY.booster.time);
+  assert.equal(p.boostT, 0, 'se acaba a los 2 s');
+  p.hurt(10, sim.game);
+  assert.ok(p.hp < hp, 'después vuelve a recibir daño');
+});
+
+test('bomber: el misil cae donde apunta y arrasa en su radio; berserker: tres cargadores en 3 s', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana', cls: 'bomber' }, { id: 'b', idx: 2, name: 'Beto', cls: 'berserker' }]);
+  const a = sim.slots.get('a')!;
+  const p = a.p;
+  const seq = { n: 0 };
+  const seqB = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  sim.horde.list.length = 0;
+  const tx = p.x + 400;
+  const ty = p.y;
+  for (let i = 0; i < 5; i++) sim.horde.spawn('swat', tx - 250 + i * 100, ty, 1, 1);
+  sim.act('a', { s: seq.n + 1, k: 'ab', kind: '', tx, ty });
+  idle(sim, 'a', seq, 1);
+  assert.equal(sim.structures.missiles.length, 1, 'misil en el aire');
+  assert.ok(Array.isArray(sim.snapshot('a', 0)!.ms) && sim.snapshot('a', 0)!.ms.length === 4, 'la foto lo lleva');
+  idle(sim, 'a', seq, Math.ceil(60 * ABILITY.bomber.fall) + 2);
+  assert.equal(sim.structures.missiles.length, 0, 'cayó');
+  assert.ok(a.kills >= 4, `mató a los SWAT del radio (${a.kills})`);
+  // berserker: unas 300 balas en 3 s sin gastar su munición
+  const b = sim.slots.get('b')!;
+  idle(sim, 'b', seqB, 1);
+  const mag = b.p.weapon.mag;
+  sim.act('b', { s: seqB.n + 1, k: 'ab', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'b', seqB, 60 * ABILITY.berserker.time + 5);
+  assert.equal(b.p.rageT, 0);
+  assert.equal(b.p.weapon.mag, mag, 'no gasta su cargador');
+  assert.ok(b.p.rageShots >= 299 && b.p.rageShots <= 300, `balas: ${b.p.rageShots}`);
 });

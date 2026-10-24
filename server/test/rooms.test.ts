@@ -95,8 +95,8 @@ test('permisos del propietario y paso por las fases', async () => {
   await waitFor(() => owner.state.phase === 'playing', 3000, 'jugando');
   await waitFor(() => (oIn.snap?.length || 0) > 3, 3000, 'fotos');
   const s = oIn.snap[oIn.snap.length - 1];
-  assert.ok(Array.isArray(s.me) && s.me.length === 10);
-  assert.equal(s.pl.length, 15, 'el otro jugador aparece en la foto');
+  assert.ok(Array.isArray(s.me) && s.me.length === 11);
+  assert.equal(s.pl.length, 16, 'el otro jugador aparece en la foto');
   // el invitado no puede devolver la sala al lobby
   guest.send('lobby');
   await waitFor(() => gIn.error?.length > 1, 2000, 'error lobby');

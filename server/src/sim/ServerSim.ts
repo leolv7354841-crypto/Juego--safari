@@ -16,8 +16,9 @@ import { Robot } from '../../../js/robot.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, xpForLevel } from '../../../js/config.js';
+import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, ABILITY, CLASS_ORDER, xpForLevel } from '../../../js/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
+import { Abilities, isClass } from '../../../js/abilities.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
 import type { Cmd, Act } from '../validate.ts';
 
@@ -37,7 +38,7 @@ const STRUCT_EVERY = 6;
 const r100 = (v: number) => Math.round(v * 100);
 const UPGRADE_BY_ID = new Map<string, any>(UPGRADES.map((u: any) => [u.id, u]));
 // estadísticas del jugador que cambian con las mejoras (el cliente las necesita para predecir)
-export const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult'];
+export const STAT_KEYS = ['maxHp', 'armor', 'dmgMult', 'rateMult', 'maxStamina', 'staminaRegenMult', 'speedMult', 'ammoMult', 'pierce', 'reloadMult', 'cdMult'];
 
 type Fx = { e: unknown[]; x?: number; y?: number; by: string | null };
 
@@ -103,7 +104,7 @@ export class ServerSim {
   kills: Record<string, number> = {};
   snapN = 0;
 
-  constructor(seed: number, players: { id: string; idx: number; name: string }[]) {
+  constructor(seed: number, players: { id: string; idx: number; name: string; cls?: string }[]) {
     this.seed = seed;
     this.world = new World(seed);
     this.horde = new Horde();
@@ -120,6 +121,8 @@ export class ServerSim {
       const p: any = new Player(s.x + Math.cos(a) * 44 * Math.min(1, i), s.y + Math.sin(a) * 44 * Math.min(1, i));
       this.world.collide(p, p.r, true);
       p.field = this.newField();
+      // clase elegida en el lobby (si no eligió, bomber)
+      p.cls = isClass(pl.cls) ? pl.cls : CLASS_ORDER[0];
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
       this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [],
         level: 1, xp: 0, xpNeed: xpForLevel(1), pending: 0, taken: {}, choices: [], choiceN: 0,
@@ -447,8 +450,14 @@ export class ServerSim {
         if (a.kind === 'molotov') this.structures.throwMolotov(g, a.tx, a.ty, s.id);
         else this.structures.throwGrenade(g, a.tx, a.ty, s.id);
       } else if (a.k === 'robot') this.toggleRobot(s);
+      else if (a.k === 'ab') {
+        // la megarráfaga y el impulso ya los vio en su pantalla; el misil, no
+        if (p.cls !== 'bomber') this.actor = s.id;
+        Abilities.use(g, p, a.tx, a.ty, s.id);
+      }
     } finally {
       g.player = null;
+      this.actor = null;
       this.toastTo = null;
     }
   }
@@ -491,7 +500,7 @@ export class ServerSim {
   // Cada golpe de zombi cuesta dinero (como en solitario; dentro del robot, no).
   onZombieHit(p: any) {
     const s = this.slotOf(p);
-    if (!s || p.inRobot) return;
+    if (!s || p.inRobot || p.boostT > 0) return;
     const loss = Math.min(s.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
     if (loss <= 0) return;
     s.money -= loss;
@@ -501,7 +510,7 @@ export class ServerSim {
   // Ácido del gordo: quema unos segundos (vida fija por segundo).
   applyAcid(p: any) {
     const s = this.slotOf(p);
-    if (!s || !p.alive || p.inRobot) return;
+    if (!s || !p.alive || p.inRobot || p.boostT > 0) return;
     if (!(s.acidT > 0)) s.acidTick = 0;
     s.acidT = ACID.burn;
   }
@@ -683,6 +692,7 @@ export class ServerSim {
     const before = this.bullets.list.length;
     applyMove(p, cmd, g);
     p.act(TICK, g, { x: cmd.mx, y: cmd.my });
+    Abilities.update(TICK, g, p);
     // las balas que acaba de disparar son suyas (bajas y aciertos)
     for (let i = before; i < this.bullets.list.length; i++) this.bullets.list[i].owner = s.id;
     g.input.cmd = null;
@@ -737,7 +747,8 @@ export class ServerSim {
       if (q === s) continue;
       const p = q.p;
       pl.push(q.idx, Math.round(p.x), Math.round(p.y), r100(p.angle), r100(p.legAngle), p.running ? 1 : 0, WEAPON_ORDER.indexOf(p.weapon.id),
-        p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow), Math.ceil(p.hp), q.away ? 1 : 0, p.inRobot ? 1 : 0);
+        p.flashT > 0 ? 1 : 0, p.alive ? 1 : 0, p.hurtT > 0 ? 1 : 0, r100(p.recoil), Math.round(p.speedNow), Math.ceil(p.hp), q.away ? 1 : 0, p.inRobot ? 1 : 0,
+        (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0));
     }
     // robots de todos (el propio también): estacionados o con su piloto dentro
     const rb: number[] = [];
@@ -773,6 +784,10 @@ export class ServerSim {
       gr: st.grenades.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), Math.round(q.h), r100(q.rot), q.kind === 'molotov' ? 1 : 0, q.t > q.dur ? 1 : 0] : [])),
       fi: st.fires.flatMap((f: any) => (near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [])),
       so: st.stuck.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.ang || 0), r100(q.t), r100(q.stick), r100(q.glow), q.kind === 'fat' ? 1 : 0] : [])),
+      // misiles del Bomber (la mira en el suelo es grande: se mandan con margen)
+      ms: st.missiles.flatMap((q: any) => (Math.abs(q.x - me.x) < V + ABILITY.bomber.radius && Math.abs(q.y - me.y) < V + ABILITY.bomber.radius ? [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)] : [])),
+      // habilidad propia: clase, espera (décimas) y megarráfaga en curso
+      ab: [CLASS_ORDER.indexOf(me.cls), Math.ceil((me.abCd || 0) * 10), r100(me.rageT || 0)],
       bl: st.blasts.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.t)] : [])),
     };
     this.structSnap(s, snap);

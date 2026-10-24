@@ -1,4 +1,4 @@
-import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT } from './config.js';
+import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT, ABILITY } from './config.js';
 import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
@@ -31,6 +31,7 @@ export class Player {
       ammoMult: 1,
       pierce: 0,
       reloadMult: 1,
+      cdMult: 1,
     };
     this.hp = this.stats.maxHp;
     this.stamina = this.stats.maxStamina;
@@ -51,6 +52,12 @@ export class Player {
     this.shotsFired = 0;
     this.shotsHit = 0;
     this.damageTaken = 0;
+    // clase elegida al empezar y su habilidad (ver abilities.js)
+    this.cls = null;
+    this.abCd = 0;
+    this.boostT = 0;
+    this.rageT = 0;
+    this.rageAcc = 0;
   }
 
   get weapon() {
@@ -122,7 +129,8 @@ export class Player {
   }
 
   hurt(dmg, game) {
-    if (!this.alive) return;
+    // Booster: inmune mientras dura el impulso
+    if (!this.alive || this.boostT > 0) return;
     // compañero en cooperativo: su vida la lleva su propio celular
     if (this.remote) {
       this.hurtT = 0.3;
@@ -187,6 +195,10 @@ export class Player {
     let speed = PLAYER_BASE.walkSpeed * st.speedMult;
     if (this.running) speed *= PLAYER_BASE.runMult;
     if (this.exhausted) speed *= 0.85;
+    if (this.boostT > 0) {
+      this.boostT = Math.max(0, this.boostT - dt);
+      speed *= ABILITY.booster.speed;
+    }
     if (this.inRobot) {
       speed *= ROBOT.speed;
       // con el peso del robot casi nada lo empuja

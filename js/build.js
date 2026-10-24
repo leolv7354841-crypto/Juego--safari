@@ -1,5 +1,5 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET } from './config.js';
+import { SHOP, MOLOTOV, ROCKET, ABILITY } from './config.js';
 import { TAU, rand, clamp } from './util.js';
 import { OUT, flameSprite } from './sprites.js';
 import { drawRocket } from './bullets.js';
@@ -35,12 +35,14 @@ export class Structures {
     this.pending = [];
     this.fires = [];
     this.stuck = [];
+    this.missiles = [];
   }
 
   clear() {
     this.pending.length = 0;
     this.fires.length = 0;
     this.stuck.length = 0;
+    this.missiles.length = 0;
     this.blocks.length = 0;
     this.wires.length = 0;
     this.grenades.length = 0;
@@ -188,6 +190,83 @@ export class Structures {
     const ey = p.y + Math.sin(a) * d;
     const dur = 0.25 + d / 650;
     this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0, owner });
+  }
+
+  /* ---------- misil balístico (habilidad del Bomber) ---------- */
+
+  // Cae del cielo donde apunta el jugador (como mucho a ABILITY.bomber.range de él).
+  launchMissile(game, p, tx, ty, owner = null) {
+    const M = ABILITY.bomber;
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const d = Math.min(Math.hypot(dx, dy), M.range);
+    const a = Math.atan2(dy, dx);
+    this.missiles.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, t: 0, dur: M.fall, owner });
+    game.sfx.missile();
+  }
+
+  updateMissiles(dt, game) {
+    const M = ABILITY.bomber;
+    for (let i = this.missiles.length - 1; i >= 0; i--) {
+      const m = this.missiles[i];
+      m.t += dt;
+      if (m.t < m.dur) continue;
+      this.missiles.splice(i, 1);
+      this.explode(game, m, M.radius, M.power, 1.5);
+      game.particles.ring(m.x, m.y, M.radius * 0.3, '255,190,120');
+      game.camera.shake(0.9);
+    }
+  }
+
+  // Mira roja en el suelo que se cierra y el misil cayendo en picada sobre ella.
+  drawMissiles(ctx, time) {
+    const R = ABILITY.bomber.radius;
+    for (const m of this.missiles) {
+      const k = Math.min(1, m.t / m.dur);
+      const blink = 0.55 + 0.45 * Math.abs(Math.sin(time * (6 + k * 18)));
+      ctx.save();
+      ctx.globalAlpha = 0.12 + 0.12 * k;
+      ctx.fillStyle = '#b5302a';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, R, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 0.5 * blink;
+      ctx.strokeStyle = '#ff5a40';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([18, 12]);
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, R, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // mira que se cierra hacia el punto de impacto
+      const rr = 30 + (1 - k) * 120;
+      ctx.globalAlpha = 0.9 * blink;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, rr, 0, TAU);
+      ctx.moveTo(m.x - rr - 14, m.y);
+      ctx.lineTo(m.x - rr + 10, m.y);
+      ctx.moveTo(m.x + rr - 10, m.y);
+      ctx.lineTo(m.x + rr + 14, m.y);
+      ctx.moveTo(m.x, m.y - rr - 14);
+      ctx.lineTo(m.x, m.y - rr + 10);
+      ctx.moveTo(m.x, m.y + rr - 10);
+      ctx.lineTo(m.x, m.y + rr + 14);
+      ctx.stroke();
+      // sombra que crece mientras baja
+      ctx.globalAlpha = 0.15 + 0.35 * k;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y, 6 + 16 * k, 4 + 9 * k, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      const h = (1 - k) * (1 - k) * 900;
+      ctx.save();
+      ctx.translate(m.x, m.y - h);
+      ctx.scale(2.2, 2.2);
+      drawRocket(ctx, 0, 0, Math.PI / 2, true);
+      ctx.restore();
+    }
   }
 
   // Los reventones de ácido se encolan: así una cadena de gordos no se pisa a sí misma.
@@ -452,6 +531,7 @@ export class Structures {
       this.acidBurst(game, b.x, b.y);
     }
     this.updateFires(dt, game);
+    this.updateMissiles(dt, game);
     this.updateStuck(dt, game);
     for (let i = this.blasts.length - 1; i >= 0; i--) {
       this.blasts[i].t -= dt;
