@@ -22,16 +22,12 @@
     },
     {
       "name": "dist",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "npm",
       "runtimeArgs": [
-        "--yes",
-        "http-server",
-        "-c-1",
-        "-p",
-        "8081",
-        "dist"
+        "run",
+        "preview"
       ],
-      "port": 8081
+      "port": 4173
     }
   ]
 }

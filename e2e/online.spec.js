@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-const SERVER_URL = 'ws://127.0.0.1:2599'; // el mismo puerto que playwright.config.js
+const SERVER_URL = `ws://127.0.0.1:${process.env.E2E_SERVER_PORT || 2599}`; // el mismo puerto que playwright.config.js
 import { abrir } from './helpers.js';
 
 // Dos páginas entran a la misma sala del servidor local y empiezan la partida.

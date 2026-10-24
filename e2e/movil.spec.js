@@ -5,7 +5,10 @@ import { abrir, esperarEstado, jugarSolo } from './helpers.js';
 test.describe('móvil táctil', () => {
   test('muestra los controles táctiles y se puede jugar', async ({ browser, browserName }) => {
     const perfil = browserName === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7'];
-    const context = await browser.newContext({ ...perfil, baseURL: 'http://127.0.0.1:4173' });
+    const context = await browser.newContext({
+      ...perfil,
+      baseURL: `http://127.0.0.1:${process.env.E2E_WEB_PORT || 4173}`,
+    });
     const page = await context.newPage();
     const errores = await abrir(page);
 
