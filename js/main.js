@@ -1,5 +1,6 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER } from './config.js';
+import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './abilities.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
 import { Coop } from './coop.js';
@@ -108,6 +109,9 @@ class Game {
     this.cache = {};
     this.$ = (id) => document.getElementById(id);
     this.look = cleanLook(storage.get('dz-look', null));
+    // última clase elegida (se vuelve a preguntar en cada partida)
+    const cls = storage.get('dz-class', null);
+    this.classPick = isClass(cls) ? cls : CLASS_ORDER[0];
     this.bindUi();
     this.resize();
     this.newWorld();
@@ -233,6 +237,7 @@ class Game {
     storage.remove(this.accounts.checkKey());
     if (freshWorld) this.newWorld();
     this.resetRun();
+    this.player.cls = this.classPick;
     this.input.reset();
     this.input.setRun(false);
     this.setState('play');
@@ -241,7 +246,7 @@ class Game {
 
   setState(s) {
     this.state = s;
-    this.music.setPaused(s !== 'play' && s !== 'menu' && s !== 'look');
+    this.music.setPaused(s !== 'play' && s !== 'menu' && s !== 'look' && s !== 'class');
     this.root.className = this.root.className.replace(/\bstate-\w+/g, '').trim() + ' state-' + s;
     this.$('screen-pause').hidden = s !== 'pause';
     this.$('screen-level').hidden = s !== 'levelup';
@@ -252,6 +257,7 @@ class Game {
     this.$('screen-look').hidden = s !== 'look';
     this.$('screen-coop').hidden = s !== 'coop';
     this.$('screen-online').hidden = s !== 'online';
+    this.$('screen-class').hidden = s !== 'class';
   }
 
   pause() {
@@ -309,6 +315,8 @@ class Game {
         shotsFired: p.shotsFired,
         shotsHit: p.shotsHit,
         damageTaken: p.damageTaken,
+        cls: p.cls,
+        abCd: p.abCd,
       },
       blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
       wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
@@ -356,6 +364,9 @@ class Game {
     p.shotsFired = sp.shotsFired;
     p.shotsHit = sp.shotsHit;
     p.damageTaken = sp.damageTaken;
+    // partidas guardadas antes de las clases: la última elegida
+    p.cls = isClass(sp.cls) ? sp.cls : this.classPick;
+    p.abCd = Math.max(0, Number(sp.abCd) || 0);
     for (const b of d.blocks) {
       if (!SHOP[b.kind]) continue;
       const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0, cd: 0, ang: 0 };
@@ -464,6 +475,76 @@ class Game {
     }
   }
 
+  /* ---------- habilidad de clase ---------- */
+
+  // Pantalla de elegir clase antes de una partida en solitario.
+  showClass(freshWorld) {
+    this.classFresh = freshWorld;
+    this.setState('class');
+    const wrap = this.$('class-cards');
+    wrap.classList.remove('ready');
+    wrap.innerHTML = '';
+    CLASS_ORDER.forEach((id, i) => {
+      const c = CLASSES[id];
+      const b = document.createElement('button');
+      b.className = 'card cls' + (id === this.classPick ? ' sel' : '');
+      b.innerHTML = `<span class="ic">${c.icon}</span><span class="nm"></span><span class="ds"></span><span class="tg">Cada ${Math.round(cooldownOf(this.player))} s <span class="key">· tecla ${i + 1}</span></span>`;
+      b.querySelector('.nm').textContent = c.name;
+      b.querySelector('.ds').textContent = c.desc;
+      b.addEventListener('click', () => this.chooseClass(id));
+      wrap.appendChild(b);
+    });
+    this.classReadyAt = performance.now() + 250;
+    setTimeout(() => wrap.classList.add('ready'), 250);
+  }
+
+  chooseClass(id) {
+    if (this.state !== 'class' || performance.now() < this.classReadyAt || !isClass(id)) return;
+    this.setClassPick(id);
+    this.start(this.classFresh);
+    this.toast(`${CLASSES[id].name}: ${this.input.mode === 'touch' ? 'toca el botón de habilidad' : 'pulsa X'} para usarla`);
+  }
+
+  setClassPick(id) {
+    if (!isClass(id)) return;
+    this.classPick = id;
+    storage.set('dz-class', id);
+    this.renderClassRows();
+    // en la sala en línea el servidor la guarda para la próxima partida
+    if (this.online.room && !this.online.playing) this.online.send('cls', { v: id });
+  }
+
+  // Selector compacto de clase en las salas del cooperativo y en línea.
+  renderClassRows() {
+    for (const row of this.root.querySelectorAll('.class-row')) {
+      row.innerHTML = '';
+      for (const id of CLASS_ORDER) {
+        const c = CLASSES[id];
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cls-btn' + (id === this.classPick ? ' sel' : '');
+        b.title = c.desc;
+        b.innerHTML = `${c.icon}<span></span>`;
+        b.querySelector('span').textContent = c.name;
+        b.addEventListener('click', () => this.setClassPick(id));
+        row.appendChild(b);
+      }
+    }
+  }
+
+  // X o el botón: misil donde apuntas, megarráfaga o impulso.
+  useAbility() {
+    const p = this.player;
+    if (!p.cls || !p.alive) return;
+    if (p.abCd > 0) return this.toast(`Habilidad lista en ${Math.ceil(p.abCd)} s`);
+    const t = abilityTarget(this, p);
+    // en línea la usa el servidor; aquí se ve al instante (el misil llega con la siguiente foto)
+    if (this.online.active) this.online.act('ab', { tx: Math.round(t.x), ty: Math.round(t.y) });
+    else if (this.coop.isGuest && p.cls === 'bomber') this.coop.guestMissile(t.x, t.y);
+    Abilities.use(this, p, t.x, t.y, null);
+    this.updateHud(false);
+  }
+
   /* ---------- robot ---------- */
 
   // Subirse o bajarse del robot (E o el botón ROBOT).
@@ -546,7 +627,7 @@ class Game {
 
   // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.
   applyAcid() {
-    if (this.state === 'menu' || !this.player.alive || this.player.inRobot) return;
+    if (this.state === 'menu' || !this.player.alive || this.player.inRobot || this.player.boostT > 0) return;
     if (!(this.acidT > 0)) this.acidTick = 0;
     this.acidT = ACID.burn;
     this.hurtFlash = Math.min(1, this.hurtFlash + 0.3);
@@ -610,7 +691,7 @@ class Game {
     // el golpe al compañero se lo cobra su propio celular
     if (target && target.remote) return this.coop.send({ t: 'hit' });
     // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
-    if (this.state === 'menu' || this.player.inRobot) return;
+    if (this.state === 'menu' || this.player.inRobot || this.player.boostT > 0) return;
     const loss = Math.min(this.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
     if (loss <= 0) return;
     this.money -= loss;
@@ -787,6 +868,7 @@ class Game {
     if (this.inviteCode) this.$('ol-code-in').value = this.inviteCode;
     const url = this.online.serverUrl();
     if (!keepStatus) this.onlineStatus(url ? '' : 'No hay servidor configurado: ver NET.server en js/config.js.', !url);
+    this.renderClassRows();
     this.renderLobby();
   }
 
@@ -816,7 +898,7 @@ class Game {
       li.className = 'ol-member' + (id === room.sessionId ? ' me' : '') + (m.connected ? '' : ' off');
       const nm = document.createElement('span');
       nm.className = 'nm';
-      nm.textContent = (id === st.ownerId ? '★ ' : '') + m.name + (id === room.sessionId ? ' (tú)' : '');
+      nm.textContent = (id === st.ownerId ? '★ ' : '') + m.name + (id === room.sessionId ? ' (tú)' : '') + (CLASSES[m.cls] ? ` · ${CLASSES[m.cls].name}` : '');
       const tag = document.createElement('span');
       tag.className = 'tg';
       tag.textContent = !m.connected ? 'reconectando…' : st.phase === 'playing' ? (m.inGame ? (m.alive ? 'jugando' : 'caído') : 'esperando') : id === st.ownerId ? 'propietario' : m.ready ? 'listo' : 'no listo';
@@ -926,6 +1008,7 @@ class Game {
   showCoop() {
     this.sfx.unlock();
     this.setState('coop');
+    this.renderClassRows();
     this.$('coop-choose').hidden = false;
     this.$('coop-wait').hidden = true;
     this.$('coop-code-in').value = '';
@@ -1506,8 +1589,12 @@ class Game {
     const on = (id, fn) => this.$(id).addEventListener('click', fn);
     on('btn-start', () => {
       this.tryFullscreen();
-      this.start(false);
+      this.showClass(false);
     });
+    on('btn-ability', () => {
+      if (this.state === 'play') this.useAbility();
+    });
+    on('btn-class-back', () => this.setupMenu());
     on('btn-pause', () => this.pause());
     on('btn-resume', () => this.resume());
     // en cooperativo reinicia el anfitrión (el invitado espera)
@@ -1520,7 +1607,7 @@ class Game {
         this.newWorld();
         return this.setupMenu();
       }
-      this.start(true);
+      this.showClass(true);
     };
     on('btn-restart', again);
     on('btn-again', again);
@@ -1703,6 +1790,33 @@ class Game {
       this.set('rbv', $('rb-val'), 'text', rb.broken ? 'ROTO' : String(Math.ceil(rb.hp)));
       this.set('rbon', $('btn-robot'), 'text', rb.piloted ? 'Bajar' : 'Robot');
     }
+    // habilidad de clase: icono, segundos que faltan y arco de espera en el botón táctil
+    const cls = p.cls;
+    if (this.cache.cls !== cls) {
+      this.cache.cls = cls;
+      $('btn-ability').hidden = !cls;
+      $('btn-ab-touch').classList.toggle('gone', !cls);
+      if (cls) {
+        $('ab-ic').innerHTML = CLASSES[cls].icon;
+        $('btn-ab-touch').innerHTML = CLASSES[cls].icon;
+        $('ab-nm').textContent = CLASSES[cls].name;
+      }
+    }
+    if (cls) {
+      const ready = !(p.abCd > 0) && p.alive;
+      this.set('abcd', $('ab-cd'), 'text', p.abCd > 0 ? `${Math.ceil(p.abCd)} s` : 'Lista');
+      if (this.cache.abReady !== ready) {
+        this.cache.abReady = ready;
+        $('btn-ability').classList.toggle('ready', ready);
+        $('btn-ab-touch').classList.toggle('ready', ready);
+      }
+      const k = ready ? '1' : (1 - (p.abCd || 0) / cooldownOf(p)).toFixed(2);
+      if (this.cache.abk !== k) {
+        this.cache.abk = k;
+        $('btn-ab-touch').style.setProperty('--k', k);
+        $('btn-ability').style.setProperty('--k', k);
+      }
+    }
     this.set('stw', $('st-fill'), 'transform', `scaleX(${(p.stamina / p.stats.maxStamina).toFixed(3)})`);
     if (this.cache.ex !== p.exhausted) {
       this.cache.ex = p.exhausted;
@@ -1855,7 +1969,11 @@ class Game {
         this.updateMenu(dt);
         this.drawLookPreview(dt);
       }
-      else if (this.state === 'levelup') {
+      else if (this.state === 'class') {
+        const s = this.input.consume('slot');
+        if (s) this.chooseClass(CLASS_ORDER[s - 1]);
+        this.updateMenu(dt);
+      } else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
         if (s) this.chooseUpgrade(s - 1);
       } else if (this.state === 'pause') {
@@ -1896,6 +2014,8 @@ class Game {
     }
     if (p.alive) {
       p.update(dt, this);
+      if (this.input.consume('ability')) this.useAbility();
+      Abilities.update(dt, this, p);
       if (this.input.consume('build')) this.tryBuild();
       if (this.input.consume('cycleBuild')) this.cycleBuild();
       if (this.input.consume('grenade')) this.tryGrenade();
@@ -1985,7 +2105,7 @@ class Game {
     v.x1 = (W - tx) / z;
     v.y1 = (H - ty) / z;
     const p = this.player;
-    const playing = this.state !== 'menu';
+    const playing = this.state !== 'menu' && this.state !== 'class';
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#0c0e0b';
@@ -2001,6 +2121,7 @@ class Game {
     this.horde.draw(ctx, v, base, 'small');
     this.structures.drawFires(ctx, v, this.time);
     this.structures.drawStuck(ctx, this.time);
+    this.structures.drawMissiles(ctx, this.time);
     if (playing && this.robot.owned && !this.robot.piloted) this.robot.draw(ctx, p, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;

@@ -47,6 +47,7 @@ export class Input {
       if (e.code === 'KeyT') this.pressed.molotov = true;
       if (e.code === 'KeyE') this.pressed.robot = true;
       if (e.code === 'KeyU') this.pressed.upgrade = true;
+      if (e.code === 'KeyX') this.pressed.ability = true;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
       const m = /^Digit([1-9])$/.exec(e.code);
@@ -175,6 +176,7 @@ export class Input {
     tap('#btn-grenade', () => (this.pressed.grenade = true));
     tap('#btn-molotov', () => (this.pressed.molotov = true));
     tap('#btn-robot', () => (this.pressed.robot = true));
+    tap('#btn-ab-touch', () => (this.pressed.ability = true));
 
     // evita zoom por gestos y menú contextual en iOS
     this.on(document, 'gesturestart', prevent);

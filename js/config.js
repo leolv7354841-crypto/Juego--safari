@@ -94,6 +94,18 @@ export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autosho
 // Contra un gordo se queda clavado en su panza (stick s), brilla en verde (glow s) y estalla más fuerte;
 // contra un super blindado se incrusta en la placa de la panza y lo revienta de un solo tiro.
 export const ROCKET = { radius: 200, power: 660, fatStick: 1, fatGlow: 0.6, fatRadius: 250, fatPower: 950, heavyStick: 0.35 };
+// Habilidad de clase (se elige al empezar cada partida). cooldown en s; cada mejora la baja
+// cdStep (x0,85) hasta minCooldown.
+// bomber: misil balístico que cae donde apuntas tras fall s (3 veces el radio y 2 veces el
+// daño del cohete); berserker: 3 ametralladoras vacían 3 cargadores en time s;
+// booster: inmune y speed veces más rápido durante time s.
+export const ABILITY = {
+  cooldown: 60, minCooldown: 20, cdStep: 0.85,
+  bomber: { radius: ROCKET.radius * 3, power: ROCKET.power * 2, fall: 1.4, range: 700 },
+  berserker: { time: 3, mags: 3, guns: 3, weapon: 'lmg' },
+  booster: { time: 2, speed: 3 },
+};
+export const CLASS_ORDER = ['bomber', 'berserker', 'booster'];
 // cajas de armas (las básicas); las mejores se compran
 export const CRATE_WEAPONS = ['smg', 'shotgun', 'rifle'];
 
