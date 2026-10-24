@@ -1,3 +1,4 @@
+// @ts-check
 import { segCircleT } from './util.js';
 
 const near = [];
@@ -18,6 +19,10 @@ export class Bullets {
     this.list.length = 0;
   }
 
+  /**
+   * @param {number} dt
+   * @param {import('./types').GameHost} game
+   */
   update(dt, game) {
     const list = this.list;
     const world = game.world;

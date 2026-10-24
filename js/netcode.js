@@ -1,3 +1,4 @@
+// @ts-check
 // Piezas del multijugador en línea que no dependen del navegador (las usan el cliente y las
 // pruebas del servidor): predicción con reconciliación del jugador propio e interpolación
 // de los demás a partir de las fotos del servidor.
@@ -27,6 +28,11 @@ export function unpackBody(p, a) {
 }
 
 // Aplica una entrada al cuerpo del jugador (igual en el servidor y en el cliente).
+/**
+ * @param {import('./player.js').Player} p
+ * @param {import('./types').Cmd} cmd
+ * @param {Pick<import('./types').GameHost, 'world' | 'sfx'>} game
+ */
 export function applyMove(p, cmd, game) {
   p.move(TICK, cmd.mx, cmd.my, !!(cmd.f & IN_RUN), game);
 }

@@ -1,3 +1,4 @@
+// @ts-check
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
 import { MAX_ALIVE, COOP_MAX_ALIVE, WORLD_SIZE } from './config.js';
 import { rand, randInt, TAU } from './util.js';
@@ -10,6 +11,10 @@ export class Director {
     this.queue = [];
     this.spawnT = 0;
     this.waveSize = 0;
+    /** @type {boolean | undefined} partida cooperativa o en línea (lo pone quien crea la partida) */
+    this.coop;
+    /** @type {number | undefined} multiplicador de zombis en línea (NET.crowd) */
+    this.crowd;
   }
 
   get hpMult() {
@@ -74,6 +79,10 @@ export class Director {
     return true;
   }
 
+  /**
+   * @param {number} dt
+   * @param {import('./types').GameHost} game
+   */
   update(dt, game) {
     if (this.state === 'waiting') return;
     if (this.state === 'break') {

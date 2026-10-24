@@ -1,3 +1,4 @@
+// @ts-check
 import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT } from './config.js';
 import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
@@ -61,6 +62,10 @@ export class Player {
     this.shotsFired = 0;
     this.shotsHit = 0;
     this.damageTaken = 0;
+    /** @type {boolean | undefined} compañero de cooperativo (lo pone coop.js) */
+    this.remote;
+    /** @type {boolean | undefined} dentro del robot (lo pone main.js / el servidor) */
+    this.inRobot;
   }
 
   get weapon() {
@@ -121,7 +126,8 @@ export class Player {
     return any;
   }
 
-  startReload() {
+  /** @param {unknown} [_game] lo pasan algunos llamadores; no se usa */
+  startReload(_game) {
     const w = this.weapon;
     if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
     this.reloadDur = w.def.reload / this.stats.reloadMult;
@@ -167,6 +173,13 @@ export class Player {
 
   // Estamina y movimiento con choques. Sólo depende de la entrada y del mundo, así que el
   // servidor y la predicción del cliente en línea dan exactamente el mismo resultado.
+  /**
+   * @param {number} dt
+   * @param {number} mx
+   * @param {number} my
+   * @param {boolean} run
+   * @param {import('./types').GameHost | Pick<import('./types').GameHost, 'world' | 'sfx'>} game
+   */
   move(dt, mx, my, run, game) {
     const st = this.stats;
     const mv = { x: mx, y: my };
