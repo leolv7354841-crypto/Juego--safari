@@ -1,5 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
-import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER, WAVES, START_WEAPON, CAMERA } from './config.js';
+import { xpForLevel, BOUNTY, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, WEAPONS, WEAPON_ORDER, SELL_RATE, GOLDEN, MONEY_LOSS, DROPS, WORLD_SIZE, ROCKET, ROBOT, CLASS_ORDER, WAVES, START_WEAPON, CAMERA, HEAVY } from './config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './abilities.js';
 import { Music } from './music.js';
 import { Robot } from './robot.js';
@@ -38,6 +38,7 @@ const ITEM_ICONS = {
   concrete: '<svg viewBox="0 0 12 12"><rect x="0.5" y="3" width="11" height="6" fill="#8c8a84" stroke="#141612"/><rect x="0.5" y="3" width="11" height="2" fill="#a3a19a"/></svg>',
   hesco: '<svg viewBox="0 0 12 12"><rect x="0.5" y="2.5" width="11" height="7" fill="#c9b98c" stroke="#141612"/><rect x="1.8" y="3.8" width="3.6" height="4.4" fill="#a8966a"/><rect x="6.6" y="3.8" width="3.6" height="4.4" fill="#a8966a"/><path d="M6 2.5v7" stroke="#6e7070" stroke-width=".8"/></svg>',
   turret: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#3d4246" stroke="#141612"/><circle cx="6" cy="6" r="3" fill="#5c6268"/><rect x="6" y="5" width="5.5" height="2" fill="#1e2124"/></svg>',
+  heavy: '<svg viewBox="0 0 12 12"><path d="M6 6L2 1.5M6 6l-4 4.5M6 6l-.5 5" stroke="#141612" stroke-width="1.6"/><rect x="2.5" y="2.5" width="5" height="7" rx="1" fill="#7b838a" stroke="#141612" stroke-width=".8"/><rect x="7.5" y="3.5" width="4.5" height="1.6" fill="#25282b"/><rect x="7.5" y="6.9" width="4.5" height="1.6" fill="#25282b"/><rect x="3" y="5.6" width="4" height=".8" fill="#c9a54a"/></svg>',
   spikes: '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#4a4740" stroke="#141612"/><path d="M3 5l1-2 1 2M7 5l1-2 1 2M3 10l1-2 1 2M7 10l1-2 1 2" fill="#b8b2a4"/></svg>',
   mine: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#4a5236" stroke="#141612"/><circle cx="6" cy="6" r="1.4" fill="#ff5a3a"/></svg>',
   wire: '<svg viewBox="0 0 12 12"><path d="M0 6l2-3 2 6 2-6 2 6 2-6 2 3" fill="none" stroke="#c9c4b6" stroke-width="1.2"/></svg>',
@@ -326,6 +327,7 @@ class Game {
         damageTaken: p.damageTaken,
         cls: p.cls,
         abCd: p.abCd,
+        heavyAmmo: p.heavyAmmo,
       },
       blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
       wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
@@ -379,6 +381,7 @@ class Game {
     // partidas guardadas antes de las clases: la última elegida
     p.cls = isClass(sp.cls) ? sp.cls : this.classPick;
     p.abCd = Math.max(0, Number(sp.abCd) || 0);
+    p.heavyAmmo = Math.max(0, Number(sp.heavyAmmo) || 0);
     for (const b of d.blocks) {
       if (!SHOP[b.kind]) continue;
       const o = { k: 0, x: b.x, y: b.y, w: b.w, h: b.h, low: true, block: true, kind: b.kind, hp: b.hp, max: SHOP[b.kind].hp, hitT: 0, cd: 0, ang: 0 };
@@ -559,12 +562,20 @@ class Game {
 
   /* ---------- robot ---------- */
 
-  // Subirse o bajarse del robot (E o el botón ROBOT).
+  // Subirse o bajarse del robot (E o el botón ROBOT). Junto a una torreta pesada, la monta.
   toggleRobot() {
+    const p = this.player;
+    if (p.manned) return this.leaveHeavy();
+    if (!p.inRobot && !this.online.active && !this.coop.isGuest) {
+      const h = this.structures.nearHeavy(p);
+      if (h) return this.mountHeavy(h);
+    }
     if (this.coop.isGuest) return this.toast('En cooperativo el robot es del anfitrión');
     const rb = this.robot;
-    const p = this.player;
-    if (!rb.owned) return this.toast('Compra el robot de combate en la tienda');
+    if (!rb.owned) {
+      if (this.structures.blocks.some((b) => b.kind === 'heavy')) return this.toast('Acércate a la torreta pesada para montarla');
+      return this.toast('Compra el robot de combate en la tienda');
+    }
     // en línea se sube o se baja en el servidor (que repite estas mismas comprobaciones)
     if (this.online.active) {
       if (!rb.piloted && rb.broken) return this.toast('Robot destruido: repáralo en la tienda');
@@ -581,6 +592,35 @@ class Game {
     rb.board(p);
     this.sfx.punch();
     this.camera.shake(0.2);
+  }
+
+  /* ---------- torreta pesada ---------- */
+
+  mountHeavy(b) {
+    const p = this.player;
+    p.manned = b;
+    b.manned = p;
+    p.reloadT = 0;
+    p.target = null;
+    this.sfx.build();
+    this.camera.shake(0.12);
+    if (p.heavyAmmo <= 0) this.toast('Torreta sin balas: cómpralas en la tienda');
+  }
+
+  leaveHeavy() {
+    const p = this.player;
+    if (p.manned) p.manned.manned = null;
+    p.manned = null;
+    this.sfx.build();
+  }
+
+  buyHeavyAmmo(n) {
+    const cost = HEAVY.price * n;
+    if (this.money < cost) return;
+    this.money -= cost;
+    this.player.heavyAmmo += HEAVY.pack * n;
+    this.sfx.buy();
+    this.renderShop();
   }
 
   onRobotHit(dmg) {
@@ -1355,7 +1395,9 @@ class Game {
         </div>
       </div>`;
     });
-    const gear = SHOP_ORDER.map((k) => {
+    // la torreta pesada sólo se maneja en solitario o como anfitrión del cooperativo
+    const noHeavy = this.online.active || this.coop.isGuest;
+    const gear = SHOP_ORDER.filter((k) => !(noHeavy && SHOP[k].manned)).map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
       return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
@@ -1366,7 +1408,7 @@ class Game {
     });
     this.$('shop-items').innerHTML = `
       <h3 class="shop-sec">Armas</h3>${guns.join('')}
-      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}
+      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}${noHeavy ? '' : this.heavyAmmoItem()}
       <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
       <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
     this.$('shop-items').querySelectorAll('canvas[data-ic]').forEach((c) => this.drawShopIcon(c, c.dataset.ic));
@@ -1388,6 +1430,19 @@ class Game {
       g.shadowBlur = 3;
       drawGunIcon(g, c.dataset.gun);
     });
+  }
+
+  heavyAmmoItem() {
+    const buy = (n) => {
+      const price = HEAVY.price * n;
+      const poor = this.money < price;
+      return `<button class="btn buy sm${poor ? ' poor' : ''}" data-heavy-ammo="${n}" ${poor ? 'disabled' : ''}>+${HEAVY.pack * n} · $${price}</button>`;
+    };
+    return `<div class="shop-item">
+      <canvas class="shop-ic" data-ic="heavy" width="96" height="96"></canvas>
+      <div class="shop-txt"><b>Balas · Torreta pesada</b><span>Cinta de ${HEAVY.pack} balas perforantes por $${HEAVY.price}. Las usa cualquier torreta pesada que montes.</span><small>Tienes: ${this.player.heavyAmmo} balas</small></div>
+      <div class="buy-col">${buy(1)}${buy(5)}</div>
+    </div>`;
   }
 
   robotShopItem() {
@@ -1463,6 +1518,12 @@ class Game {
     if (k === 'grenade') {
       g.setTransform(4.5, 0, 0, 4.5, 0, 0);
       this.structures.drawGrenades.call({ grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] }, g);
+      return;
+    }
+    if (k === 'heavy') {
+      // el cañón sobresale del trípode: se centra todo el conjunto
+      g.setTransform(1.15, 0, 0, 1.15, 33 - 1.15 * 20, 48 - 1.15 * 20);
+      this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w: 40, h: 40, hp: 1, max: 1, hitT: 0, ang: 0 }] }, g, { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 });
       return;
     }
     const def = SHOP[k];
@@ -1722,6 +1783,8 @@ class Game {
       if (g) return this.buyWeapon(g.dataset.gunBuy);
       const a = e.target.closest('[data-ammo]');
       if (a) return this.buyAmmo(a.dataset.ammo, Number(a.dataset.n));
+      const hva = e.target.closest('[data-heavy-ammo]');
+      if (hva) return this.buyHeavyAmmo(Number(hva.dataset.heavyAmmo));
       const rbt = e.target.closest('[data-robot-act]');
       if (rbt) return rbt.dataset.robotAct === 'buy' ? this.buyRobot() : this.repairRobot();
       const b = e.target.closest('[data-buy]');
@@ -1734,7 +1797,7 @@ class Game {
       this.buildSel = b.dataset.k;
     });
     this.$('slots').addEventListener('pointerdown', (e) => {
-      const b = e.target.closest('.slot');
+      const b = e.target.closest('.slot[data-i]');
       if (!b) return;
       e.preventDefault();
       this.player.select(Number(b.dataset.i));
@@ -1795,13 +1858,19 @@ class Game {
     if (this.cache.rbOwned !== rb.owned) {
       this.cache.rbOwned = rb.owned;
       $('rb-bar').hidden = !rb.owned;
-      $('btn-robot').classList.toggle('gone', !rb.owned);
+    }
+    // el botón táctil también monta y desmonta la torreta pesada
+    const heavy = p.manned ? null : this.structures.nearHeavy(p);
+    const rbBtn = rb.owned || !!p.manned || !!heavy;
+    if (this.cache.rbBtn !== rbBtn) {
+      this.cache.rbBtn = rbBtn;
+      $('btn-robot').classList.toggle('gone', !rbBtn);
     }
     if (rb.owned) {
       this.set('rbw', $('rb-fill'), 'transform', `scaleX(${Math.max(0, rb.hp / ROBOT.hp).toFixed(3)})`);
       this.set('rbv', $('rb-val'), 'text', rb.broken ? 'ROTO' : String(Math.ceil(rb.hp)));
-      this.set('rbon', $('btn-robot'), 'text', rb.piloted ? 'Bajar' : 'Robot');
     }
+    this.set('rbon', $('btn-robot'), 'text', rb.piloted || p.manned ? 'Bajar' : heavy ? 'Torreta' : 'Robot');
     // habilidad de clase: icono, segundos que faltan y arco de espera en el botón táctil
     const cls = p.cls;
     if (this.cache.cls !== cls) {
@@ -1840,7 +1909,8 @@ class Game {
     this.set('time', $('time'), 'text', fmtTime(this.time));
     this.set('kills', $('kills'), 'text', String(this.totalKills()));
     this.set('wave', $('wave'), 'text', String(Math.max(1, this.director.wave)));
-    const w = p.weapon;
+    // montado en la torreta pesada se ven sus balas
+    const w = p.manned ? { def: WEAPONS.heavy, mag: p.heavyAmmo, reserve: 0 } : p.weapon;
     this.set('wname', $('wname'), 'text', w.def.name);
     this.set('mag', $('mag'), 'text', String(w.mag));
     this.set('res', $('reserve'), 'text', w.reserve === Infinity ? '∞' : String(w.reserve));
@@ -1874,12 +1944,12 @@ class Game {
       $('molo-count').textContent = inv.molotov;
       $('btn-molotov').classList.toggle('off', inv.molotov <= 0);
     }
-    const sig = p.weapons.map((x) => x.id).join() + '|' + p.wi;
+    const sig = p.manned ? 'heavy' : p.weapons.map((x) => x.id).join() + '|' + p.wi;
     if (this.cache.slots !== sig) {
       this.cache.slots = sig;
-      $('slots').innerHTML = p.weapons
-        .map((x, i) => `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`)
-        .join('');
+      $('slots').innerHTML = p.manned
+        ? `<button class="slot on">${WEAPONS.heavy.name}</button>`
+        : p.weapons.map((x, i) => `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`).join('');
     }
     const prep = this.director.state === 'waiting' && p.alive;
     if (this.cache.prep !== prep) {
@@ -2140,6 +2210,7 @@ class Game {
       if (p.inRobot) this.robot.draw(ctx, p, this.time);
       else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
+      this.structures.drawMannedHeavy(ctx);
       this.coop.drawPeer(ctx);
       this.online.drawPeers(ctx);
     }

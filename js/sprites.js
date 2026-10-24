@@ -1209,7 +1209,7 @@ export function drawSurvivor(g, p, time) {
       GUNS.lmg(g, r, p);
       g.restore();
     }
-  } else GUNS[p.weapon.id](g, r, p);
+  } else if (!p.manned) GUNS[p.weapon.id](g, r, p);
   if (longGun || rage) {
     limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, L.jacket);
     limb(g, 0, -r * 0.62, r * 1.25, -r * 0.05, r * 0.28, L.jacket);

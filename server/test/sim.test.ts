@@ -231,7 +231,7 @@ test('robot: se compra, se sube y aguanta los golpes por el piloto', () => {
   const a = sim.slots.get('a')!;
   const seq = { n: 0 };
   idle(sim, 'a', seq, 2);
-  a.money = 5000;
+  a.money = 13000;
   sim.director.state = 'waiting';
   assert.ok(sim.shop('a', 'robot', 'buy', 0));
   assert.equal(sim.shop('a', 'robot', 'buy', 0), false, 'sólo uno');
@@ -247,14 +247,14 @@ test('robot: se compra, se sube y aguanta los golpes por el piloto', () => {
   assert.equal(a.p.hp, hp, 'el piloto no pierde vida');
   assert.equal(a.robot.hp, 10000 - 50);
   sim.onZombieHit(a.p);
-  assert.equal(a.money, 2000, 'dentro del robot los golpes no cuestan dinero');
+  assert.equal(a.money, 3000, 'dentro del robot los golpes no cuestan dinero');
   assert.ok(sim.shop('a', 'robot', 'repair', 0));
   assert.equal(a.robot.hp, 10000);
   sim.act('a', { s: seq.n + 1, k: 'robot', kind: '', tx: 0, ty: 0 });
   idle(sim, 'a', seq, 1);
   assert.ok(!a.p.inRobot, 'bajó');
   sim.onZombieHit(a.p);
-  assert.ok(a.money < 2000 - 10 && sim.snapshot('a', 0)!.ml > 0, 'fuera del robot el golpe cuesta dinero y se avisa');
+  assert.ok(a.money < 3000 - 10 && sim.snapshot('a', 0)!.ml > 0, 'fuera del robot el golpe cuesta dinero y se avisa');
 });
 
 test('el gordo revienta en ácido que quema, y los cohetes estallan', () => {

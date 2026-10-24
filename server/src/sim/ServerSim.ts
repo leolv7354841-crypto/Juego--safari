@@ -397,7 +397,8 @@ export class ServerSim {
   // Barricadas, trampas, granadas y molotovs: van a su inventario y los usa cuando quiere.
   buyItem(s: Slot, k: string) {
     const it = Object.hasOwn(SHOP, k) ? (SHOP as any)[k] : null;
-    if (!it || s.money < it.price) return false;
+    // la torreta pesada se maneja a mano: en línea no se vende
+    if (!it || it.manned || s.money < it.price) return false;
     s.money -= it.price;
     s.inv[k]++;
     return true;
