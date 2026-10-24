@@ -34,7 +34,7 @@ y para eso está el margen.
 | **Vultr High Performance AMD 2 vCPU / 2 GB, Ciudad de México** | **18 USD** | **Sí, con margen (recomendado)** |
 | Vultr High Performance AMD 1 vCPU / 2 GB, Ciudad de México | 12 USD | Sí, justo: los picos compiten con el sistema |
 | Vultr High Performance AMD 2 vCPU / 4 GB, Ciudad de México | 24 USD | Sí; la RAM extra no hace falta hoy |
-| Render plan gratis (lo actual) | 0 | No: 0,1 CPU, se duerme y tarda un minuto en despertar |
+| Render plan gratis (lo anterior) | 0 | No: 0,1 CPU, se duerme y tarda un minuto en despertar |
 
 ## Pasos
 

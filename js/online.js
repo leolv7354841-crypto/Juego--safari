@@ -30,7 +30,7 @@ export function explainOnline(err) {
   if (/locked|full/i.test(m)) return `La sala está llena (máximo ${NET.maxPlayers} jugadores).`;
   if (m === 'servidor-lleno') return 'El servidor está lleno: todas las salas están ocupadas. Únete a la sala de un amigo o prueba en unos minutos.';
   if (m === 'sin-servidor') return 'No hay servidor configurado (NET.server en js/config.js o ?servidor=wss://…).';
-  return 'No se pudo contactar con el servidor. Si está en el plan gratis puede tardar hasta un minuto en despertar: vuelve a intentarlo.';
+  return 'No se pudo contactar con el servidor. Revisa tu conexión y vuelve a intentarlo en un momento.';
 }
 
 export class Online {
