@@ -10,7 +10,10 @@
     "server": "npm start --prefix server",
     "server:install": "npm ci --prefix server",
     "server:test": "npm test --prefix server",
-    "server:load": "npm run load --prefix server"
+    "server:load": "npm run load --prefix server",
+    "test": "node --test test/*.test.js",
+    "lint": "biome check .",
+    "format": "biome format --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2"
