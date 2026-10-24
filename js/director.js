@@ -1,5 +1,5 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { MAX_ALIVE, COOP_MAX_ALIVE, WORLD_SIZE } from './config.js';
+import { MAX_ALIVE, COOP_MAX_ALIVE, WORLD_SIZE, WAVES } from './config.js';
 import { rand, randInt, TAU } from './util.js';
 
 export class Director {
@@ -14,10 +14,10 @@ export class Director {
 
   get hpMult() {
     // cooperativo: 1,4 veces la vida, pero la mitad de zombis (ver startWave)
-    return (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 1.4 : 1);
+    return WAVES.hp * (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 1.4 : 1);
   }
   get speedMult() {
-    return 1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02);
+    return WAVES.speed * (1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02));
   }
 
   startWave(game) {
@@ -27,16 +27,18 @@ export class Director {
     // el 20% de los normales llega como policía SWAT
     // cooperativo: la mitad de zombis que en solitario (eran demasiados)
     // en línea: crowd crece con el número de jugadores (ver NET.crowd)
-    const m = this.coop ? this.crowd || 0.5 : 1;
+    // WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno
+    const m = (this.coop ? this.crowd || 0.5 : 1) * WAVES.count;
+    const few = (n) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
     const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
     const swats = Math.round(normalTotal * 0.2);
     const normals = normalTotal - swats;
     const sprinters = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
-    const fats = Math.round(m * (w >= 2 ? Math.floor((w - 1) * 2) : 0));
+    const fats = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
     // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
     const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
     // toros desde la oleada 3: pocos, pero embisten
-    const bulls = Math.round(m * (w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0));
+    const bulls = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
     const q = [];
     for (let i = 0; i < normals - heavies; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
@@ -86,7 +88,7 @@ export class Director {
   // Si quedan pocos zombis atascados lejos, los acerca para que la ronda no se trabe.
   herdStragglers(dt, game) {
     this.straggleT = (this.straggleT || 0) + dt;
-    if (this.straggleT < 6) return;
+    if (this.straggleT < WAVES.straggle) return;
     this.straggleT = 0;
     const p = game.spawnFocus();
     const cam = game.camera;
