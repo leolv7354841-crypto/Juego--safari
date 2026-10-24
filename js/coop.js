@@ -1,3 +1,4 @@
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Modo cooperativo para 2 jugadores (sin competitivo), con la mitad de zombis.
 //
 // El anfitrión simula todo el mundo (zombis, oleadas, estructuras, explosiones) y le manda

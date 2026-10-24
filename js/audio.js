@@ -1,3 +1,4 @@
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Efectos de sonido sintetizados con Web Audio (sin archivos externos).
 // Cada efecto se arma por capas (chasquido, cuerpo, golpe grave, cola) con pequeñas
 // variaciones aleatorias, y un límite de voces evita que la horda sature la mezcla.

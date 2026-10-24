@@ -1,4 +1,3 @@
-// @ts-check
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
 import { MAX_ALIVE, COOP_MAX_ALIVE, WORLD_SIZE } from './config.js';
 import { rand, randInt, TAU } from './util.js';
@@ -81,7 +80,7 @@ export class Director {
 
   /**
    * @param {number} dt
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    */
   update(dt, game) {
     if (this.state === 'waiting') return;

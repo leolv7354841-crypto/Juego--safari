@@ -1,4 +1,3 @@
-// @ts-check
 import { drawPickup } from './sprites.js';
 import { rand, pick } from './util.js';
 import { CRATE_WEAPONS, WEAPONS } from './config.js';
@@ -18,7 +17,7 @@ export class Pickups {
 
   /**
    * @param {number} dt
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    */
   update(dt, game) {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)

@@ -1,13 +1,12 @@
-// @ts-check
 // Reglas de impacto compartidas por el juego local y el servidor en línea (mismo daño,
 // frenado, heridas y empuje en los dos sitios).
 import { rand } from './util.js';
 
 // Aplica una bala a un zombi. No lo mata: quien llama decide (y cuenta la baja).
 /**
- * @param {import('./types').GameHost} game
- * @param {import('./types').Zombie} z
- * @param {import('./types').Bullet} b
+ * @param {import('./types.js').GameHost} game
+ * @param {import('./types.js').Zombie} z
+ * @param {import('./types.js').Bullet} b
  * @param {number} hx
  * @param {number} hy
  */

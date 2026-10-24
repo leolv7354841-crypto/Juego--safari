@@ -1,3 +1,4 @@
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Multijugador en línea (hasta NET.maxPlayers jugadores por sala) contra el servidor autoritativo (carpeta server/).
 //
 // El servidor simula todo; aquí sólo se manda lo que quiere hacer el jugador (dirección,

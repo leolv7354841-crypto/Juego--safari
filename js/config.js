@@ -1,4 +1,3 @@
-// @ts-check
 // Constantes de equilibrio del juego. Todo lo ajustable vive aquí.
 
 export const WORLD_SIZE = 3800;

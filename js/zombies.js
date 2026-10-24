@@ -1,4 +1,3 @@
-// @ts-check
 import { ZOMBIES, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV } from './config.js';
 import { clamp, rand, angleTo, TAU } from './util.js';
 import { zombieSprites, flameSprite } from './sprites.js';
@@ -137,7 +136,7 @@ export class Horde {
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
     const def = ZOMBIES[type];
     const sets = this.sprites[type];
-    /** @type {import('./types').Zombie} */
+    /** @type {import('./types.js').Zombie} */
     const z = {
       id: nextId++,
       type,
@@ -222,7 +221,7 @@ export class Horde {
 
   /**
    * @param {number} dt
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    */
   update(dt, game) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas

@@ -1,4 +1,3 @@
-// @ts-check
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
 import {
   xpForLevel,

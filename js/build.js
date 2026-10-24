@@ -1,4 +1,3 @@
-// @ts-check
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
 import { SHOP, MOLOTOV, ROCKET } from './config.js';
 import { TAU, rand, clamp } from './util.js';
@@ -48,7 +47,7 @@ export class Structures {
 
   // Dónde caería el bloque: delante del jugador, alineado a una rejilla de 20 px.
   /**
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    * @param {string} kind
    */
   placement(game, kind) {
@@ -101,7 +100,7 @@ export class Structures {
 
   // owner: de quién son las bajas de sus minas y torretas (en línea)
   /**
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    * @param {string} kind
    * @param {string | null} [owner]
    */
@@ -162,7 +161,7 @@ export class Structures {
   }
 
   /**
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    * @param {any} o
    * @param {number} dmg
    */
@@ -231,11 +230,11 @@ export class Structures {
 
   // El cohete se queda clavado en la panza (gordo) o en la placa (super blindado) y estalla después.
   /**
-   * @param {import('./types').GameHost} game
-   * @param {import('./types').Zombie} z
+   * @param {import('./types.js').GameHost} game
+   * @param {import('./types.js').Zombie} z
    * @param {number} x
    * @param {number} y
-   * @param {import('./types').Bullet} b
+   * @param {import('./types.js').Bullet} b
    */
   stickRocket(game, z, x, y, b) {
     const fat = z.type === 'fat';
@@ -489,7 +488,7 @@ export class Structures {
 
   /**
    * @param {number} dt
-   * @param {import('./types').GameHost} game
+   * @param {import('./types.js').GameHost} game
    */
   update(dt, game) {
     this.time = (this.time || 0) + dt;

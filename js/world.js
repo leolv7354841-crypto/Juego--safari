@@ -1,4 +1,3 @@
-// @ts-check
 // Ciudad en ruinas generada por semilla. Incluye:
 // - obstáculos (rectángulos y círculos) con rejilla espacial
 // - campo de flujo (BFS) para que los zombis rodeen edificios y coches

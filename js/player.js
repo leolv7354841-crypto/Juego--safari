@@ -1,4 +1,3 @@
-// @ts-check
 import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT } from './config.js';
 import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
@@ -180,7 +179,7 @@ export class Player {
    * @param {number} mx
    * @param {number} my
    * @param {boolean} run
-   * @param {import('./types').GameHost | Pick<import('./types').GameHost, 'world' | 'sfx'>} game
+   * @param {import('./types.js').GameHost | Pick<import('./types.js').GameHost, 'world' | 'sfx'>} game
    */
   move(dt, mx, my, run, game) {
     const st = this.stats;

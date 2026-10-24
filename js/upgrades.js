@@ -1,3 +1,4 @@
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 import { WEAPONS } from './config.js';
 
 // Cada mejora modifica las estadísticas reales del jugador.
