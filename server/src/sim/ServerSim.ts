@@ -14,7 +14,7 @@ import { Player } from '../../../js/player.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET } from '../../../js/config.js';
+import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, BOUNTY } from '../../../js/config.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
 import type { Cmd } from '../validate.ts';
 
@@ -40,6 +40,7 @@ export type Slot = {
   last: Cmd;
   ack: number;
   kills: number;
+  money: number;
   deaths: number;
   away: boolean;
   dropped: number;
@@ -87,7 +88,7 @@ export class ServerSim {
       this.world.collide(p, p.r, true);
       p.field = this.newField();
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
-      this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [] });
+      this.slots.set(pl.id, { id: pl.id, idx: pl.idx, name: pl.name, p, queue: [], last: idle, ack: 0, kills: 0, money: 0, deaths: 0, away: false, dropped: 0, starve: 0, toasts: [] });
     });
   }
 
@@ -238,12 +239,16 @@ export class ServerSim {
     if (z.burn > 0) z.burnt = true;
     g.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
     const by = this.slots.get(z.lastOwner);
-    if (by && z.type !== 'golden') by.kills++;
+    if (by) {
+      by.kills++;
+      by.money += BOUNTY[z.type] || 0;
+    }
     if (z.type === 'golden') {
-      // el dorado cuenta como 5 bajas para quien lo atrapó (en línea no hay dinero)
+      // recompensa única del zombi dorado para quien lo mató (como en solitario)
       if (by) {
-        by.kills += 5;
-        by.toasts.push('¡Zombi dorado! +5 bajas');
+        const reward = randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
+        by.money += reward;
+        by.toasts.push(`¡Zombi dorado! +$${reward}`);
       }
       g.particles.pickupFx(z.x, z.y, '#f0c040');
     }
@@ -451,11 +456,14 @@ export class ServerSim {
     const oy = Math.round(me.y);
     const z: number[] = [];
     const zx: number[] = [];
+    // vida de los zombis heridos, en %, para su barra (sólo los que la muestran)
+    const zh: number[] = [];
     for (const o of this.horde.list) {
       if (o.dead || !near(o.x, o.y)) continue;
       const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
         | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
       z.push(o.id, TYPES.indexOf(o.type), Math.round(o.x - ox), Math.round(o.y - oy), Math.round((o.angle / TAU) * 64) & 63, flags);
+      if (o.hp < o.maxHp && o.type !== 'normal' && o.type !== 'sprinter') zh.push(o.id, Math.max(0, Math.ceil((o.hp / o.maxHp) * 100)));
       if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
     }
     const pl: number[] = [];
@@ -477,9 +485,9 @@ export class ServerSim {
     const snap: any = {
       q: ++this.snapN, t: this.tick, ts: Math.round(now), ack: s.ack,
       me: packBody(me),
-      st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills],
+      st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills, s.money],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
-      o: [ox, oy], z, zx, pl,
+      o: [ox, oy], z, zx, zh, pl,
       pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
       b: this.bullets.list.flatMap((b: any) => (b.owner !== id && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
       w: d.wave, ds: d.state, tm: Math.round(this.time), kl: this.totalKills(), lft: d.queue.length + this.horde.list.length,

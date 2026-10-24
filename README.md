@@ -252,11 +252,12 @@ sin partida (esperando o en resultados) se cierra a los 20 minutos para liberar 
 
 **Reglas del modo en línea (fase 1).** Para no romper nada, en línea por ahora **no hay tienda,
 construcciones, granadas, molotovs, robot ni mejoras de nivel** (siguen igual en solitario y en el
-cooperativo directo); el dinero no se usa. Se conservan armas de cajas, munición y botiquines.
+cooperativo directo); el dinero se gana como en solitario (recompensas por zombi y el dorado), aunque todavía no hay
+tienda donde gastarlo. Se conservan armas de cajas, munición y botiquines.
 Zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra (y 1,4 veces su vida, como en el
 cooperativo). Si caes, revives al terminar la oleada junto a un compañero; la partida termina cuando
 caen todos. La siguiente oleada la inicia cualquiera (o empieza sola a los 45 s). El zombi dorado
-vale 5 bajas. Quien entra a una sala con la partida empezada espera en la sala y juega la
+da dinero a quien lo mata. Quien entra a una sala con la partida empezada espera en la sala y juega la
 siguiente. Si alguien pierde la conexión, su personaje se queda quieto, los zombis lo ignoran y no
 recibe daño durante 20 s; si vuelve (con el token de reconexión, también tras recargar la página)
 recupera el mismo personaje; si no, sale de la sala.

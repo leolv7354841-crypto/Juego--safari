@@ -62,3 +62,24 @@ test('una entrada no puede mover más rápido que el juego', () => {
   const moved = Math.hypot(p.x - x0, p.y - y0);
   assert.ok(moved < 118 * 1.75 * 1.05, `avanzó ${moved.toFixed(1)} px en 1 s`);
 });
+
+test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida', () => {
+  const sim = new ServerSim(42, [{ id: 'a', idx: 1, name: 'Ana' }]);
+  let seq = 0;
+  for (let i = 0; i < 60 * 12; i++) {
+    sim.push('a', [{ s: ++seq, mx: 0, my: 0, f: IN_FIRE, a: aimAt(sim, 'a'), w: -1 }]);
+    sim.step();
+  }
+  const a = sim.slots.get('a')!;
+  assert.ok(a.kills > 0 && a.money > 0, 'ganó dinero');
+  assert.equal(sim.snapshot('a', 0)!.st[7], a.money, 'el dinero va en la foto');
+  // un gordo herido cerca: su vida en % va en zh para dibujar la barra
+  const p = a.p;
+  sim.horde.spawn('fat', p.x + 120, p.y, 1, 1);
+  const fat = sim.horde.list[sim.horde.list.length - 1];
+  fat.hp = fat.maxHp * 0.4;
+  const zh = sim.snapshot('a', 0)!.zh;
+  const i = zh.indexOf(fat.id);
+  assert.ok(i >= 0 && i % 2 === 0, 'el gordo herido está en zh');
+  assert.equal(zh[i + 1], 40);
+});

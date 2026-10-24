@@ -5,7 +5,7 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES } from './config.js';
+import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN } from './config.js';
 import { Player } from './player.js';
 import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
@@ -513,7 +513,7 @@ export class Online {
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
     this.applyPeers(s.pl || [], ts);
-    this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], ts);
+    this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], ts);
     const pk = s.pk || [];
     g.pickups.list = [];
     for (let i = 0; i + 3 < pk.length; i += 4) g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
@@ -547,6 +547,16 @@ export class Online {
     p.stats.maxHp = Number(st[1]) || 100;
     p.alive = alive;
     this.myKills = st[6] | 0;
+    const money = st[7] | 0;
+    if (money > g.money) {
+      g.moneyEarned += money - g.money;
+      // como en solitario: sólo la recompensa del dorado salta en pantalla
+      if (money - g.money >= GOLDEN.rewardMin) {
+        g.moneyPop(`+$${money - g.money}`, 'gold');
+        g.sfx.gold();
+      }
+    }
+    g.money = money;
     const wp = Array.isArray(s.wp) ? s.wp.filter((w) => Array.isArray(w) && WEAPONS[w[0]]) : [];
     if (wp.length) {
       const ids = wp.map((w) => w[0]).join();
@@ -598,11 +608,14 @@ export class Online {
     for (const idx of this.peers.keys()) if (!seen.has(idx)) this.peers.delete(idx);
   }
 
-  applyZombies(z, org, zx, ts) {
+  applyZombies(z, org, zx, zh, ts) {
     const g = this.game;
     const seen = new Set();
     const extra = new Map();
     for (let i = 0; i + 2 < zx.length; i += 3) extra.set(zx[i], [zx[i + 1], zx[i + 2] / 100]);
+    // vida en % de los heridos (la barra usa hp / maxHp)
+    const life = new Map();
+    for (let i = 0; i + 1 < zh.length; i += 2) life.set(zh[i], zh[i + 1]);
     for (let i = 0; i + 5 < z.length; i += 6) {
       const id = z[i];
       const x = org[0] + z[i + 2];
@@ -633,6 +646,8 @@ export class Online {
       }
       o.life = f & 32 ? 1 : 99;
       o.lunge = f & 64 ? 1 : o.lunge;
+      o.maxHp = 100;
+      o.hp = life.get(id) ?? 100;
       const ex = extra.get(id);
       o.air = ex ? ex[0] : 0;
       o.swell = ex ? ex[1] : 0;
