@@ -6,7 +6,7 @@ name: Publicar servidor
 
 on:
   push:
-    branches: [main, claude/juego-safari-setup-t5zanh]
+    branches: [main]
     paths: ['server/**', 'js/**', 'deploy/**', 'package.json']
   workflow_dispatch:
 

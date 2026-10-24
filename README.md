@@ -154,7 +154,7 @@ Para probar en tu celular, conéctalo a la misma red Wi-Fi y abre `http://IP-DE-
 
 Flujo actual:
 
-1. **Push a la rama principal** → el proyecto `deadzone` de Vercel publica en producción
+1. **Push a `main`** (la rama principal) → el proyecto `deadzone` de Vercel publica en producción
    (`deadzone-five-red.vercel.app`). Las demás ramas del repositorio generan una vista previa.
 2. Vercel no publica la carpeta tal cual: ejecuta `node tools/build.mjs` (lo pide `vercel.json`),
    que sella la versión y copia a `dist/` sólo el juego (`index.html`, `manifest.webmanifest`,
@@ -168,14 +168,15 @@ Flujo actual:
 Para crear el proyecto desde cero: [vercel.com](https://vercel.com) → **Add New… → Project** →
 importa este repositorio. `vercel.json` ya define el build (*Framework Preset* da igual).
 
-**yeyo.games/deadzone.** El hub `yeyo.games` es otro proyecto de Vercel. Para que muestre
-siempre la última versión, no debe guardar una copia del juego: en su `vercel.json`, redirige
-(sin copiar archivos) al proyecto `deadzone`:
+**yeyo.games/deadzone.** El hub `yeyo.games` es otro proyecto de Vercel (`yeyo-games`, Astro,
+publicado con la CLI de Vercel). No guarda una copia del juego: su `vercel.json` pasa `/deadzone/`
+al proyecto `deadzone`, así que muestra siempre la última versión publicada:
 
 ```json
+"redirects": [{ "source": "/deadzone", "destination": "/deadzone/", "permanent": false }],
 "rewrites": [
-  { "source": "/deadzone", "destination": "https://deadzone-five-red.vercel.app/deadzone/" },
-  { "source": "/deadzone/:path*", "destination": "https://deadzone-five-red.vercel.app/deadzone/:path*" }
+  { "source": "/deadzone/", "destination": "https://deadzone-five-red.vercel.app/index.html" },
+  { "source": "/deadzone/:path+", "destination": "https://deadzone-five-red.vercel.app/deadzone/:path+" }
 ]
 ```
 

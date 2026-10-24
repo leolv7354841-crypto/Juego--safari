@@ -116,7 +116,7 @@ Mira que «pasos/s por sala» quede en 60 y «descartados» en 0.
 
 ## Publicación automática
 
-Con esto, cada push a la rama principal que cambie `server/`, `js/` o `deploy/` actualiza la
+Con esto, cada push a `main` que cambie `server/`, `js/` o `deploy/` actualiza la
 máquina solo (`.github/workflows/servidor.yml`), esperando a que no haya salas abiertas.
 Hace falta la cuenta dueña del repositorio, porque los secretos de GitHub sólo los puede
 crear un administrador.
