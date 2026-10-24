@@ -8,7 +8,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 antes=$(git rev-parse HEAD)
-git pull --ff-only
+# sigue la rama principal de GitHub aunque cambie de nombre (por ejemplo, al pasar a main)
+rama=$(git ls-remote --symref origin HEAD | sed -n 's|^ref: refs/heads/\(.*\)\tHEAD$|\1|p')
+git fetch -q origin "$rama"
+git checkout -q -B "$rama" --track "origin/$rama"
 if [ "$antes" != "$(git rev-parse HEAD)" ] && git diff --quiet "$antes" HEAD -- ../server ../js ../deploy ../package.json; then
   echo "Sin cambios para el servidor: no hace falta reiniciar."
   exit 0
