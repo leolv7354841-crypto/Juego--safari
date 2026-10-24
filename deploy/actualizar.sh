@@ -12,7 +12,7 @@ antes=$(git rev-parse HEAD)
 rama=$(git ls-remote --symref origin HEAD | sed -n 's|^ref: refs/heads/\(.*\)\tHEAD$|\1|p')
 git fetch -q origin "$rama"
 git checkout -q -B "$rama" --track "origin/$rama"
-if [ "$antes" != "$(git rev-parse HEAD)" ] && git diff --quiet "$antes" HEAD -- ../server ../js ../deploy ../package.json; then
+if [ "$antes" != "$(git rev-parse HEAD)" ] && git diff --quiet "$antes" HEAD -- ../server ../js ../deploy ../package.json ':!../deploy/README.md'; then
   echo "Sin cambios para el servidor: no hace falta reiniciar."
   exit 0
 fi

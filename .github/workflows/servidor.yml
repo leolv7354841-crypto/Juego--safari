@@ -7,7 +7,7 @@ name: Publicar servidor
 on:
   push:
     branches: [main]
-    paths: ['server/**', 'js/**', 'deploy/**', 'package.json']
+    paths: ['server/**', 'js/**', 'deploy/**', '!deploy/README.md', 'package.json']
   workflow_dispatch:
 
 concurrency:
