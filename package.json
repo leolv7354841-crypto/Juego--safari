@@ -13,11 +13,13 @@
     "server:load": "npm run load --prefix server",
     "test": "node --test test/*.test.js",
     "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json",
     "format": "biome format --write .",
     "e2e": "playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",
-    "@playwright/test": "1.64.1"
+    "@playwright/test": "1.64.1",
+    "typescript": "5.9"
   }
 }
