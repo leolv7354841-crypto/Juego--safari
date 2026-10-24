@@ -16,6 +16,7 @@ const SHOTS = {
   sniper: { crack: 6200, body: 900, thump: 80, tail: 0.65, gain: 1, dur: 0.26 },
   lmg: { crack: 4400, body: 1250, thump: 125, tail: 0.14, gain: 0.55, dur: 0.09 },
   bazooka: { crack: 1500, body: 420, thump: 60, tail: 0.9, gain: 1, dur: 0.45 },
+  heavy: { crack: 3400, body: 760, thump: 70, tail: 0.32, gain: 0.8, dur: 0.15 },
 };
 
 // Etapas de recarga sincronizadas con el progreso de la animación (0..1).

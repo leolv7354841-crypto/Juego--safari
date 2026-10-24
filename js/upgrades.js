@@ -1,4 +1,4 @@
-import { WEAPONS, ABILITY } from './config.js';
+import { ABILITY } from './config.js';
 import { cooldownOf } from './abilities.js';
 
 // Cada mejora modifica las estadísticas reales del jugador.
@@ -47,22 +47,6 @@ export const UPGRADES = [
     when: (p) => !!p.cls && cooldownOf(p) > ABILITY.minCooldown + 0.01,
     apply: (p) => (p.stats.cdMult *= ABILITY.cdStep),
   },
-  ...['smg', 'shotgun', 'rifle'].map((id, i) => ({
-    id: 'w_' + id,
-    name: WEAPONS[id].name,
-    desc: {
-      smg: 'Ráfagas rápidas para contener a la horda',
-      shotgun: 'Perdigones de corto alcance que derriban grupos',
-      rifle: 'Disparo potente y lejano que atraviesa 2 enemigos',
-    }[id],
-    icon: 'gun',
-    weapon: id,
-    max: 1,
-    minLevel: 2 + i,
-    weight: 2.2,
-    when: (p) => !p.has(id),
-    apply: (p) => p.unlock(id),
-  })),
 ];
 
 export function rollUpgrades(player, level, taken, count = 3) {

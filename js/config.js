@@ -47,55 +47,66 @@ export const WEAPONS = {
     knock: 30, shake: 0.03, pierce: 0, len: 15,
     desc: 'Ráfagas rápidas para contener a la horda.',
   },
+  // Armas de la tienda: todas rinden lo mismo (unos 330 de daño por segundo efectivo, contando
+  // perforación y perdigones que fallan) y cuestan casi lo mismo; cambia el estilo, no el poder.
+  // La munición cuesta lo mismo por cada 1000 de daño que lleva el cargador.
   shotgun: {
-    id: 'shotgun', name: 'Escopeta', damage: 17, rate: 1.25, mag: 6,
-    reserve: 24, reserveMax: Infinity, pickup: 12, reload: 1.9,
-    spread: 0.3, bloom: 0.1, pellets: 8, speed: 820, range: 330,
-    knock: 130, shake: 0.3, pierce: 0, len: 20,
-    price: 160, ammoPrice: 8, desc: '8 perdigones a corta distancia que derriban grupos.',
+    id: 'shotgun', name: 'Escopeta', damage: 30, rate: 1.8, mag: 6,
+    reserve: 24, reserveMax: Infinity, pickup: 12, reload: 1.8,
+    spread: 0.3, bloom: 0.1, pellets: 8, speed: 820, range: 340,
+    knock: 140, shake: 0.3, pierce: 0, len: 20,
+    price: 1000, ammoPrice: 12, desc: '8 perdigones de golpe: derriba grupos y los empuja lejos.',
   },
   rifle: {
-    id: 'rifle', name: 'Rifle', damage: 72, rate: 1.9, mag: 10,
+    id: 'rifle', name: 'Rifle', damage: 110, rate: 2, mag: 10,
     reserve: 40, reserveMax: Infinity, pickup: 16, reload: 1.7,
     spread: 0.008, bloom: 0.06, pellets: 1, speed: 1500, range: 950,
     knock: 110, shake: 0.22, pierce: 2, len: 24,
-    price: 220, ammoPrice: 8, desc: 'Disparo potente y lejano que atraviesa 2 enemigos.',
+    price: 1000, ammoPrice: 18, desc: 'Disparo potente y lejano que atraviesa 2 enemigos.',
   },
   ar: {
-    id: 'ar', name: 'Fusil de asalto', damage: 30, rate: 8, mag: 30,
+    id: 'ar', name: 'Fusil de asalto', damage: 30, rate: 9, mag: 30,
     reserve: 90, reserveMax: Infinity, pickup: 30, reload: 1.6,
     spread: 0.05, bloom: 0.015, pellets: 1, speed: 1250, range: 700,
     knock: 50, shake: 0.04, pierce: 1, len: 20,
-    price: 400, ammoPrice: 10, desc: 'Automático, preciso y perforante. El todoterreno.',
+    price: 1000, ammoPrice: 12, desc: 'Automático, preciso y perforante. El todoterreno.',
   },
   autoshotgun: {
-    id: 'autoshotgun', name: 'Escopeta automática', damage: 18, rate: 3.5, mag: 12,
+    id: 'autoshotgun', name: 'Escopeta automática', damage: 16, rate: 3.2, mag: 12,
     reserve: 36, reserveMax: Infinity, pickup: 12, reload: 2.2,
     spread: 0.32, bloom: 0.06, pellets: 9, speed: 850, range: 340,
-    knock: 120, shake: 0.28, pierce: 0, len: 22,
-    price: 600, ammoPrice: 15, desc: '9 perdigones en ráfaga continua. Barre hordas de cerca.',
+    knock: 110, shake: 0.28, pierce: 0, len: 22,
+    price: 1000, ammoPrice: 14, desc: '9 perdigones en ráfaga continua. Barre hordas de cerca.',
   },
   sniper: {
-    id: 'sniper', name: 'Francotirador', damage: 240, rate: 1.1, mag: 5,
+    id: 'sniper', name: 'Francotirador', damage: 200, rate: 0.9, mag: 5,
     reserve: 20, reserveMax: Infinity, pickup: 5, reload: 2.4,
     spread: 0.003, bloom: 0.08, pellets: 1, speed: 2000, range: 1400,
     knock: 220, shake: 0.35, pierce: 6, len: 30,
-    price: 750, ammoPrice: 15, desc: 'Daño enorme: cada bala atraviesa hasta 6 zombis en fila.',
+    price: 1000, ammoPrice: 20, desc: 'Lento pero brutal: cada bala atraviesa hasta 6 zombis en fila.',
   },
   lmg: {
-    id: 'lmg', name: 'Ametralladora', damage: 26, rate: 13, mag: 100,
+    id: 'lmg', name: 'Ametralladora', damage: 22, rate: 12, mag: 100,
     reserve: 200, reserveMax: Infinity, pickup: 100, reload: 3.2,
     spread: 0.08, bloom: 0.012, pellets: 1, speed: 1200, range: 650,
     knock: 45, shake: 0.015, pierce: 1, len: 26,
-    price: 900, ammoPrice: 35, desc: 'Cargador de 100 balas a ritmo infernal. La reina del caos.',
+    price: 1000, ammoPrice: 30, desc: 'Cargador de 100 balas: fuego sin pausa, recarga lenta.',
   },
-  // Lanza cohetes (ver ROCKET): explota al impactar; tarda 5 s en recargar.
+  // Lanza cohetes (ver ROCKET): explota al impactar; tarda 4 s en recargar.
   bazooka: {
     id: 'bazooka', name: 'Bazuca antitanque', damage: 0, rate: 1, mag: 1,
-    reserve: 4, reserveMax: Infinity, pickup: 1, reload: 5,
+    reserve: 4, reserveMax: Infinity, pickup: 1, reload: 4,
     spread: 0.01, bloom: 0, pellets: 1, speed: 640, range: 950,
     knock: 260, shake: 0.5, pierce: 0, len: 30, rocket: true,
-    price: 1400, ammoPrice: 40, desc: 'Cohete con el doble de explosión que una granada. Revienta gordos y blindados. Recarga en 5 s.',
+    price: 1000, ammoPrice: 30, desc: 'Cohete con el doble de explosión que una granada. Revienta gordos y blindados. Recarga en 4 s.',
+  },
+  // Cañón doble de la torreta pesada (SHOP.heavy): no se compra ni se lleva, se usa montado.
+  // Sus balas salen de HEAVY.ammo (se compran en la tienda) y atraviesan 4 zombis.
+  heavy: {
+    id: 'heavy', name: 'Torreta pesada', damage: 70, rate: 9, mag: 0,
+    reserve: 0, reserveMax: 0, pickup: 0, reload: 0,
+    spread: 0.035, bloom: 0.01, pellets: 1, speed: 1600, range: 1000,
+    knock: 90, shake: 0.06, pierce: 4, len: 30,
   },
 };
 export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun', 'rifle', 'ar', 'autoshotgun', 'sniper', 'lmg', 'bazooka'];
@@ -211,7 +222,11 @@ export const DROPS = {
 };
 
 // Robot de combate (tienda): vida, tamaño (el doble de un gordo), precio y reparación.
-export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 3000, repairPerHp: 0.1, speed: 0.85, gunScale: 1.7 };
+export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 10000, repairPerHp: 0.1, speed: 0.85, gunScale: 1.7 };
+
+// Torreta pesada montada: munición que se compra (pack balas por price), qué tan rápido gira el
+// cañón (rad/s), cuánto daño quita su escudo al que la maneja y a qué distancia se monta.
+export const HEAVY = { pack: 100, price: 200, turn: 4.5, shield: 0.5, reach: 60 };
 
 // Clasificación mundial (Firebase Realtime Database, sin librerías: API REST).
 // Pega aquí la URL de tu base de datos, p. ej. 'https://mi-juego-default-rtdb.firebaseio.com'.
@@ -264,11 +279,16 @@ export const SHOP = {
   },
   hesco: {
     name: 'Barrera HESCO', desc: 'Gaviones militares de malla rellenos de arena. Casi indestructible.',
-    price: 600, hp: 10000, w: 80, h: 40, rotates: true,
+    price: 800, hp: 10000, w: 80, h: 40, rotates: true,
   },
   turret: {
     name: 'Torreta automática', desc: 'Dispara sola al zombi más cercano. Ponla detrás de tus muros.',
-    price: 350, hp: 700, w: 40, h: 40, turret: true,
+    price: 1000, hp: 700, w: 40, h: 40, turret: true,
+  },
+  // Se monta con E (o el botón): la manejas tú con su cañón doble (WEAPONS.heavy) y balas compradas.
+  heavy: {
+    name: 'Torreta pesada', desc: 'Cañón doble blindado: móntala con E y dispara balas que atraviesan 4 zombis. Necesita munición.',
+    price: 15000, hp: 4000, w: 40, h: 40, turret: true, manned: true,
   },
   wire: {
     name: 'Alambre de púas', desc: 'No bloquea el paso: frena mucho y hiere a los zombis que lo cruzan.',
@@ -291,7 +311,7 @@ export const SHOP = {
     price: 60, consumable: true,
   },
 };
-export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'hesco', 'turret', 'wire', 'spikes', 'mine'];
+export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'hesco', 'turret', 'heavy', 'wire', 'spikes', 'mine'];
 export const THROWABLES = ['grenade', 'molotov'];
 export const SHOP_ORDER = [...BUILD_ORDER, ...THROWABLES];
 // Vender un arma devuelve esta fracción de su precio.

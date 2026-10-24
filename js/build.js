@@ -1,6 +1,6 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET, ABILITY } from './config.js';
-import { TAU, rand, clamp } from './util.js';
+import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from './config.js';
+import { TAU, rand, clamp, roundRect } from './util.js';
 import { OUT, flameSprite } from './sprites.js';
 import { drawRocket } from './bullets.js';
 
@@ -86,7 +86,7 @@ export class Structures {
     }
     if (ok && !def.ground) {
       for (const b of this.blocks) {
-        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || b.kind === 'turret')) {
+        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || SHOP[b.kind].turret)) {
           ok = false;
           break;
         }
@@ -131,7 +131,7 @@ export class Structures {
     for (let i = this.blocks.length - 1; i >= 0; i--) {
       const b = this.blocks[i];
       if (b === o) return o;
-      if (b.kind !== 'turret' && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
+      if (!SHOP[b.kind].turret && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
     }
     return o;
   }
@@ -616,6 +616,26 @@ export class Structures {
     }
   }
 
+  // La torreta pesada libre más cercana al alcance de p (o null).
+  nearHeavy(p) {
+    let best = null;
+    let bd = HEAVY.reach + p.r;
+    for (const b of this.blocks) {
+      if (b.kind !== 'heavy' || b.manned) continue;
+      const d = Math.hypot(b.x + b.w / 2 - p.x, b.y + b.h / 2 - p.y);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  // El cañón de las torretas pesadas montadas va encima de quien las maneja.
+  drawMannedHeavy(ctx) {
+    for (const b of this.blocks) if (b.kind === 'heavy' && b.manned) drawHeavyGun(ctx, b);
+  }
+
   drawGhost(ctx, game, kind, time) {
     const pl = this.placement(game, kind);
     const pulse = 0.55 + Math.sin(time * 6) * 0.15;
@@ -689,7 +709,128 @@ export class Structures {
   }
 }
 
+// Torreta pesada (inspirada en la torreta de Gears of War 4): trípode y cañón doble blindado.
+function drawHeavy(ctx, b) {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 4, cy + 6, 24, 20, 0, 0, TAU);
+  ctx.fill();
+  // patas del trípode
+  ctx.lineCap = 'round';
+  for (const [lw, col] of [[7, OUT], [4, '#4a5056']]) {
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    for (let k = 0; k < 3; k++) {
+      const a = (k * TAU) / 3 - Math.PI / 2;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * 21, cy + Math.sin(a) * 21);
+    }
+    ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = '#2a2e32';
+  for (let k = 0; k < 3; k++) {
+    const a = (k * TAU) / 3 - Math.PI / 2;
+    ctx.fillRect(cx + Math.cos(a) * 21 - 3.5, cy + Math.sin(a) * 21 - 3.5, 7, 7);
+  }
+  // anillo de giro
+  ctx.fillStyle = b.hitT > 0 ? '#8a9096' : '#3a3f44';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 12, 0, TAU);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = OUT;
+  ctx.stroke();
+  drawHeavyGun(ctx, b);
+}
+
+function drawHeavyGun(ctx, b) {
+  ctx.save();
+  ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
+  ctx.rotate(b.ang || 0);
+  ctx.strokeStyle = OUT;
+  // dos cañones con camisa de aletas y freno de boca; retrocede el que acaba de disparar
+  for (const s of [-1, 1]) {
+    const k = b.side === s ? (b.recoil || 0) * 4 : 0;
+    const y = s * 7;
+    ctx.lineWidth = 1.2;
+    ctx.fillStyle = '#25282b';
+    ctx.fillRect(6 - k, y - 2.6, 32, 5.2);
+    ctx.strokeRect(6 - k, y - 2.6, 32, 5.2);
+    ctx.fillStyle = '#4c5258';
+    for (let i = 0; i < 4; i++) ctx.fillRect(14 + i * 4.5 - k, y - 3.6, 2.2, 7.2);
+    ctx.fillStyle = '#3b4045';
+    ctx.fillRect(36 - k, y - 3.8, 7, 7.6);
+    ctx.strokeRect(36 - k, y - 3.8, 7, 7.6);
+    ctx.fillStyle = '#0e0f10';
+    ctx.fillRect(41.5 - k, y - 1.2, 1.5, 2.4);
+    if (b.flash > 0 && b.side === s) {
+      ctx.fillStyle = 'rgba(255,214,140,0.95)';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        const d = i % 2 ? 3 : 9 + Math.random() * 6;
+        ctx.lineTo(46 + Math.cos(a) * d * 1.4, y + Math.sin(a) * d * 0.7);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // cajas blindadas de cada cañón, con franja amarilla y remaches
+  ctx.lineWidth = 1.6;
+  for (const s of [-1, 1]) {
+    const y = s < 0 ? -14 : 2;
+    roundRect(ctx, -13, y, 24, 12, 3);
+    ctx.fillStyle = b.hitT > 0 ? '#b8bec4' : '#7b838a';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#c9a54a';
+    ctx.fillRect(-10, s < 0 ? y + 1.5 : y + 8.5, 17, 2);
+    ctx.fillStyle = '#3a3f44';
+    ctx.fillRect(-10, y + 5, 2, 2);
+    ctx.fillRect(5, y + 5, 2, 2);
+  }
+  // escudo frontal en ángulo
+  ctx.beginPath();
+  ctx.moveTo(8, -19);
+  ctx.lineTo(13, -16);
+  ctx.lineTo(13, -10);
+  ctx.lineTo(10, -10);
+  ctx.lineTo(10, 10);
+  ctx.lineTo(13, 10);
+  ctx.lineTo(13, 16);
+  ctx.lineTo(8, 19);
+  ctx.closePath();
+  ctx.fillStyle = '#9aa2a8';
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#c9a54a';
+  ctx.fillRect(11, -15, 1.6, 4);
+  ctx.fillRect(11, 11, 1.6, 4);
+  // núcleo y asas de atrás (donde se agarra quien la maneja)
+  ctx.fillStyle = '#2e3236';
+  ctx.beginPath();
+  ctx.arc(-2, 0, 5.5, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = b.manned ? '#7fe07a' : '#b5463a';
+  ctx.fillRect(-3, -1, 2, 2);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#2a2e32';
+  ctx.beginPath();
+  ctx.moveTo(-13, -9);
+  ctx.lineTo(-19, -11);
+  ctx.moveTo(-13, 9);
+  ctx.lineTo(-19, 11);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawBlock(ctx, b) {
+  if (b.kind === 'heavy') return drawHeavy(ctx, b);
   const { x, y, w, h } = b;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(x + 5, y + 6, w, h);
