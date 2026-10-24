@@ -262,6 +262,10 @@ export const SHOP = {
     name: 'Muro de concreto', desc: 'La defensa más dura: aguanta más del doble que la valla.',
     price: 150, hp: 3200, w: 80, h: 28, rotates: true,
   },
+  hesco: {
+    name: 'Barrera HESCO', desc: 'Gaviones militares de malla rellenos de arena. Casi indestructible.',
+    price: 600, hp: 10000, w: 80, h: 40, rotates: true,
+  },
   turret: {
     name: 'Torreta automática', desc: 'Dispara sola al zombi más cercano. Ponla detrás de tus muros.',
     price: 350, hp: 700, w: 40, h: 40, turret: true,
@@ -287,7 +291,7 @@ export const SHOP = {
     price: 60, consumable: true,
   },
 };
-export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'turret', 'wire', 'spikes', 'mine'];
+export const BUILD_ORDER = ['wood', 'sandbag', 'metal', 'fence', 'concrete', 'hesco', 'turret', 'wire', 'spikes', 'mine'];
 export const THROWABLES = ['grenade', 'molotov'];
 export const SHOP_ORDER = [...BUILD_ORDER, ...THROWABLES];
 // Vender un arma devuelve esta fracción de su precio.

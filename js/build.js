@@ -769,6 +769,63 @@ function drawBlock(ctx, b) {
       ctx.fillRect(x + w - 6, y + 6, 3, 10);
       ctx.fillRect(x + w - 6, y + h - 16, 3, 10);
     }
+  } else if (b.kind === 'hesco') {
+    // Celdas cuadradas de malla con geotextil beige, vistas desde arriba con la arena dentro.
+    const horiz = w >= h;
+    const S = horiz ? h : w;
+    const n = Math.max(1, Math.round((horiz ? w : h) / S));
+    const L = (horiz ? w : h) / n;
+    for (let i = 0; i < n; i++) {
+      const cx = horiz ? x + i * L : x;
+      const cy = horiz ? y : y + i * L;
+      const cw = horiz ? L : w;
+      const ch = horiz ? h : L;
+      ctx.fillStyle = '#c9b98c';
+      ctx.fillRect(cx, cy, cw, ch);
+      ctx.fillStyle = '#a8966a';
+      ctx.fillRect(cx + 4, cy + 4, cw - 8, ch - 8);
+      ctx.fillStyle = 'rgba(70,58,36,0.3)';
+      ctx.fillRect(cx + 4, cy + 4, cw - 8, 3);
+      ctx.fillRect(cx + 4, cy + 4, 3, ch - 8);
+      ctx.fillStyle = 'rgba(60,50,30,0.35)';
+      for (let k = 0; k < 5; k++) ctx.fillRect(cx + 8 + ((k * 13 + i * 7) % (cw - 16)), cy + 8 + ((k * 11 + i * 5) % (ch - 16)), 2, 2);
+    }
+    ctx.strokeStyle = 'rgba(95,98,98,0.85)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let gx = x + 4; gx < x + w; gx += 6) {
+      ctx.moveTo(gx, y);
+      ctx.lineTo(gx, y + 4);
+      ctx.moveTo(gx, y + h - 4);
+      ctx.lineTo(gx, y + h);
+    }
+    for (let gy = y + 4; gy < y + h; gy += 6) {
+      ctx.moveTo(x, gy);
+      ctx.lineTo(x + 4, gy);
+      ctx.moveTo(x + w - 4, gy);
+      ctx.lineTo(x + w, gy);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#6e7070';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 1; i < n; i++) {
+      if (horiz) {
+        ctx.moveTo(x + i * L, y);
+        ctx.lineTo(x + i * L, y + h);
+      } else {
+        ctx.moveTo(x, y + i * L);
+        ctx.lineTo(x + w, y + i * L);
+      }
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#4d5050';
+    for (let i = 0; i <= n; i++) {
+      const px = horiz ? x + i * L : x;
+      const py = horiz ? y : y + i * L;
+      ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+      ctx.fillRect(px - 1.5 + (horiz ? 0 : w), py - 1.5 + (horiz ? h : 0), 3, 3);
+    }
   } else if (b.kind === 'turret') {
     const cx = x + w / 2;
     const cy = y + h / 2;
