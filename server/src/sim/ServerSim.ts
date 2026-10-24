@@ -221,6 +221,8 @@ export class ServerSim {
         const s = alive.length ? alive[(Math.random() * alive.length) | 0] : null;
         return s ? s.p : this.world.spawn;
       },
+      // la bala de la torreta no va en la foto: cada cliente lanza la suya al recibir el disparo
+      onTurretShot: (x: number, y: number, a: number) => this.record('t', 'shot', [x, y, a]),
       banner: rec('g', 'banner'),
       toast: (m: string) => (this.toastTo ? this.slots.get(this.toastTo)?.toasts.push(m) : this.toastAll(m)),
     };
@@ -238,7 +240,7 @@ export class ServerSim {
       x = z.x;
       y = z.y;
       packed = [{ type: z.type, si: z.si | 0, x: Math.round(z.x), y: Math.round(z.y), r: z.r, a: r100(z.angle) / 100, burnt: !!z.burnt }, args[1], args[2]];
-    } else if ((tag === 'p' || tag === 'd') && typeof args[0] === 'number' && typeof args[1] === 'number') {
+    } else if ((tag === 'p' || tag === 'd' || tag === 't') && typeof args[0] === 'number' && typeof args[1] === 'number') {
       x = args[0];
       y = args[1];
     } else if ((tag === 's' || tag === 'c') && this.lastPos.ok && n !== 'wave') {
@@ -772,7 +774,7 @@ export class ServerSim {
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
       o: [ox, oy], z, zx, zh, pl,
       pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
-      b: this.bullets.list.flatMap((b: any) => (b.owner !== id && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
+      b: this.bullets.list.flatMap((b: any) => (b.owner !== id && !b.turret && near(b.x, b.y) ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0] : [])),
       w: d.wave, ds: d.state, tm: Math.round(this.time), kl: this.totalKills(), lft: d.queue.length + this.horde.list.length,
       ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),

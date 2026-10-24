@@ -180,6 +180,45 @@ test('construcción, granadas y molotovs: se compran entre oleadas y se usan cua
   assert.ok(sim.structures.scorches.length > 0, 'dejó la marca');
 });
 
+test('torreta: el disparo va como efecto y su bala no viaja en la foto', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }]);
+  const a = sim.slots.get('a')!;
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  a.money = 1000;
+  sim.director.state = 'waiting';
+  assert.ok(sim.shop('a', 'item', 'turret', 0));
+  sim.director.state = 'active';
+  // delante de donde mira: se prueba hacia varios lados hasta que quepa
+  for (let k = 0; k < 8 && !sim.structures.blocks.length; k++) {
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+    sim.act('a', { s: seq.n + 1, k: 'build', kind: 'turret', tx: 0, ty: 0 });
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+  }
+  const t = sim.structures.blocks[0];
+  assert.equal(t?.kind, 'turret');
+  // un zombi a tiro, en un sitio libre del mapa
+  for (let k = 0; k < 16; k++) {
+    const x = t.x + 20 + Math.cos(k) * 160;
+    const y = t.y + 20 + Math.sin(k) * 160;
+    if (!sim.world.pointBlocked(x, y, 12)) {
+      sim.horde.spawn('normal', x, y).spawnT = 0;
+      break;
+    }
+  }
+  let shot: unknown;
+  for (let i = 0; i < 60 * 30 && !shot; i++) {
+    sim.flushFx();
+    idle(sim, 'a', seq, 1);
+    shot = sim.fx.find((f) => f.e[0] === 't');
+  }
+  assert.ok(shot, 'la torreta disparó');
+  assert.ok(sim.bullets.list.some((b: any) => b.turret), 'la bala existe en el servidor');
+  const snap = sim.snapshot('a', 0)!;
+  assert.ok(snap.fx.some((e: any) => e[0] === 't' && e[1] === 'shot'), 'el dueño también recibe el disparo');
+  assert.equal(snap.b.length, 0, 'la bala de la torreta no va en la foto');
+});
+
 test('robot: se compra, se sube y aguanta los golpes por el piloto', () => {
   const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }]);
   const a = sim.slots.get('a')!;
