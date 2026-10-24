@@ -9,7 +9,7 @@
 import { Net } from './net.js';
 import { Player } from './player.js';
 import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN } from './config.js';
-import { zombieSprites, drawSurvivor } from './sprites.js';
+import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
 import { Bullets } from './bullets.js';
 import { rand, angleTo, TAU } from './util.js';
 
@@ -112,6 +112,7 @@ export class Coop {
     this.mode = null; // 'host' | 'guest'
     this.peer = null; // host: el compañero simulado · guest: el anfitrión (sólo para dibujarlo)
     this.peerName = '';
+    this.peerLook = null;
     this.fx = [];
     this.rec = false;
     this.depth = 0;
@@ -160,7 +161,7 @@ export class Coop {
     this.net.onMessage = (m) => this.onMessage(m);
     this.net.onClose = () => this.lost();
     await this.net.join(code);
-    this.send({ t: 'hello', name: this.myName() });
+    this.send({ t: 'hello', name: this.myName(), look: this.game.look });
   }
 
   cancel() {
@@ -182,11 +183,12 @@ export class Coop {
     g.director.coop = true;
     const s = g.world.spawn;
     this.peer = new Player(s.x + 46, s.y + 10);
+    this.peer.look = this.peerLook;
     this.peer.remote = true;
     this.peer.tx = this.peer.x;
     this.peer.ty = this.peer.y;
     this.installRecording();
-    this.send({ t: 'start', seed: g.world.seedBase, x: Math.round(this.peer.x), y: Math.round(this.peer.y), name: this.myName() });
+    this.send({ t: 'start', seed: g.world.seedBase, x: Math.round(this.peer.x), y: Math.round(this.peer.y), name: this.myName(), look: g.look });
     g.input.reset();
     g.input.setRun(false);
     g.setState('play');
@@ -211,11 +213,13 @@ export class Coop {
     this.lastSeq = 0;
     g.coopRun = true;
     this.peerName = m.name || 'Anfitrión';
+    this.peerLook = cleanLook(m.look);
     g.director.coop = true;
     g.director.state = 'waiting';
     g.player.x = m.x;
     g.player.y = m.y;
     this.peer = new Player(g.world.spawn.x, g.world.spawn.y);
+    this.peer.look = this.peerLook;
     this.peer.puppet = true;
     this.zmap.clear();
     this.fireMap.clear();
@@ -409,7 +413,13 @@ export class Coop {
     if (m.t === 'bye') return this.lost();
     if (this.isHost) this.onGuestMessage(m);
     else if (this.isGuest) this.onHostMessage(m);
-    else if (m.t === 'hello') this.peerName = String(m.name || '').slice(0, 16);
+    else if (m.t === 'hello') this.onHello(m);
+  }
+
+  onHello(m) {
+    this.peerName = String(m.name || '').slice(0, 16);
+    this.peerLook = cleanLook(m.look);
+    if (this.peer) this.peer.look = this.peerLook;
   }
 
   onGuestMessage(m) {
@@ -417,7 +427,7 @@ export class Coop {
     const peer = this.peer;
     switch (m.t) {
       case 'hello':
-        this.peerName = String(m.name || '').slice(0, 16);
+        this.onHello(m);
         break;
       case 'in': {
         if (Number(m.ak) > (this.peerAck || 0)) this.peerAck = Number(m.ak);

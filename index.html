@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=09d6c4c1">
+  <link rel="stylesheet" href="css/style.css?v=6bca0f78">
   <script id="dz-latest">
     // githack guarda en caché el link con el nombre de la rama y a veces sirve una versión
     // vieja; aquí se pregunta a GitHub cuál es el último cambio y se salta a su link exacto.
@@ -35,7 +35,7 @@
   <!-- version:start -->
   <script id="dz-loader">
     (function () {
-      var v = '09d6c4c1';
+      var v = '6bca0f78';
       var b = '';
       try {
         b = new URLSearchParams(location.search).get('b') || '';
@@ -159,12 +159,13 @@
           <span>Jugador: <b id="acct-name">Sin cuenta</b></span>
           <span class="rank-badge" id="acct-rank" hidden></span>
           <button class="link-btn" id="btn-account" type="button">Cambiar cuenta</button>
+          <button class="link-btn" id="btn-look" type="button">Personaje</button>
         </div>
         <div class="start-actions">
           <button class="btn primary" id="btn-continue" hidden>Continuar</button>
           <button class="btn primary" id="btn-start">Jugar</button>
           <button class="btn coop-btn" id="btn-coop">Cooperativo · 2 jugadores</button>
-          <button class="btn coop-btn" id="btn-online">En línea · hasta 10</button>
+          <button class="btn coop-btn" id="btn-online">En línea · hasta 4</button>
         </div>
         <p class="best" id="acct-best"></p>
         <div class="controls-help">
@@ -186,7 +187,7 @@
           </div>
         </div>
         <p class="best" id="best"></p>
-        <p class="ver"><span id="ver">Versión 09d6c4c1</span></p>
+        <p class="ver"><span id="ver">Versión 6bca0f78</span></p>
       </div>
       <aside class="hall" aria-labelledby="hall-title">
         <div class="hall-embers" aria-hidden="true"></div>
@@ -228,7 +229,7 @@
 
     <section class="screen" id="screen-online" hidden>
       <div class="panel coop-panel">
-        <p class="kicker">Hasta 10 jugadores</p>
+        <p class="kicker">Hasta 4 jugadores</p>
         <h2>En línea</h2>
         <p class="acct-lead">Todos se conectan a un <b>servidor</b>: funciona en cualquier red. Sala privada con código o invitación; si alguien cae, revive al terminar la oleada.</p>
         <div class="coop-step" id="ol-choose">
@@ -321,6 +322,20 @@
         <p class="acct-note" id="acct-cloud" hidden>Conectado a Claude: tu progreso también se guarda en tu cuenta de Claude y tus récords aparecen en la clasificación global.</p>
         <p class="acct-note">Las cuentas viven en este navegador. El PIN evita que otros en este dispositivo usen tu partida; no es una contraseña segura.</p>
         <button class="btn ghost" id="btn-acct-back" type="button">Volver</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-look" hidden>
+      <div class="panel">
+        <p class="kicker">Antes de salir</p>
+        <h2>Tu superviviente</h2>
+        <canvas id="look-preview" width="160" height="160" aria-label="Vista previa del personaje"></canvas>
+        <div class="look-parts" id="look-parts"></div>
+        <div class="look-actions">
+          <button class="btn" id="btn-look-random" type="button">Al azar</button>
+          <button class="btn ghost" id="btn-look-reset" type="button">Original</button>
+        </div>
+        <button class="btn primary" id="btn-look-done" type="button">Listo</button>
       </div>
     </section>
 

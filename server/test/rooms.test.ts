@@ -51,6 +51,18 @@ test('nombre inválido se rechaza', async () => {
   await assert.rejects(client(url).create('dz', { name: '<script>' }), (e: any) => e.message === 'nombre');
 });
 
+test('colores del personaje: se guardan si son válidos, si no quedan vacíos', async () => {
+  const owner = await client(url).create('dz', { name: 'Color', look: '304120' });
+  const bad = await client(url).joinById(owner.roomId, { name: 'Raro', look: '<b>' });
+  for (const r of [owner, bad]) r.onMessage('*', () => {});
+  await waitFor(() => owner.state.members.size === 2, 4000, '2 integrantes');
+  const looks = new Map<string, string>();
+  owner.state.members.forEach((m: any) => looks.set(m.name, m.look));
+  assert.equal(looks.get('Color'), '304120');
+  assert.equal(looks.get('Raro'), '');
+  await leaveAll([owner, bad]);
+});
+
 test('entradas simultáneas al último cupo: sólo una entra', async () => {
   const rooms = await fill(MAX - 1);
   const tries = await Promise.allSettled([1, 2, 3, 4].map((i) => client(url).joinById(rooms[0].roomId, { name: `Carrera ${i}` })));

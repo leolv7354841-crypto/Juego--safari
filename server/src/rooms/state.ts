@@ -5,6 +5,7 @@ import { schema, t } from '@colyseus/schema';
 export const Member = schema(
   {
     name: t.string(),
+    look: t.string(), // colores del personaje (código de dígitos, ver cleanLookCode)
     idx: t.uint8(), // número estable del jugador en esta sala (lo usan las fotos)
     ready: t.boolean(),
     connected: t.boolean(),

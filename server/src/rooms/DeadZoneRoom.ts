@@ -6,7 +6,7 @@ import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core
 import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanCmd, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanCmd, Bucket, type Cmd } from '../validate.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -115,11 +115,11 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (!originAllowed(context.headers.get('origin'))) throw new ServerError(403, 'origen');
     const name = cleanName(options && options.name);
     if (!name) throw new ServerError(400, 'nombre');
-    return { name };
+    return { name, look: cleanLookCode(options && options.look) };
   }
 
-  onJoin(client: Client, _options: any, auth: { name: string }) {
-    const m = new Member({ name: auth.name, idx: this.nextIdx++, ready: false, connected: true, inGame: false, alive: false, kills: 0, joinedAt: Date.now() });
+  onJoin(client: Client, _options: any, auth: { name: string; look?: string }) {
+    const m = new Member({ name: auth.name, look: auth.look || '', idx: this.nextIdx++, ready: false, connected: true, inGame: false, alive: false, kills: 0, joinedAt: Date.now() });
     this.state.members.set(client.sessionId, m);
     if (!this.state.ownerId) this.state.ownerId = client.sessionId;
     this.limits.set(client.sessionId, {

@@ -19,7 +19,7 @@ import { Director } from './director.js';
 import { Lighting } from './lighting.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
-import { drawSurvivor, drawGunIcon } from './sprites.js';
+import { drawSurvivor, drawGunIcon, LOOK_PARTS, DEFAULT_LOOK, cleanLook } from './sprites.js';
 import { rollUpgrades, ICONS } from './upgrades.js';
 
 const CROWN_SVG = '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
@@ -107,6 +107,7 @@ class Game {
     this.hurtFlash = 0;
     this.cache = {};
     this.$ = (id) => document.getElementById(id);
+    this.look = cleanLook(storage.get('dz-look', null));
     this.bindUi();
     this.resize();
     this.newWorld();
@@ -156,6 +157,7 @@ class Game {
   resetRun() {
     const w = this.world;
     this.player = new Player(w.spawn.x, w.spawn.y);
+    this.player.look = this.look;
     this.horde = new Horde();
     this.director = new Director();
     this.particles.clear();
@@ -239,7 +241,7 @@ class Game {
 
   setState(s) {
     this.state = s;
-    this.music.setPaused(s !== 'play' && s !== 'menu');
+    this.music.setPaused(s !== 'play' && s !== 'menu' && s !== 'look');
     this.root.className = this.root.className.replace(/\bstate-\w+/g, '').trim() + ' state-' + s;
     this.$('screen-pause').hidden = s !== 'pause';
     this.$('screen-level').hidden = s !== 'levelup';
@@ -247,6 +249,7 @@ class Game {
     this.$('screen-shop').hidden = s !== 'shop';
     this.$('screen-account').hidden = s !== 'account';
     this.$('screen-board').hidden = s !== 'board';
+    this.$('screen-look').hidden = s !== 'look';
     this.$('screen-coop').hidden = s !== 'coop';
     this.$('screen-online').hidden = s !== 'online';
   }
@@ -970,6 +973,60 @@ class Game {
     }
   }
 
+  /* ---------- personaje ---------- */
+
+  showLook() {
+    this.setState('look');
+    // muñeco sólo para la vista previa: camina en su sitio y gira despacio
+    this.lookDummy = new Player(80, 80);
+    this.lookDummy.r *= 3.4;
+    this.lookDummy.speedNow = 60;
+    this.renderLook();
+  }
+
+  renderLook() {
+    const box = this.$('look-parts');
+    box.innerHTML = '';
+    for (const part of LOOK_PARTS) {
+      const row = document.createElement('div');
+      row.className = 'look-row';
+      const lbl = document.createElement('span');
+      lbl.textContent = part.name;
+      const sw = document.createElement('div');
+      sw.className = 'look-sw';
+      for (const c of part.colors) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.style.background = c;
+        b.setAttribute('aria-label', `${part.name} ${c}`);
+        b.classList.toggle('on', this.look[part.id] === c);
+        b.addEventListener('click', () => this.setLook({ ...this.look, [part.id]: c }));
+        sw.appendChild(b);
+      }
+      row.append(lbl, sw);
+      box.appendChild(row);
+    }
+  }
+
+  setLook(look) {
+    this.look = cleanLook(look);
+    this.player.look = this.look;
+    storage.set('dz-look', this.look);
+    this.renderLook();
+  }
+
+  drawLookPreview(dt) {
+    const p = this.lookDummy;
+    const c = this.$('look-preview');
+    const g = c.getContext('2d');
+    p.look = this.look;
+    p.walkPhase += dt * 9;
+    p.angle += dt * 0.6;
+    p.legAngle = p.angle;
+    g.clearRect(0, 0, c.width, c.height);
+    drawSurvivor(g, p, this.time);
+  }
+
   /* ---------- cuentas y clasificación ---------- */
 
   showAccount() {
@@ -1448,6 +1505,10 @@ class Game {
     this.syncSoundLabel();
     on('btn-shop-done', () => this.closeShop());
     on('btn-account', () => this.showAccount());
+    on('btn-look', () => this.showLook());
+    on('btn-look-done', () => this.setState('menu'));
+    on('btn-look-random', () => this.setLook(Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[Math.floor(Math.random() * q.colors.length)]]))));
+    on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
     on('btn-leaderboard', () => this.showBoard());
     on('btn-coop', () => this.showCoop());
     on('btn-online', () => this.showOnline());
@@ -1743,6 +1804,10 @@ class Game {
         else this.update(dt);
       }
       else if (this.state === 'menu') this.updateMenu(dt);
+      else if (this.state === 'look') {
+        this.updateMenu(dt);
+        this.drawLookPreview(dt);
+      }
       else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
         if (s) this.chooseUpgrade(s - 1);

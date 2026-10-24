@@ -73,7 +73,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   inset: 0;
   pointer-events: none;
 }
-.state-menu #hud { display: none; }
+.state-menu #hud, .state-look #hud { display: none; }
 
 .xp-track {
   position: absolute;
@@ -388,6 +388,16 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .acct-error { min-height: 1.2em; margin: 4px 0; color: #e05a48; font-size: 15px; }
 .acct-known { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 #btn-acct-back { margin-top: 12px; }
+#look-preview { display: block; width: 160px; height: 160px; margin: 0 auto 10px; background: radial-gradient(circle, rgba(255,255,255,0.07), transparent 70%); }
+.look-parts { display: grid; gap: 8px; text-align: left; margin-bottom: 14px; }
+.look-row { display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 8px; }
+.look-row > span { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.look-sw { display: flex; flex-wrap: wrap; gap: 6px; }
+.look-sw button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.6); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.look-sw button.on { box-shadow: 0 0 0 2px var(--ink); }
+.look-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.look-actions .btn { flex: 1; }
+#btn-look-done { width: 100%; }
 .board-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
 .board-tabs .chip { font-size: 13px; padding: 4px 12px 2px; }
 .board { list-style: none; margin: 0 0 6px; padding: 0; max-height: 52vh; overflow-y: auto; text-align: left; }

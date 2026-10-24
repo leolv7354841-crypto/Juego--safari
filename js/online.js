@@ -9,7 +9,7 @@ import { NET, WEAPONS, WEAPON_ORDER, ZOMBIES, GOLDEN } from './config.js';
 import { Player } from './player.js';
 import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
-import { zombieSprites, drawSurvivor } from './sprites.js';
+import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
 import { rand, TAU, angleTo } from './util.js';
 
@@ -109,12 +109,12 @@ export class Online {
 
   async create(name) {
     const c = await this.client();
-    this.attach(await c.create('dz', { name }));
+    this.attach(await c.create('dz', { name, look: lookCode(this.game.look) }));
   }
 
   async join(code, name) {
     const c = await this.client();
-    this.attach(await c.joinById(code, { name }));
+    this.attach(await c.joinById(code, { name, look: lookCode(this.game.look) }));
   }
 
   // Tras recargar la página: vuelve a la misma sala con el token (dentro de la ventana de 20 s).
@@ -578,7 +578,11 @@ export class Online {
   applyPeers(pl, ts) {
     const seen = new Set();
     const names = new Map();
-    if (this.room && this.room.state) this.room.state.members.forEach((m) => names.set(m.idx, m.name));
+    const looks = new Map();
+    if (this.room && this.room.state) this.room.state.members.forEach((m) => {
+      names.set(m.idx, m.name);
+      looks.set(m.idx, m.look || '');
+    });
     for (let i = 0; i + PEER_N - 1 < pl.length; i += PEER_N) {
       const idx = pl[i];
       seen.add(idx);
@@ -590,6 +594,11 @@ export class Online {
         this.peers.set(idx, q);
       }
       q.name = names.get(idx) || 'Jugador';
+      const code = looks.get(idx) || '';
+      if (q.lookCode !== code) {
+        q.lookCode = code;
+        q.look = lookFromCode(code);
+      }
       q.it.push(ts, [pl[i + 1], pl[i + 2], pl[i + 3] / 100, pl[i + 4] / 100]);
       q.running = !!pl[i + 5];
       const wid = WEAPON_ORDER[pl[i + 6]];

@@ -1027,8 +1027,38 @@ export function drawGunIcon(g, id) {
   g.restore();
 }
 
+/* ---------- Aspecto del superviviente (personalización) ---------- */
+
+// Partes que el jugador puede recolorear; el primer color de cada lista es el original.
+export const LOOK_PARTS = [
+  { id: 'skin', name: 'Piel', colors: ['#c7a184', '#e8c4a2', '#a87b5a', '#8a5a3c', '#5e3b26', '#3f281b'] },
+  { id: 'hair', name: 'Pelo', colors: ['#2d2219', '#0f0d0c', '#6b4424', '#b0793d', '#d9c27a', '#9a9a96', '#b8392e', '#3e6bb0'] },
+  { id: 'scarf', name: 'Pañuelo', colors: ['#8c3b2e', '#2f3a32', '#3f566b', '#c99a2e', '#d8d2c4', '#1c1c1c', '#7a3f8c', '#d06a2a'] },
+  { id: 'jacket', name: 'Chaqueta', colors: ['#6b4f3a', '#4c5236', '#3f566b', '#2c2c2e', '#7d2f2a', '#8a7a5a', '#5b6b7a', '#c75f43'] },
+  { id: 'pants', name: 'Pantalón', colors: ['#2c3038', '#3c412a', '#4a3a2c', '#1a1a1c', '#596270', '#6b5a44'] },
+  { id: 'pack', name: 'Mochila', colors: ['#4c5236', '#6b4f3a', '#2c2c2e', '#3f566b', '#7d2f2a', '#8a6a3a'] },
+];
+export const DEFAULT_LOOK = Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[0]]));
+
+// Acepta sólo colores de las listas (llega también de la red en cooperativo).
+export function cleanLook(o) {
+  const out = {};
+  for (const q of LOOK_PARTS) out[q.id] = o && q.colors.includes(o[q.id]) ? o[q.id] : q.colors[0];
+  return out;
+}
+
+// En línea viaja como código corto: un dígito por parte (índice del color en su lista).
+export function lookCode(look) {
+  return LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('');
+}
+export function lookFromCode(code) {
+  const s = typeof code === 'string' ? code : '';
+  return Object.fromEntries(LOOK_PARTS.map((q, i) => [q.id, q.colors[Number(s[i])] || q.colors[0]]));
+}
+
 export function drawSurvivor(g, p, time) {
   const r = p.r;
+  const L = p.look || DEFAULT_LOOK;
   g.save();
   g.translate(p.x, p.y);
   softShadow(g, r * 1.5, 0.45);
@@ -1038,8 +1068,8 @@ export function drawSurvivor(g, p, time) {
   const moving = p.speedNow > 8;
   const amp = moving ? (p.running ? 0.75 : 0.5) : 0;
   const s = Math.sin(p.walkPhase) * amp;
-  ell(g, s * r, -r * 0.3, r * 0.38, r * 0.22, 0, '#2c3038');
-  ell(g, -s * r, r * 0.3, r * 0.38, r * 0.22, 0, '#2c3038');
+  ell(g, s * r, -r * 0.3, r * 0.38, r * 0.22, 0, L.pants);
+  ell(g, -s * r, r * 0.3, r * 0.38, r * 0.22, 0, L.pants);
   g.fillStyle = '#1a1a1a';
   g.fillRect(s * r + r * 0.18, -r * 0.42, r * 0.2, r * 0.24);
   g.fillRect(-s * r + r * 0.18, r * 0.18, r * 0.2, r * 0.24);
@@ -1050,16 +1080,16 @@ export function drawSurvivor(g, p, time) {
   const longGun = p.weapon.id !== 'pistol';
   // mochila
   roundRect(g, -r * 1.05, -r * 0.6, r * 0.7, r * 1.2, 4);
-  g.fillStyle = '#4c5236';
+  g.fillStyle = L.pack;
   g.fill();
   g.lineWidth = 1.4;
   g.strokeStyle = OUT;
   g.stroke();
-  g.fillStyle = '#3c412a';
+  g.fillStyle = shade(L.pack, 0.79);
   g.fillRect(-r * 0.95, -r * 0.4, r * 0.5, r * 0.25);
   // torso
-  ell(g, -r * 0.05, 0, r * 0.52, r * 0.88, 0, '#6b4f3a');
-  g.fillStyle = '#5a4130';
+  ell(g, -r * 0.05, 0, r * 0.52, r * 0.88, 0, L.jacket);
+  g.fillStyle = shade(L.jacket, 0.84);
   g.fillRect(-r * 0.12, -r * 0.7, r * 0.12, r * 1.4);
   // arma + brazos
   g.save();
@@ -1072,14 +1102,14 @@ export function drawSurvivor(g, p, time) {
   }
   GUNS[p.weapon.id](g, r, p);
   if (longGun) {
-    limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, '#6b4f3a');
-    limb(g, 0, -r * 0.62, r * 1.25, -r * 0.05, r * 0.28, '#6b4f3a');
-    circ(g, r * 0.72, r * 0.12, r * 0.17, '#c7a184', OUT, 1);
-    circ(g, r * 1.28, -r * 0.05, r * 0.17, '#c7a184', OUT, 1);
+    limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, L.jacket);
+    limb(g, 0, -r * 0.62, r * 1.25, -r * 0.05, r * 0.28, L.jacket);
+    circ(g, r * 0.72, r * 0.12, r * 0.17, L.skin, OUT, 1);
+    circ(g, r * 1.28, -r * 0.05, r * 0.17, L.skin, OUT, 1);
   } else {
-    limb(g, 0, r * 0.62, r * 0.78, r * 0.08, r * 0.28, '#6b4f3a');
-    limb(g, 0, -r * 0.62, r * 0.78, -r * 0.08, r * 0.28, '#6b4f3a');
-    circ(g, r * 0.8, 0, r * 0.2, '#c7a184', OUT, 1);
+    limb(g, 0, r * 0.62, r * 0.78, r * 0.08, r * 0.28, L.jacket);
+    limb(g, 0, -r * 0.62, r * 0.78, -r * 0.08, r * 0.28, L.jacket);
+    circ(g, r * 0.8, 0, r * 0.2, L.skin, OUT, 1);
   }
   if (p.flashT > 0) {
     const tip = p.gunTip;
@@ -1096,17 +1126,17 @@ export function drawSurvivor(g, p, time) {
   }
   g.restore();
   // cabeza con pañuelo
-  circ(g, r * 0.02, 0, r * 0.44, '#c7a184');
-  g.fillStyle = '#2d2219';
+  circ(g, r * 0.02, 0, r * 0.44, L.skin);
+  g.fillStyle = L.hair;
   g.beginPath();
   g.arc(-r * 0.04, 0, r * 0.41, Math.PI * 0.45, Math.PI * 1.55);
   g.fill();
-  g.strokeStyle = '#8c3b2e';
+  g.strokeStyle = L.scarf;
   g.lineWidth = 3;
   g.beginPath();
   g.arc(r * 0.02, 0, r * 0.38, -1.2, 1.2);
   g.stroke();
-  g.fillStyle = '#8c3b2e';
+  g.fillStyle = L.scarf;
   g.beginPath();
   g.moveTo(-r * 0.38, -2);
   g.lineTo(-r * 0.75, -5 + Math.sin(time * 9) * 2);

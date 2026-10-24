@@ -9,6 +9,13 @@ export function cleanName(raw: unknown): string | null {
   return NAME_RE.test(s) ? s : null;
 }
 
+// Colores del personaje: un dígito por parte (índice en LOOK_PARTS de js/sprites.js).
+// Si no es válido se usa el aspecto original; no es motivo para rechazar la entrada.
+const LOOK_RE = /^[0-9]{1,8}$/;
+export function cleanLookCode(raw: unknown): string {
+  return typeof raw === 'string' && LOOK_RE.test(raw) ? raw : '';
+}
+
 export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
 
 // Una entrada: [secuencia, mx, my, bits, ángulo, arma]. null si está mal formada.
