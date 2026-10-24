@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/netcode.js';
-import { ABILITY } from '../../js/config.js';
+import { ABILITY, BOUNTY } from '../../js/config.js';
 import { UPGRADES } from '../../js/upgrades.js';
 import { cooldownOf } from '../../js/abilities.js';
 import { cleanAct, cleanClass } from '../src/validate.ts';
@@ -75,7 +75,13 @@ test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida'
     sim.step();
   }
   const a = sim.slots.get('a')!;
-  assert.ok(a.kills > 0 && a.money > 0, 'ganó dinero');
+  assert.ok(a.kills > 0, 'mató zombis');
+  // (los golpes que recibió le quitan dinero: se comprueba la recompensa de una baja suelta)
+  const m0 = a.money;
+  const z = sim.horde.list.find((o: any) => o.type === 'normal' && !o.dead);
+  z.lastOwner = 'a';
+  sim.killZombie(z);
+  assert.equal(a.money, m0 + BOUNTY.normal, 'la baja le da dinero a quien disparó');
   assert.equal(sim.snapshot('a', 0)!.st[7], a.money, 'el dinero va en la foto');
   // un gordo herido cerca: su vida en % va en zh para dibujar la barra
   const p = a.p;

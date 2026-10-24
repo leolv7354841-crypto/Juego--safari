@@ -725,8 +725,8 @@ class Game {
     for (let i = 0; i < 20; i++) {
       const c = d.edgePoint(this, rand(60, 140));
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y) || d.seen(d.views(this), c.x, c.y, 16)) continue;
-      this.horde.spawn('golden', c.x, c.y, 1, 1);
+      if (this.world.pointBlocked(c.x, c.y, 16) || !d.canReach(this, c.x, c.y) || d.seen(d.views(this), c.x, c.y, 16)) continue;
+      this.horde.spawn('golden', c.x, c.y, 1, d.speedMult);
       this.sfx.goldenSpawn();
       this.toast('¡Apareció un zombi dorado! Atrápalo antes de que escape');
       return true;

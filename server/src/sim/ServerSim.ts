@@ -701,13 +701,21 @@ export class ServerSim {
     this.toastTo = null;
   }
 
+  // Media pantalla que mandó el jugador: el director no hace aparecer zombis dentro de ella.
+  setView(id: string, w: number, h: number) {
+    const s = this.slots.get(id);
+    if (!s) return;
+    s.p.vw = w;
+    s.p.vh = h;
+  }
+
   spawnGolden() {
     const d = this.director;
     for (let i = 0; i < 20; i++) {
       const c = d.edgePoint(this.game, rand(60, 140));
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y) || d.seen(d.views(this.game), c.x, c.y, 16)) continue;
-      this.horde.spawn('golden', c.x, c.y, 1, 1);
+      if (this.world.pointBlocked(c.x, c.y, 16) || !d.canReach(this.game, c.x, c.y) || d.seen(d.views(this.game), c.x, c.y, 16)) continue;
+      this.horde.spawn('golden', c.x, c.y, 1, d.speedMult);
       this.game.sfx.goldenSpawn();
       this.toastAll('¡Apareció un zombi dorado! Atrápalo antes de que escape');
       return true;
@@ -728,6 +736,10 @@ export class ServerSim {
     const me = s.p;
     const V = NET.view;
     const near = (x: number, y: number) => Math.abs(x - me.x) < V && Math.abs(y - me.y) < V;
+    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
+    const ZW = Math.max(NET.zombieView[0], (me.vw || 0) + 150);
+    const ZH = Math.max(NET.zombieView[1], (me.vh || 0) + 150);
+    const nearZ = (o: any) => (o.type === 'golden' || o.type === 'giant' ? near(o.x, o.y) : Math.abs(o.x - me.x) < ZW && Math.abs(o.y - me.y) < ZH);
     const ox = Math.round(me.x);
     const oy = Math.round(me.y);
     const z: number[] = [];
@@ -735,7 +747,7 @@ export class ServerSim {
     // vida de los zombis heridos, en %, para su barra (sólo los que la muestran)
     const zh: number[] = [];
     for (const o of this.horde.list) {
-      if (o.dead || !near(o.x, o.y)) continue;
+      if (o.dead || !nearZ(o)) continue;
       const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
         | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
       z.push(o.id, TYPES.indexOf(o.type), Math.round(o.x - ox), Math.round(o.y - oy), Math.round((o.angle / TAU) * 64) & 63, flags);

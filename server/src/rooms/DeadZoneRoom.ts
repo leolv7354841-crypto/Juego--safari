@@ -6,7 +6,7 @@ import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core
 import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanLookCode, cleanClass, cleanCmd, cleanAct, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanClass, cleanCmd, cleanAct, cleanView, Bucket, type Cmd } from '../validate.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -109,6 +109,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       if (!l || !l.ping.take()) return;
       const t = m && Number.isFinite(m.c) ? m.c : 0;
       c.send('p', { c: t, s: Math.round(performance.now()) });
+      const v = cleanView(m && m.v);
+      if (v && this.sim) this.sim.setView(c.sessionId, v[0], v[1]);
     });
     this.onMessage('*', (c, type) => this.strike(c, `mensaje desconocido: ${String(type).slice(0, 20)}`));
 

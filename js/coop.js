@@ -8,7 +8,7 @@
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
 import { Net } from './net.js';
 import { Player } from './player.js';
-import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY } from './config.js';
+import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from './config.js';
 import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
 import { Abilities } from './abilities.js';
 import { Bullets } from './bullets.js';
@@ -358,12 +358,16 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     const near = (x, y, m = VIEW) => Math.abs(x - peer.x) < m && Math.abs(y - peer.y) < m;
+    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
+    const zw = Math.max(NET.zombieView[0], (peer.vw || 0) + 150);
+    const zh = Math.max(NET.zombieView[1], (peer.vh || 0) + 150);
+    const nearZ = (o) => (o.type === 'golden' || o.type === 'giant' ? near(o.x, o.y) : Math.abs(o.x - peer.x) < zw && Math.abs(o.y - peer.y) < zh);
     const ox = Math.round(peer.x);
     const oy = Math.round(peer.y);
     const z = [];
     const zx = [];
     for (const o of g.horde.list) {
-      if (o.dead || !near(o.x, o.y)) continue;
+      if (o.dead || !nearZ(o)) continue;
       const flags = (o.flash > 0 ? 1 : 0) | (o.burn > 0 ? 2 : 0) | (o.wounded ? 4 : 0) | (o.bs === 'windup' ? 8 : 0)
         | (o.hitT > 0 ? 16 : 0) | (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) | (o.lunge > 0.3 ? 64 : 0);
       // compacto: posición relativa al compañero y ángulo en 64 pasos
@@ -446,6 +450,10 @@ export class Coop {
         peer.alive = !!m.al;
         peer.hp = Number(m.hp) || 0;
         peer.stats.maxHp = Number(m.mh) || 100;
+        if (Number.isFinite(m.vw) && Number.isFinite(m.vh)) {
+          peer.vw = Math.min(1600, Math.max(100, m.vw));
+          peer.vh = Math.min(1600, Math.max(100, m.vh));
+        }
         peer.needAmmo = !!m.na;
         if (WEAPONS[m.w] && (!peer.weapons[0] || peer.weapons[0].id !== m.w)) {
           peer.weapons = [peer.makeWeapon(m.w)];
@@ -643,6 +651,8 @@ export class Coop {
       na: p.weapons.some((x) => x.reserve !== Infinity && x.reserve < p.reserveMax(x.def)) ? 1 : 0,
       w: w.id, mag: w.mag, rl: r100(Math.max(0, p.reloadT)) / 100, rp: r100(p.reloadProg || 0) / 100,
       ab: (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
+      // media pantalla en px del mundo: el anfitrión no hace aparecer zombis dentro de ella
+      vw: Math.round(g.camera.viewW / 2), vh: Math.round(g.camera.viewH / 2),
     }, true);
   }
 

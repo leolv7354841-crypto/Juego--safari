@@ -22,6 +22,14 @@ export function cleanClass(raw: unknown): string {
   return typeof raw === 'string' && CLASSES.includes(raw) ? raw : '';
 }
 
+// Media pantalla del cliente en px del mundo [ancho, alto] (llega con el ping). null si no sirve.
+export function cleanView(raw: unknown): [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const [w, h] = raw;
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+  return [Math.min(1600, Math.max(100, Math.round(w))), Math.min(1600, Math.max(100, Math.round(h)))];
+}
+
 export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
 
 // Una entrada: [secuencia, mx, my, bits, ángulo, arma]. null si está mal formada.

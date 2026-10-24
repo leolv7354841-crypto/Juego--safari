@@ -1376,6 +1376,25 @@ export class World {
         }
       }
     }
+    if (bi < 0 && here === 65535) {
+      // en una celda sin ruta (pegado a un muro o en un rincón): ir a la celda con ruta más cercana
+      for (let r = 2; r <= 3 && bi < 0; r++) {
+        for (let dj = -r; dj <= r; dj++) {
+          for (let di = -r; di <= r; di++) {
+            if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+            const i = ci + di;
+            const j = cj + dj;
+            if (i < 0 || j < 0 || i >= n || j >= n) continue;
+            const v = dist[j * n + i];
+            if (v < best) {
+              best = v;
+              bi = i;
+              bj = j;
+            }
+          }
+        }
+      }
+    }
     if (bi < 0) return null;
     const tx = bi * NAV_CELL + NAV_CELL / 2 - x;
     const ty = bj * NAV_CELL + NAV_CELL / 2 - y;
@@ -1385,11 +1404,11 @@ export class World {
     return out;
   }
 
-  reachable(x, y) {
+  reachable(x, y, field = this.main) {
     const n = this.navN;
     const ci = clamp(Math.floor(x / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(y / NAV_CELL), 0, n - 1);
-    return this.dist[cj * n + ci] < 65535;
+    return field.ok && field.dist[cj * n + ci] < 65535;
   }
 
   /* ---------- render ---------- */

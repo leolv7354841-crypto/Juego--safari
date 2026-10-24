@@ -355,7 +355,9 @@ export class Online {
     this.pingT -= dt;
     if (this.pingT <= 0) {
       this.pingT = 1;
-      this.send('p', { c: Math.round(performance.now()) });
+      // con el ping va la media pantalla (px del mundo): el servidor no hace aparecer zombis a la vista
+      const cam = this.game.camera;
+      this.send('p', { c: Math.round(performance.now()), v: [Math.round(cam.viewW / 2), Math.round(cam.viewH / 2)] });
       // la ventana para volver tras recargar cuenta desde la última vez que hubo conexión
       if (!this.reconnecting) this.remember();
     }
