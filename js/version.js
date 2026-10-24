@@ -1,2 +1,2 @@
 // Generado por tools/stamp.mjs: versión del código (sirve para detectar archivos viejos en caché).
-export const VERSION = '27747c80';
+export const VERSION = 'e9fcdf47';

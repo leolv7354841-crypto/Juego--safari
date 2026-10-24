@@ -186,7 +186,7 @@ export const ONLINE = { url: 'https://dead-zone-73dcc-default-rtdb.firebaseio.co
 // server: dirección del servidor (wss://…). Vacía: en localhost se usa ws://<equipo>:2567.
 // También se puede cambiar al abrir el juego con ?servidor=wss://…
 export const NET = {
-  server: 'wss://dead-zone-server.onrender.com',
+  server: 'wss://servidor.yeyo.games', // máquina de Vultr en Ciudad de México (deploy/README.md)
   maxPlayers: 4, // cupo de sala (el servidor manda: MAX_PLAYERS)
   tickHz: 60, // pasos de simulación por segundo (servidor y predicción)
   snapHz: 20, // fotos del estado por segundo hacia cada jugador
