@@ -1,4 +1,4 @@
-// Multijugador en línea (hasta 10 jugadores) contra el servidor autoritativo (carpeta server/).
+// Multijugador en línea (hasta NET.maxPlayers jugadores por sala) contra el servidor autoritativo (carpeta server/).
 //
 // El servidor simula todo; aquí sólo se manda lo que quiere hacer el jugador (dirección,
 // correr, disparar, apuntar, recargar, arma) 60 veces por segundo. Para que los controles
@@ -17,6 +17,9 @@ const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
 const PEER_N = 14;
 const r3 = (v) => Math.round(v * 1000) / 1000;
+// códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
+const KICKED = 4100;
+const IDLE = 4101;
 
 // Mensaje claro para cada error del servidor o de la red.
 export function explainOnline(err) {
@@ -24,7 +27,8 @@ export function explainOnline(err) {
   if (m === 'nombre') return 'Nombre no válido: de 1 a 16 letras, números, espacios, _ . -';
   if (m === 'origen') return 'Esta página no tiene permiso para usar el servidor (ALLOWED_ORIGINS).';
   if (/not found/i.test(m)) return 'No existe una sala con ese código (o ya se cerró).';
-  if (/locked|full/i.test(m)) return 'La sala está llena (máximo 10 jugadores).';
+  if (/locked|full/i.test(m)) return `La sala está llena (máximo ${NET.maxPlayers} jugadores).`;
+  if (m === 'servidor-lleno') return 'El servidor está lleno: todas las salas están ocupadas. Únete a la sala de un amigo o prueba en unos minutos.';
   if (m === 'sin-servidor') return 'No hay servidor configurado (NET.server en js/config.js o ?servidor=wss://…).';
   return 'No se pudo contactar con el servidor. Si está en el plan gratis puede tardar hasta un minuto en despertar: vuelve a intentarlo.';
 }
@@ -152,6 +156,7 @@ export class Online {
     const g = this.game;
     this.room = room;
     this.leaving = false;
+    this.shutdown = false;
     this.results = null;
     // reconexión automática con espera progresiva y pocos intentos (el servidor guarda el sitio 20 s)
     Object.assign(room.reconnection, { minUptime: 0, maxRetries: 8, minDelay: 300, maxDelay: 4000 });
@@ -165,7 +170,10 @@ export class Online {
     room.onMessage('results', (r) => this.onResults(r));
     room.onMessage('notice', (m) => g.onlineStatus(String((m && m.m) || '')));
     room.onMessage('error', (m) => g.onlineStatus(String((m && m.m) || 'Error'), true));
-    room.onMessage('shutdown', () => g.onlineStatus('El servidor se está reiniciando: las partidas en memoria se pierden.', true));
+    room.onMessage('shutdown', () => {
+      this.shutdown = true;
+      g.onlineStatus('El servidor se está reiniciando: las partidas en memoria se pierden.', true);
+    });
     room.onMessage('p', (m) => this.onPong(m));
     room.onDrop(() => {
       this.reconnecting = true;
@@ -222,7 +230,12 @@ export class Online {
     g.newWorld();
     g.setupMenu();
     g.showOnline();
-    g.onlineStatus(code === 4003 ? 'El servidor te sacó por mandar datos no válidos.' : 'Se perdió la conexión con la sala y no se pudo reconectar.', true);
+    const why =
+      code === KICKED ? 'El servidor te sacó por mandar datos no válidos.'
+      : code === IDLE ? 'La sala se cerró por llevar mucho rato sin partida.'
+      : this.shutdown ? 'El servidor se reinició: vuelve a crear la sala en un momento.'
+      : 'Se perdió la conexión con la sala y no se pudo reconectar.';
+    g.onlineStatus(why, true);
   }
 
   /* ---------- sala ---------- */

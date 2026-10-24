@@ -1,4 +1,5 @@
-# Servidor multijugador en Render (plan gratis). El juego (la página) se publica aparte
+# Servidor multijugador en Render (plan gratis). Para 5 salas de 4 se recomienda la máquina virtual
+# de deploy/README.md: el plan gratis (0,1 CPU, se duerme) no da para tanto. El juego (la página) se publica aparte
 # (Vercel, raw.githack…); aquí sólo va el servidor de la carpeta server/.
 # El servidor importa módulos de js/, por eso se construye desde la raíz del repositorio.
 services:
@@ -20,3 +21,8 @@ services:
       # en el plan gratis (0,1 CPU) conviene mandar menos fotos por segundo; ver README
       - key: SNAP_HZ
         value: "10"
+      # capacidad: jugadores por sala y salas a la vez
+      - key: MAX_PLAYERS
+        value: "4"
+      - key: MAX_ROOMS
+        value: "5"

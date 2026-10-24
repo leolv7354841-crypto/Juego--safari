@@ -3,6 +3,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, client, sleep, waitFor, serverRoom, cut, inbox } from './helpers.ts';
 import { CONFIG } from '../src/config.ts';
+import { STATS } from '../src/stats.ts';
+import { IDLE } from '../src/rooms/DeadZoneRoom.ts';
 
 let srv: any;
 let url = '';
@@ -27,11 +29,14 @@ async function fill(n: number) {
 // salir sin quedarse colgado si la conexión ya estaba cortada
 const leaveAll = (rooms: any[]) => Promise.all(rooms.map((r) => Promise.race([r.leave().catch(() => {}), sleep(600)])));
 
-test('crear, entrar y llenar una sala de 10; el 11.º no entra', async () => {
-  const rooms = await fill(10);
+const MAX = CONFIG.maxPlayers;
+
+test(`crear, entrar y llenar una sala de ${MAX}; el siguiente no entra`, async () => {
+  const rooms = await fill(MAX);
   const owner = rooms[0];
   assert.match(owner.roomId, /^[A-HJ-NP-Z2-9]{6}$/);
-  await waitFor(() => owner.state.members.size === 10, 4000, '10 integrantes');
+  assert.equal(owner.state.maxPlayers, MAX);
+  await waitFor(() => owner.state.members.size === MAX, 4000, `${MAX} integrantes`);
   await assert.rejects(client(url).joinById(owner.roomId, { name: 'Sobra' }), (e: any) => {
     assert.ok(/locked|full|lleno/i.test(e.message), e.message);
     return true;
@@ -47,12 +52,12 @@ test('nombre inválido se rechaza', async () => {
 });
 
 test('entradas simultáneas al último cupo: sólo una entra', async () => {
-  const rooms = await fill(9);
+  const rooms = await fill(MAX - 1);
   const tries = await Promise.allSettled([1, 2, 3, 4].map((i) => client(url).joinById(rooms[0].roomId, { name: `Carrera ${i}` })));
   const ok = tries.filter((t) => t.status === 'fulfilled');
   assert.equal(ok.length, 1, 'exactamente una entrada');
-  await waitFor(() => serverRoom(rooms[0].roomId).clients.length === 10, 4000, '10 en el servidor');
-  assert.equal(serverRoom(rooms[0].roomId).state.members.size, 10);
+  await waitFor(() => serverRoom(rooms[0].roomId).clients.length === MAX, 4000, 'sala llena en el servidor');
+  assert.equal(serverRoom(rooms[0].roomId).state.members.size, MAX);
   await leaveAll([...rooms, ...ok.map((t: any) => t.value)]);
 });
 
@@ -196,10 +201,55 @@ test('fin de partida, vuelta al lobby y limpieza de la sala vacía', async () =>
   await waitFor(() => serverRoom(id) === undefined, 4000, 'sala vacía eliminada');
 });
 
-test('origen no permitido', async () => {
+test(`tope de ${CONFIG.maxRooms} salas: la siguiente da servidor-lleno`, async () => {
+  await waitFor(() => STATS.rooms === 0, 4000, 'sin salas de otras pruebas');
+  const owners: any[] = [];
+  for (let i = 0; i < CONFIG.maxRooms; i++) owners.push((await fill(1))[0]);
+  assert.equal(STATS.rooms, CONFIG.maxRooms);
+  await assert.rejects(client(url).create('dz', { name: 'Sobra' }), (e: any) => e.message === 'servidor-lleno');
+  // simultáneas con el último cupo libre: sólo una se crea
+  await leaveAll(owners.splice(0, 1));
+  await waitFor(() => STATS.rooms === CONFIG.maxRooms - 1, 4000, 'se libera un cupo');
+  const tries = await Promise.allSettled([1, 2, 3].map((i) => client(url).create('dz', { name: `Carrera ${i}` })));
+  const ok = tries.filter((t) => t.status === 'fulfilled');
+  assert.equal(ok.length, 1, 'exactamente una sala nueva: ' + tries.map((t: any) => t.status + ' ' + (t.reason?.message || '')).join(' / '));
+  assert.equal(STATS.rooms, CONFIG.maxRooms);
+  // a una sala existente sí se puede entrar con el servidor lleno
+  const guest = await client(url).joinById(owners[0].roomId, { name: 'Invitado' });
+  guest.onMessage('*', () => {});
+  await leaveAll([...owners, guest, ...ok.map((t: any) => t.value)]);
+  await waitFor(() => STATS.rooms === 0, 4000, 'todas las salas borradas');
+});
+
+test('una reserva que nunca se usa no deja la sala ocupada', async () => {
+  await waitFor(() => STATS.rooms === 0, 4000, 'sin salas');
+  const { matchMaker } = await import('@colyseus/core');
+  await matchMaker.create('dz', { name: 'Fantasma' }, { headers: new Headers(), token: '', ip: '' } as any);
+  assert.equal(STATS.rooms, 1);
+  await waitFor(() => STATS.rooms === 0, 4000, 'sala sin nadie borrada');
+});
+
+test('una sala sin partida se cierra por inactividad', async () => {
+  const old = CONFIG.idleRoomMinutes;
+  CONFIG.idleRoomMinutes = 0.02; // 1,2 s
+  try {
+    const [owner, guest] = await fill(2);
+    let code = 0;
+    owner.onLeave((c: number) => (code = c));
+    await waitFor(() => code !== 0, 4000, 'sala cerrada');
+    assert.equal(code, IDLE);
+    await leaveAll([guest]);
+  } finally {
+    CONFIG.idleRoomMinutes = old;
+  }
+});
+
+test('origen no permitido: ni siquiera se crea la sala', async () => {
+  await waitFor(() => STATS.rooms === 0, 4000, 'sin salas');
   CONFIG.origins.push('https://permitido.example');
   try {
     await assert.rejects(client(url).create('dz', { name: 'Ana' }), (e: any) => e.message === 'origen');
+    assert.equal(STATS.rooms, 0, 'no ocupa cupo');
   } finally {
     CONFIG.origins.length = 0;
   }
@@ -211,4 +261,6 @@ test('/health responde con métricas', async () => {
   const j = await r.json();
   assert.equal(j.ok, true);
   assert.ok('rooms' in j && 'players' in j);
+  assert.equal(j.maxRooms, CONFIG.maxRooms);
+  assert.equal(j.maxPlayers, CONFIG.maxPlayers);
 });

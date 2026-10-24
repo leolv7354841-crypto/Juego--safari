@@ -1,0 +1,4 @@
+# Caddy pide y renueva solo el certificado de DOMAIN (Let's Encrypt) y pasa el WebSocket al juego.
+{$DOMAIN} {
+	reverse_proxy dz:2567
+}
