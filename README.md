@@ -156,11 +156,8 @@ Flujo actual:
 
 1. **Push a `main`** (la rama principal) → el proyecto `deadzone` de Vercel publica en producción
    (`deadzone-five-red.vercel.app`). Las demás ramas del repositorio generan una vista previa.
-2. Vercel no publica la carpeta tal cual: ejecuta `node tools/build.mjs` (lo pide `vercel.json`),
-   que sella la versión y copia a `dist/` sólo el juego (`index.html`, `manifest.webmanifest`,
-   `css/`, `js/`, `assets/`). El servidor, la documentación y los scripts no quedan públicos.
-3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request que el
-   sellado está al día, que el build funciona y que pasan las pruebas del servidor.
+2. Vercel no publica la carpeta tal cual: ejecuta `npm run build` (Vite, lo pide `vercel.json`) y publica `dist/`. El servidor, la documentación y los scripts no quedan públicos.
+3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request que Biome, el build de Vite y que pasan las pruebas del servidor.
 4. Si cambió código que usa el servidor (`server/`, `js/`, `deploy/`),
    `.github/workflows/servidor.yml` actualiza la máquina de Vultr en cuanto no hay salas
    abiertas (ver «Publicación automática» en [`deploy/README.md`](deploy/README.md)).
@@ -344,7 +341,7 @@ memoria).
    - Variables: `NODE_VERSION=24`, `ALLOWED_ORIGINS=https://tu-juego.vercel.app` (las páginas desde
      las que se juega, separadas por comas) y `SNAP_HZ=10`.
 3. Cuando esté en marcha, copia su dirección y ponla en `NET.server` de `js/config.js` con `wss://`
-   (por ejemplo `wss://dead-zone-server.onrender.com`), ejecuta `npm run stamp` y publica el juego.
+   (por ejemplo `wss://dead-zone-server.onrender.com`), y publica el juego.
    También se puede probar sin publicar abriendo el juego con `?servidor=wss://…`.
 
 Con 0,1 CPU, una sala de 10 (o 5 de 4) a 60 pasos y 20 fotos por segundo **probablemente no da abasto** (en
@@ -401,12 +398,7 @@ conectarse. Los tokens no se registran.
 
 ## Versiones y caché
 
-`node tools/stamp.mjs` (o `npm run stamp`) sella `index.html` con un hash del código: un pequeño
-cargador arma un *import map* para pedir cada módulo con `?v=<hash>`, y `js/version.js` guarda el
-mismo hash. Si un CDN (como raw.githack.com) entrega un archivo viejo, el juego lo detecta al abrir y se
-recarga solo pidiendo todo de nuevo. Ejecútalo antes de cada commit (GitHub Actions avisa si se
-olvida, y Vercel vuelve a sellar al publicar). El hash no depende de los saltos de línea (CRLF o LF), así
-que sale igual en Windows y en Linux. La versión aparece en el menú.
+Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siempre) y `index.html` va con `no-cache` (ver `vercel.json`), así que ya no hay que sellar nada. `js/version.js` lleva la versión del build; si una pestaña vieja sigue abierta cuando se publica otra, el juego avisa con un mensaje (compara con `version.json`). La versión aparece en el menú.
 
 ## Estructura
 
@@ -434,9 +426,9 @@ js/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
 js/online.js        Modo en línea: sala, predicción, interpolación y diagnóstico
 js/netcode.js       Predicción/reconciliación e interpolación (compartido con el servidor)
 js/combat.js        Reglas de impacto de bala (compartidas con el servidor)
-js/vendor/          SDK de Colyseus para el navegador (se carga sólo en línea)
+
 js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
-js/version.js       Versión del código (la genera tools/stamp.mjs)
+js/version.js       Versión del código (la inyecta Vite al compilar)
 server/             Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
 deploy/             Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
 render.yaml         Despliegue del servidor en Render
