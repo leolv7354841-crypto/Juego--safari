@@ -37,6 +37,7 @@ import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
 import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
+import { openLevelUp, chooseUpgrade } from './ui/levelup.js';
 import { drawLookPreview, bindLook } from './ui/look.js';
 import { showClass, chooseClass, renderClassRows, bindClass } from './ui/class.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
@@ -47,7 +48,6 @@ import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
 import { drawSurvivor, cleanLook } from './render/sprites.js';
-import { rollUpgrades, ICONS } from './sim/upgrades.js';
 
 class Game {
   constructor() {
@@ -154,6 +154,7 @@ class Game {
   onlineStatus = (text, bad) => onlineStatus(this, text, bad);
   renderLobby = () => renderLobby(this);
   renderClassRows = () => renderClassRows(this);
+  openLevelUp = () => openLevelUp(this);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -384,57 +385,6 @@ class Game {
   }
 
   /* ---------- mejoras ---------- */
-
-  openLevelUp() {
-    this.setState('levelup');
-    this.input.reset();
-    this.sfx.level();
-    const lvl = this.level - this.pendingLevels + 1;
-    this.$('level-kicker').textContent = `Nivel ${lvl} alcanzado`;
-    // en línea las ofrece el servidor (es quien aplica la mejora)
-    this.choices = this.online.active ? this.online.upChoices() : rollUpgrades(this.player, lvl, this.taken);
-    const wrap = this.$('cards');
-    wrap.classList.remove('ready');
-    wrap.innerHTML = '';
-    this.choices.forEach((u, i) => {
-      const b = document.createElement('button');
-      b.className = 'card' + (u.weapon ? ' weapon' : '');
-      const n = this.taken[u.id] || 0;
-      const tag = u.weapon ? 'Arma nueva' : n ? `Nivel ${n + 1}` : 'Mejora';
-      b.innerHTML = `<span class="ic">${ICONS[u.icon]}</span><span class="nm"></span><span class="ds"></span><span class="tg">${tag} <span class="key">· tecla ${i + 1}</span></span>`;
-      b.querySelector('.nm').textContent = u.name;
-      b.querySelector('.ds').textContent = u.desc;
-      b.addEventListener('click', () => this.chooseUpgrade(i));
-      wrap.appendChild(b);
-    });
-    // breve espera para no elegir sin querer al estar disparando
-    this.levelReadyAt = performance.now() + 450;
-    setTimeout(() => wrap.classList.add('ready'), 450);
-  }
-
-  chooseUpgrade(i) {
-    if (this.state !== 'levelup' || performance.now() < this.levelReadyAt) return;
-    const u = this.choices[i];
-    if (!u) return;
-    if (this.online.active) {
-      // la siguiente tanda (si quedan niveles) llega con la próxima foto del servidor
-      this.online.pickUpgrade(i);
-      this.taken[u.id] = (this.taken[u.id] || 0) + 1;
-      this.input.reset();
-      this.last = performance.now();
-      return this.setState('play');
-    }
-    u.apply(this.player);
-    this.taken[u.id] = (this.taken[u.id] || 0) + 1;
-    this.pendingLevels--;
-    if (u.weapon) this.toast(`${u.name} equipada`);
-    if (this.pendingLevels > 0) this.openLevelUp();
-    else {
-      this.input.reset();
-      this.last = performance.now();
-      this.setState('play');
-    }
-  }
 
   /* ---------- tienda y construcción ---------- */
 
@@ -730,7 +680,7 @@ class Game {
         this.updateMenu(dt);
       } else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
-        if (s) this.chooseUpgrade(s - 1);
+        if (s) chooseUpgrade(this, s - 1);
       } else if (this.state === 'pause') {
         if (this.input.consume('pause')) this.resume();
       }
