@@ -3,6 +3,13 @@
 import { rand } from './util.js';
 
 // Aplica una bala a un zombi. No lo mata: quien llama decide (y cuenta la baja).
+/**
+ * @param {import('./types.js').GameHost} game
+ * @param {import('./types.js').Zombie} z
+ * @param {import('./types.js').Bullet} b
+ * @param {number} hx
+ * @param {number} hy
+ */
 export function bulletHit(game, z, b, hx, hy) {
   z.hp -= b.dmg;
   z.flash = 0.08;

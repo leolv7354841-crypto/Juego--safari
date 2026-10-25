@@ -18,6 +18,10 @@ export class Bullets {
     this.list.length = 0;
   }
 
+  /**
+   * @param {number} dt
+   * @param {import('./types.js').GameHost} game
+   */
   update(dt, game) {
     const list = this.list;
     const world = game.world;

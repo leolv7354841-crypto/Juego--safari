@@ -184,6 +184,7 @@ export class Horde {
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
     const def = ZOMBIES[type];
     const sets = this.sprites[type];
+    /** @type {import('./types.js').Zombie} */
     const z = {
       id: nextId++,
       type,
@@ -266,6 +267,10 @@ export class Horde {
     return best;
   }
 
+  /**
+   * @param {number} dt
+   * @param {import('./types.js').GameHost} game
+   */
   update(dt, game) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
     const targets = game.targets || null;
@@ -273,6 +278,8 @@ export class Horde {
     const p0 = targets ? IDLE : game.player;
     const peer =
       !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    // objetivo actual: Player, compañero remoto o el IDLE sin jugadores (por eso any)
+    /** @type {any} */
     let p = p0;
     const world = game.world;
     const time = game.time;

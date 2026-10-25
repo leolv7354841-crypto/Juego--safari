@@ -28,6 +28,11 @@ export function unpackBody(p, a) {
 }
 
 // Aplica una entrada al cuerpo del jugador (igual en el servidor y en el cliente).
+/**
+ * @param {import('./player.js').Player} p
+ * @param {import('./types.js').Cmd} cmd
+ * @param {Pick<import('./types.js').GameHost, 'world' | 'sfx'>} game
+ */
 export function applyMove(p, cmd, game) {
   p.move(TICK, cmd.mx, cmd.my, !!(cmd.f & IN_RUN), game);
 }

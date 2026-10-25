@@ -1509,6 +1509,7 @@ export class World {
   drawFlame(ctx, f, time) {
     const s = f.s;
     const seed = f.x * 0.37 + f.y * 0.11;
+    /** @type {[string, number, number][]} */
     const layers = [
       ['rgba(150,50,20,0.75)', 13, 1],
       ['rgba(225,110,40,0.85)', 9.5, 0.75],

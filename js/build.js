@@ -61,6 +61,10 @@ export class Structures {
   /* ---------- construcción ---------- */
 
   // Dónde caería el bloque: delante del jugador, alineado a una rejilla de 20 px.
+  /**
+   * @param {import('./types.js').GameHost} game
+   * @param {string} kind
+   */
   placement(game, kind) {
     const def = SHOP[kind];
     const p = game.player;
@@ -110,6 +114,11 @@ export class Structures {
   }
 
   // owner: de quién son las bajas de sus minas y torretas (en línea)
+  /**
+   * @param {import('./types.js').GameHost} game
+   * @param {string} kind
+   * @param {string | null} [owner]
+   */
   place(game, kind, owner = null) {
     const pl = this.placement(game, kind);
     if (!pl.ok) return false;
@@ -166,6 +175,11 @@ export class Structures {
     return o;
   }
 
+  /**
+   * @param {import('./types.js').GameHost} game
+   * @param {any} o
+   * @param {number} dmg
+   */
   damageBlock(game, o, dmg) {
     if (o.hp <= 0) return;
     o = this.topOf(o);
@@ -307,6 +321,13 @@ export class Structures {
   /* ---------- cohetes clavados ---------- */
 
   // El cohete se queda clavado en la panza (gordo) o en la placa (super blindado) y estalla después.
+  /**
+   * @param {import('./types.js').GameHost} game
+   * @param {import('./types.js').Zombie} z
+   * @param {number} x
+   * @param {number} y
+   * @param {import('./types.js').Bullet} b
+   */
   stickRocket(game, z, x, y, b) {
     const fat = z.type === 'fat';
     // posición relativa al cuerpo, en el sistema del zombi, para que se mueva con él
@@ -557,6 +578,10 @@ export class Structures {
     if (this.scorches.length > 20) this.scorches.shift();
   }
 
+  /**
+   * @param {number} dt
+   * @param {import('./types.js').GameHost} game
+   */
   update(dt, game) {
     this.time = (this.time || 0) + dt;
     for (let i = this.grenades.length - 1; i >= 0; i--) {

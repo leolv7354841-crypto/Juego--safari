@@ -86,6 +86,12 @@ export class Player {
     // torreta pesada que maneja (estructura de build.js) y sus balas compradas
     this.manned = null;
     this.heavyAmmo = 0;
+    /** @type {any} aspecto del personaje (lo pone Game; ver cleanLook) */
+    this.look;
+    /** @type {boolean | undefined} compañero de cooperativo (lo pone coop.js) */
+    this.remote;
+    /** @type {boolean | undefined} dentro del robot (lo pone main.js / el servidor) */
+    this.inRobot;
   }
 
   get weapon() {
@@ -146,7 +152,8 @@ export class Player {
     return any;
   }
 
-  startReload() {
+  /** @param {unknown} [_game] lo pasan algunos llamadores; no se usa */
+  startReload(_game) {
     const w = this.weapon;
     if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
     this.reloadDur = w.def.reload / this.stats.reloadMult;
@@ -196,6 +203,13 @@ export class Player {
 
   // Estamina y movimiento con choques. Sólo depende de la entrada y del mundo, así que el
   // servidor y la predicción del cliente en línea dan exactamente el mismo resultado.
+  /**
+   * @param {number} dt
+   * @param {number} mx
+   * @param {number} my
+   * @param {boolean} run
+   * @param {import('./types.js').GameHost | Pick<import('./types.js').GameHost, 'world' | 'sfx'>} game
+   */
   move(dt, mx, my, run, game) {
     const st = this.stats;
     const mv = { x: mx, y: my };

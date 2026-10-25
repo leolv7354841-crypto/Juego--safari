@@ -1,4 +1,5 @@
-import { ABILITY } from './config.js';
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
+import { ABILITY, WEAPONS } from './config.js';
 import { cooldownOf } from './abilities.js';
 
 // Cada mejora modifica las estadísticas reales del jugador.

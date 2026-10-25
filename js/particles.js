@@ -1,3 +1,4 @@
+// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 import { rand, TAU, pick } from './util.js';
 
 const BLOOD = ['#8a1f1a', '#6e1714', '#a3281f', '#5a1210'];

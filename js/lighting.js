@@ -7,6 +7,8 @@ const SCALE = 0.5;
 
 export class Lighting {
   constructor() {
+    /** @type {HTMLCanvasElement | undefined} viñeta que dibuja Game (se asigna al cambiar el tamaño) */
+    this.vignette;
     this.canvas = makeCanvas(2, 2);
     this.ctx = this.canvas.getContext('2d');
     this.soft = lightSprite('255,255,255', 256);

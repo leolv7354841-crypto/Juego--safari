@@ -1314,7 +1314,7 @@ export function drawSurvivor(g, p, time) {
     for (const y of [-9, 0, 9]) {
       g.save();
       g.translate(0, y);
-      GUNS.lmg(g, r, p);
+      GUNS.lmg(g, r);
       g.restore();
     }
   } else if (!p.manned) GUNS[p.weapon.id](g, r, p);
