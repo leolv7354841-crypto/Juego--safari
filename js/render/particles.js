@@ -1,5 +1,6 @@
 // @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 import { rand, TAU, pick } from '../core/util.js';
+import { zombieSprite } from './zombies.js';
 
 const BLOOD = ['#8a1f1a', '#6e1714', '#a3281f', '#5a1210'];
 
@@ -596,6 +597,7 @@ export class Decals {
   }
   // dx, dy: dirección del último impacto, para caer hacia ese lado
   corpse(z, dx = 0, dy = 0) {
+    const spr = zombieSprite(z);
     if (this.list.length >= this.max) this.list.shift();
     const l = Math.hypot(dx, dy) || 1;
     const fx = dx / l;
@@ -609,7 +611,7 @@ export class Decals {
     // lanzado por una explosión: vuela en arco antes de caer
     const lift = power > 1.5 ? power * rand(8, 12) : 0;
     this.list.push({
-      img: z.burnt ? z.spr.burnt : z.spr.dead,
+      img: z.burnt ? spr.burnt : spr.dead,
       x: z.x,
       y: z.y,
       x0: z.x,
@@ -618,7 +620,7 @@ export class Decals {
       y1: z.y + fy * slide * (z.r / 13),
       a0: z.angle,
       a1: z.angle + spin,
-      half: z.spr.half,
+      half: spr.half,
       t: 0,
       fall: (variant === 2 ? 0.55 : 0.4) + (lift ? 0.35 : 0),
       lift,

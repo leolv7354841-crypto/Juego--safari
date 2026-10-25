@@ -20,6 +20,7 @@ import {
   START_WEAPON,
   CAMERA,
   HEAVY,
+  ZOMBIE_VARIANTS,
 } from './core/config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
 import { Music } from './ui/music.js';
@@ -39,6 +40,7 @@ import { Particles, Decals } from './render/particles.js';
 import { Pickups } from './sim/pickups.js';
 import { drawPickups } from './render/pickups.js';
 import { drawBullets } from './render/bullets.js';
+import { drawHorde } from './render/zombies.js';
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Input } from './ui/input.js';
@@ -488,7 +490,7 @@ class Game {
       dir.waveT = WAVES.spawnTime * (1 - q.length / dir.waveSize);
       dir.spawnT = 1;
       for (const [t, x, y, hp] of d.zombies || []) {
-        if (!this.horde.sprites[t]) continue;
+        if (!ZOMBIE_VARIANTS[t]) continue;
         const z = this.horde.spawn(t, x, y, dir.hpMult, dir.speedMult);
         z.hp = Math.min(hp, z.maxHp);
       }
@@ -2372,7 +2374,7 @@ class Game {
     drawPickups(ctx, this.pickups.list, v, this.time);
     if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0)
       this.structures.drawGhost(ctx, this, this.buildSel, this.time);
-    this.horde.draw(ctx, v, base, 'small');
+    drawHorde(ctx, this.horde.list, v, base, 'small');
     this.structures.drawFires(ctx, v, this.time);
     this.structures.drawStuck(ctx, this.time);
     this.structures.drawMissiles(ctx, this.time);
@@ -2386,7 +2388,7 @@ class Game {
       this.online.drawPeers(ctx);
       this.structures.drawMannedHeavy(ctx);
     }
-    this.horde.draw(ctx, v, base, 'giant');
+    drawHorde(ctx, this.horde.list, v, base, 'giant');
     drawBullets(ctx, this.bullets.list);
     this.coop.drawRemoteBullets(ctx);
     this.online.drawRemoteBullets(ctx);

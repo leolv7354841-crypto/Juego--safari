@@ -1,5 +1,6 @@
 // Todo el arte se genera por código: texturas del suelo, zombis, árboles,
 // vehículos y el superviviente. Nada de recursos externos.
+import { ZOMBIE_VARIANTS } from '../core/config.js';
 import { TAU, makeCanvas, mulberry32, rrange, rpick, roundRect, shade } from '../core/util.js';
 
 export const OUT = '#141612';
@@ -702,6 +703,8 @@ export function zombieSprites() {
       pal.seed = 100 + i * 31 + type.length * 7;
       ZSPRITES[type].push(buildSet(type, k.r, k.frames, pal, k.scale, k.pad));
     });
+    if (ZSPRITES[type].length !== ZOMBIE_VARIANTS[type])
+      throw new Error(`ZOMBIE_VARIANTS.${type} no coincide con las paletas`);
   }
   return ZSPRITES;
 }

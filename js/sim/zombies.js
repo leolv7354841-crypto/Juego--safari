@@ -1,6 +1,15 @@
-import { ZOMBIES, ZOMBIE_SPEED, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV, WAVES } from '../core/config.js';
+import {
+  ZOMBIES,
+  ZOMBIE_SPEED,
+  WORLD_SIZE,
+  GOLDEN,
+  BULL,
+  WOUND,
+  MOLOTOV,
+  WAVES,
+  ZOMBIE_VARIANTS,
+} from '../core/config.js';
 import { clamp, rand, angleTo, TAU } from '../core/util.js';
-import { zombieSprites, flameSprite } from '../render/sprites.js';
 
 const CELL = 64;
 
@@ -164,7 +173,6 @@ export class Horde {
   constructor() {
     this.list = [];
     this.grid = new Grid(WORLD_SIZE, CELL);
-    this.sprites = zombieSprites();
     this.frame = 0;
     this.danger = 0;
     this.nearCount = 0;
@@ -183,7 +191,6 @@ export class Horde {
 
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
     const def = ZOMBIES[type];
-    const sets = this.sprites[type];
     /** @type {import('../core/types.js').Zombie} */
     const z = {
       id: nextId++,
@@ -199,7 +206,7 @@ export class Horde {
       angle: rand(0, TAU),
       anim: rand(0, def.frames),
       // variante de dibujo según el id (así el cooperativo no necesita mandarla)
-      si: nextId % sets.length,
+      si: nextId % ZOMBIE_VARIANTS[type],
       flash: 0,
       slow: 0,
       atk: 0,
@@ -243,7 +250,6 @@ export class Horde {
       hitJolt: 0,
       life: type === 'golden' ? GOLDEN.life : 0,
     };
-    z.spr = sets[z.si];
     this.list.push(z);
     return z;
   }
@@ -777,90 +783,5 @@ export class Horde {
     let w = 0;
     for (let i = 0; i < list.length; i++) if (!list[i].dead) list[w++] = list[i];
     list.length = w;
-  }
-
-  draw(ctx, view, base, layer) {
-    // base = { z, tx, ty }: transformación cámara → pantalla
-    const { z: s, tx, ty } = base;
-    for (const z of this.list) {
-      const isGiant = z.type === 'giant';
-      if ((layer === 'giant') !== isGiant) continue;
-      const half = z.spr.half;
-      if (z.x + half < view.x0 || z.x - half > view.x1 || z.y + half < view.y0 || z.y - half > view.y1) continue;
-      const frames = z.flash > 0 ? z.spr.flash : z.spr.frames;
-      const f = (((z.anim | 0) % frames.length) + frames.length) % frames.length;
-      const img = frames[f];
-      const ang = z.angle + z.tilt + (z.hitT > 0 ? z.hitJolt * (z.hitT / 0.18) : 0);
-      const c = Math.cos(ang);
-      const sn = Math.sin(ang);
-      const pop = z.hitT > 0 ? 1 + 0.08 * (z.hitT / 0.18) : 1;
-      if (z.type === 'golden') {
-        // aura dorada; parpadea cuando está por desaparecer
-        const warn = z.life < GOLDEN.warnAt;
-        const blink = warn ? 0.35 + 0.65 * Math.abs(Math.sin(z.life * 9)) : 1;
-        ctx.setTransform(s, 0, 0, s, tx, ty);
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.35 * blink;
-        ctx.fillStyle = '#e8b830';
-        ctx.beginPath();
-        ctx.arc(z.x, z.y, z.r * 2.1, 0, TAU);
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = blink;
-      }
-      const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
-      const lift = z.air > 0 ? z.air : 0;
-      // hinchado por el cohete clavado: crece y tiembla antes de reventar
-      const swell = z.swell > 0 ? z.swell : 0;
-      const k =
-        s * pop * grow * (1 + lift / 140) * (1 + swell * 0.35 + (swell ? Math.sin(z.id + swell * 60) * 0.03 : 0));
-      const shake =
-        z.bs === 'windup' ? (Math.random() - 0.5) * 2.4 : swell ? (Math.random() - 0.5) * (2 + swell * 5) : 0;
-      const lx = z.x + c * z.lunge * 5 + shake;
-      const ly = z.y + sn * z.lunge * 5 - lift * 0.7 + shake;
-      if (lift > 0) {
-        // sombra en el suelo mientras vuela
-        ctx.setTransform(s, 0, 0, s, tx, ty);
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.ellipse(z.x, z.y, z.r * 0.9, z.r * 0.6, 0, 0, TAU);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      if (z.type !== 'golden') {
-        const al = z.spawnT > 0 ? 1 - z.spawnT : 1;
-        if (ctx.globalAlpha !== al) ctx.globalAlpha = al;
-      }
-      ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
-      ctx.drawImage(img, -half, -half, half * 2, half * 2);
-      if (swell) {
-        // brilla amarillo, cada vez más fuerte
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = swell * (0.45 + 0.35 * Math.abs(Math.sin(swell * 40)));
-        ctx.drawImage(z.spr.flash[f], -half, -half, half * 2, half * 2);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-      }
-      if (z.burn > 0) {
-        // llamas sobre el cuerpo (aditivas, parpadean)
-        const fl = flameSprite();
-        ctx.setTransform(s, 0, 0, s, tx, ty);
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = Math.min(1, z.burn * 0.8);
-        for (let i = 0; i < 3; i++) {
-          const a = z.id * 2.1 + i * 2.1;
-          const fw = z.r * (0.8 + Math.random() * 0.35);
-          const fh = fw * (1.4 + Math.random() * 0.5);
-          const fx = lx + Math.cos(a) * z.r * 0.45;
-          const fy = ly + Math.sin(a) * z.r * 0.45;
-          ctx.drawImage(fl, fx - fw / 2, fy - fh * 0.8, fw, fh);
-        }
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-      }
-    }
-    ctx.globalAlpha = 1;
-    ctx.setTransform(s, 0, 0, s, tx, ty);
   }
 }

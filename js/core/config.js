@@ -709,3 +709,15 @@ export const RELOAD_STEPS = {
     [0.92, 'boltClose'],
   ],
 };
+
+// Cuántas variantes de dibujo (paletas) tiene cada tipo de zombi. render/sprites.js comprueba que coincida.
+export const ZOMBIE_VARIANTS = {
+  normal: 8,
+  golden: 2,
+  swat: 2,
+  heavy: 2,
+  sprinter: 3,
+  fat: 4,
+  bull: 3,
+  giant: 2,
+};
