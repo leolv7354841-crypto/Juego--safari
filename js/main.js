@@ -1,3 +1,6 @@
+// DEAD ZONE — punto de entrada. Crea `Game`, que sólo coordina: guarda el estado de la partida, conecta
+// los módulos (js/ui, js/render, js/sim, js/net) y corre el bucle. Cada pantalla conecta sus propios
+// botones, y los estados del juego están en la tabla de js/states.js.
 import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
 import { isClass } from './sim/abilities.js';
 import { Music } from './ui/music.js';
@@ -224,32 +227,6 @@ class Game {
     w.updateFlow(w.spawn.x, w.spawn.y);
     this.cache = {};
   }
-
-  /* ---------- progreso guardado ---------- */
-
-  /* ---------- eventos de combate ---------- */
-
-  /* ---------- habilidad de clase ---------- */
-
-  /* ---------- robot ---------- */
-
-  /* ---------- torreta pesada ---------- */
-
-  /* ---------- mejoras ---------- */
-
-  /* ---------- tienda y construcción ---------- */
-
-  /* ---------- cooperativo: sala ---------- */
-
-  /* ---------- en línea (servidor, hasta 4 por sala) ---------- */
-
-  /* ---------- personaje ---------- */
-
-  /* ---------- cuentas y clasificación ---------- */
-
-  /* ---------- fin de partida ---------- */
-
-  /* ---------- interfaz ---------- */
 
   bindUi() {
     bindHud(this);
