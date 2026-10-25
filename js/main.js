@@ -17,10 +17,7 @@ import {
   ROCKET,
   ROBOT,
   CLASS_ORDER,
-  WAVES,
-  START_WEAPON,
   HEAVY,
-  ZOMBIE_VARIANTS,
 } from './core/config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
 import { Music } from './ui/music.js';
@@ -58,13 +55,11 @@ import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { CROWN_SVG, SHORT, ITEM_ICONS } from './ui/icons.js';
+import { saveProgress, loadProgress } from './save.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
 import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
 import { rollUpgrades, ICONS } from './sim/upgrades.js';
-
-// Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
-// de control al terminar cada ronda, para continuar tras morir (ver accounts.js).
 
 /** @param {EventTarget | null} t @param {string} sel @returns {HTMLElement | null} */
 const closest = (t, sel) => /** @type {HTMLElement} */ (t).closest(sel);
@@ -143,6 +138,10 @@ class Game {
     this.inviteCode = (new URLSearchParams(location.search).get('sala') || '').toUpperCase().slice(0, 6);
     if (this.accounts.current) this.openInvite();
   }
+
+  // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
+  saveProgress = () => saveProgress(this);
+  loadProgress = (kind) => loadProgress(this, kind);
 
   // ¿Simula otro (el anfitrión del cooperativo o el servidor en línea)? Entonces aquí no se
   // calcula daño: las balas propias son de adorno.
@@ -278,171 +277,6 @@ class Game {
   }
 
   /* ---------- progreso guardado ---------- */
-
-  // Se guarda cada pocos segundos, también a mitad de ronda (con los zombis vivos),
-  // y al cerrar o minimizar la página. Al terminar una ronda se crea además un punto de control.
-  saveProgress() {
-    if (this.coop.active || this.coopRun) return;
-    const p = this.player;
-    const ds = this.director.state;
-    if (!p || !p.alive || (ds !== 'waiting' && ds !== 'active')) return;
-    const s = this.structures;
-    const queue = {};
-    for (const t of this.director.queue) queue[t] = (queue[t] || 0) + 1;
-    const data = {
-      v: 1,
-      savedAt: Date.now(),
-      dstate: ds,
-      queue,
-      waveSize: this.director.waveSize,
-      zombies:
-        ds === 'active'
-          ? this.horde.list
-              .filter((z) => !z.dead && z.type !== 'golden')
-              .map((z) => [z.type, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp)])
-          : [],
-      seed: this.world.seedBase,
-      wave: this.director.wave,
-      time: this.time,
-      kills: this.kills,
-      level: this.level,
-      xp: this.xp,
-      taken: this.taken,
-      money: this.money,
-      moneyEarned: this.moneyEarned,
-      inv: this.inv,
-      buildSel: this.buildSel,
-      player: {
-        x: p.x,
-        y: p.y,
-        hp: p.hp,
-        stamina: p.stamina,
-        stats: p.stats,
-        weapons: p.weapons.map((w) => ({ id: w.id, mag: w.mag, reserve: w.reserve === Infinity ? -1 : w.reserve })),
-        wi: p.wi,
-        shotsFired: p.shotsFired,
-        shotsHit: p.shotsHit,
-        damageTaken: p.damageTaken,
-        cls: p.cls,
-        abCd: p.abCd,
-        heavyAmmo: p.heavyAmmo,
-      },
-      blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
-      wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
-      robot: { ...this.robot.serialize(), piloted: this.robot.piloted },
-    };
-    storage.set(this.accounts.saveKey(), data);
-    if (ds === 'waiting') storage.set(this.accounts.checkKey(), data);
-    // copia en la nube (si el juego corre como Artifact con base de datos), sin saturar
-    const now = Date.now();
-    if (ds === 'waiting' || now - (this.cloudSavedAt || 0) > 20000) {
-      this.cloudSavedAt = now;
-      this.accounts.cloudSave('save', data);
-      if (ds === 'waiting') this.accounts.cloudSave('check', data);
-    }
-    this.saveT = 0;
-  }
-
-  loadProgress(kind = 'save') {
-    const key = kind === 'check' ? this.accounts.checkKey() : this.accounts.saveKey();
-    let d = storage.get(key, null);
-    if (!d && kind === 'save') d = storage.get(this.accounts.checkKey(), null);
-    if (!d || d.v !== 1) return false;
-    this.sfx.unlock();
-    if (this.world.seedBase !== d.seed) this.newWorld(d.seed);
-    this.resetRun();
-    Object.assign(this.kills, d.kills);
-    this.time = d.time;
-    this.level = d.level;
-    this.xp = d.xp;
-    this.xpNeed = xpForLevel(d.level);
-    this.taken = d.taken || {};
-    this.money = d.money;
-    this.moneyEarned = d.moneyEarned;
-    Object.assign(this.inv, d.inv);
-    this.buildSel = d.buildSel || 'wood';
-    const p = this.player;
-    const sp = d.player;
-    Object.assign(p.stats, sp.stats);
-    p.x = sp.x;
-    p.y = sp.y;
-    p.hp = Math.min(sp.hp, p.stats.maxHp);
-    p.stamina = sp.stamina;
-    // (partidas viejas: la pistola se cambia por el arma inicial, que siempre tiene balas infinitas)
-    p.weapons = sp.weapons
-      .filter((w) => WEAPONS[w.id] && w.id !== 'pistol' && w.id !== START_WEAPON)
-      .map((w) => ({ id: w.id, def: WEAPONS[w.id], mag: w.mag, reserve: w.reserve < 0 ? Infinity : w.reserve }));
-    p.weapons.unshift(p.makeWeapon(START_WEAPON));
-    p.weapons.sort((a, b) => WEAPON_ORDER.indexOf(a.id) - WEAPON_ORDER.indexOf(b.id));
-    p.wi = Math.min(sp.wi, p.weapons.length - 1);
-    p.shotsFired = sp.shotsFired;
-    p.shotsHit = sp.shotsHit;
-    p.damageTaken = sp.damageTaken;
-    // partidas guardadas antes de las clases: la última elegida
-    p.cls = isClass(sp.cls) ? sp.cls : this.classPick;
-    p.abCd = Math.max(0, Number(sp.abCd) || 0);
-    p.heavyAmmo = Math.max(0, Number(sp.heavyAmmo) || 0);
-    for (const b of d.blocks) {
-      if (!SHOP[b.kind]) continue;
-      const o = {
-        k: 0,
-        x: b.x,
-        y: b.y,
-        w: b.w,
-        h: b.h,
-        low: true,
-        block: true,
-        kind: b.kind,
-        hp: b.hp,
-        max: SHOP[b.kind].hp,
-        hitT: 0,
-        cd: 0,
-        ang: 0,
-      };
-      this.structures.blocks.push(o);
-      this.world.addDynamic(o);
-    }
-    this.structures.relayer();
-    this.robot.restore(d.robot);
-    if (d.robot && d.robot.piloted && !this.robot.broken) this.robot.board(p);
-    for (const b of d.wires) if (SHOP[b.kind]) this.structures.wires.push({ ...b, max: SHOP[b.kind].hp, hitT: 0 });
-    const dir = this.director;
-    dir.wave = d.wave;
-    dir.state = 'waiting';
-    if (d.dstate === 'active') {
-      // reanudar la ronda a medias: los zombis vuelven donde estaban y el resto sigue en cola
-      dir.state = 'active';
-      const q = [];
-      for (const [t, n] of Object.entries(d.queue || {})) for (let i = 0; i < n; i++) q.push(t);
-      for (let i = q.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [q[i], q[j]] = [q[j], q[i]];
-      }
-      dir.queue = q;
-      dir.waveSize = d.waveSize || q.length;
-      dir.waveT = WAVES.spawnTime * (1 - q.length / dir.waveSize);
-      dir.spawnT = 1;
-      for (const [t, x, y, hp] of d.zombies || []) {
-        if (!ZOMBIE_VARIANTS[t]) continue;
-        const z = this.horde.spawn(t, x, y, dir.hpMult, dir.speedMult);
-        z.hp = Math.min(hp, z.maxHp);
-      }
-    }
-    this.camera.x = p.x;
-    this.camera.y = p.y;
-    this.world.updateFlow(p.x, p.y);
-    this.input.reset();
-    this.input.setRun(false);
-    this.setState('play');
-    this.updateHud(true);
-    this.toast(
-      d.dstate === 'active'
-        ? `Progreso cargado · ronda ${d.wave} en curso`
-        : `Progreso cargado · ronda ${d.wave} superada`,
-    );
-    this.saveT = 0;
-    return true;
-  }
 
   /* ---------- eventos de combate ---------- */
 
