@@ -37,6 +37,7 @@ import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
 import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
+import { drawLookPreview, bindLook } from './ui/look.js';
 import { showClass, chooseClass, renderClassRows, bindClass } from './ui/class.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
@@ -45,7 +46,7 @@ import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
 import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
-import { drawSurvivor, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
+import { drawSurvivor, cleanLook } from './render/sprites.js';
 import { rollUpgrades, ICONS } from './sim/upgrades.js';
 
 class Game {
@@ -443,74 +444,6 @@ class Game {
 
   /* ---------- personaje ---------- */
 
-  showLook() {
-    this.setState('look');
-    // muñeco sólo para la vista previa: camina en su sitio y gira despacio
-    this.lookDummy = new Player(80, 80);
-    this.lookDummy.r *= 3.4;
-    this.lookDummy.speedNow = 60;
-    this.renderLook();
-  }
-
-  renderLook() {
-    const box = this.$('look-parts');
-    box.innerHTML = '';
-    for (const part of LOOK_PARTS) {
-      const row = document.createElement('div');
-      row.className = 'look-row';
-      const lbl = document.createElement('span');
-      lbl.textContent = part.name;
-      const sw = document.createElement('div');
-      sw.className = 'look-sw';
-      for (const c of part.colors) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.style.background = c;
-        b.setAttribute('aria-label', `${part.name} ${c}`);
-        b.classList.toggle('on', this.look[part.id] === c);
-        b.addEventListener('click', () => this.setLook({ ...this.look, [part.id]: c }));
-        sw.appendChild(b);
-      }
-      row.append(lbl, sw);
-      box.appendChild(row);
-    }
-    const row = document.createElement('div');
-    row.className = 'look-row';
-    const lbl = document.createElement('span');
-    lbl.textContent = 'Sombrero';
-    const sw = document.createElement('div');
-    sw.className = 'look-sw look-hats';
-    for (const h of HATS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = h.name;
-      b.classList.toggle('on', this.look.hat === h.id);
-      b.addEventListener('click', () => this.setLook({ ...this.look, hat: h.id }));
-      sw.appendChild(b);
-    }
-    row.append(lbl, sw);
-    box.appendChild(row);
-  }
-
-  setLook(look) {
-    this.look = cleanLook(look);
-    this.player.look = this.look;
-    storage.set('dz-look', this.look);
-    this.renderLook();
-  }
-
-  drawLookPreview(dt) {
-    const p = this.lookDummy;
-    const c = this.$('look-preview');
-    const g = c.getContext('2d');
-    p.look = this.look;
-    p.walkPhase += dt * 9;
-    p.angle += dt * 0.6;
-    p.legAngle = p.angle;
-    g.clearRect(0, 0, c.width, c.height);
-    drawSurvivor(g, p, this.time);
-  }
-
   /* ---------- cuentas y clasificación ---------- */
 
   startNextRound() {
@@ -640,6 +573,7 @@ class Game {
     bindHud(this);
     bindShop(this);
     bindClass(this);
+    bindLook(this);
     bindAccount(this);
     bindBoard(this);
     bindLobby(this);
@@ -683,13 +617,6 @@ class Game {
       this.syncSoundLabel();
     });
     this.syncSoundLabel();
-    on('btn-look', () => this.showLook());
-    on('btn-look-done', () => this.setState('menu'));
-    const pick = (a) => a[Math.floor(Math.random() * a.length)];
-    on('btn-look-random', () =>
-      this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }),
-    );
-    on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
   }
 
   syncSoundLabel() {
@@ -796,7 +723,7 @@ class Game {
       if (this.state === 'menu') this.updateMenu(dt);
       else if (this.state === 'look') {
         this.updateMenu(dt);
-        this.drawLookPreview(dt);
+        drawLookPreview(this, dt);
       } else if (this.state === 'class') {
         const s = this.input.consume('slot');
         if (s) chooseClass(this, CLASS_ORDER[s - 1]);
