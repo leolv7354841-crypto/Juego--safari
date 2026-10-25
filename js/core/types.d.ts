@@ -173,3 +173,49 @@ declare global {
 declare global {
   var __DZ_VERSION__: string | undefined;
 }
+
+// Foto del mundo (js/net/snapshot.js): la misma en el cooperativo (anfitrión) y en línea (servidor).
+// Son listas planas de números; los tamaños por elemento están como constantes en snapshot.js.
+export interface WorldSnap {
+  /** Origen (x, y) al que son relativas las posiciones de `z`. */
+  o: [number, number];
+  /** Por zombi (ZOMBIE_N = 6): id, tipo (índice en TYPES), dx, dy, ángulo (64 pasos), banderas. */
+  z: number[];
+  /** Por zombi en el aire o hinchado (3): id, altura, hinchazón x100. */
+  zx: number[];
+  /** Por zombi herido con barra (2): id, vida en %. */
+  zh: number[];
+  /** Por jugador visto (PEER_N = 19): idx, x, y, mira x100, piernas x100, corre, arma (WEAPON_ORDER), fogonazo, vivo, golpe, retroceso x100, velocidad, vida, ausente, en robot, habilidad (bits), cargador, recarga x100, avance de recarga x100. */
+  pl: number[];
+  /** Por robot (ROBOT_N = 8): idx del dueño, x, y, ángulo x100, piernas x100, paso x100, vida, pilotado. */
+  rb: number[];
+  /** Objetos (4): tipo (PICKS), x, y, edad x10. */
+  pk: number[];
+  /** Balas ajenas (5): x, y, dx x100, dy x100, cohete. */
+  b: number[];
+  /** Granadas en el aire (6), fuego (5), cohetes clavados (7), misiles (4) y explosiones (3). */
+  gr: number[];
+  fi: number[];
+  so: number[];
+  ms: number[];
+  bl: number[];
+  /** Oleada, estado del director y reloj de la partida. */
+  w: number;
+  ds: string;
+  tm: number;
+  /** Cada cierto tiempo: barricadas, trampas y quemaduras del suelo (encodeStatic). */
+  blk?: number[][];
+  wir?: number[][];
+  sc?: number[][];
+}
+
+/** Foto del anfitrión del cooperativo: el mundo + la experiencia del equipo (`t: 's'` en el canal rápido). */
+export interface CoopSnap extends WorldSnap {
+  t: 's';
+  q: number;
+  ts: number;
+  lv: number;
+  xp: number;
+  xn: number;
+  kl?: Record<string, number>;
+}
