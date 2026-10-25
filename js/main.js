@@ -4,20 +4,14 @@ import {
   xpForLevel,
   BOUNTY,
   SHOP,
-  SHOP_ORDER,
   BUILD_ORDER,
   THROWABLES,
-  WEAPONS,
-  WEAPON_ORDER,
-  SELL_RATE,
   GOLDEN,
   MONEY_LOSS,
   DROPS,
   WORLD_SIZE,
   ROCKET,
-  ROBOT,
   CLASS_ORDER,
-  HEAVY,
 } from './core/config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
 import { Music } from './ui/music.js';
@@ -28,7 +22,6 @@ import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
 import { Structures, ACID } from './sim/build.js';
 import {
-  drawBottle,
   drawMissiles,
   drawStuck,
   drawFires,
@@ -56,14 +49,12 @@ import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { CROWN_SVG } from './ui/icons.js';
 import { saveProgress, loadProgress } from './save.js';
+import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
 import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
-import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
+import { drawSurvivor, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
 import { rollUpgrades, ICONS } from './sim/upgrades.js';
-
-/** @param {EventTarget | null} t @param {string} sel @returns {HTMLElement | null} */
-const closest = (t, sel) => /** @type {HTMLElement} */ (t).closest(sel);
 
 class Game {
   constructor() {
@@ -143,6 +134,9 @@ class Game {
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
   loadProgress = (kind) => loadProgress(this, kind);
+  openShop = () => openShop(this);
+  closeShop = () => closeShop(this);
+  renderShop = () => renderShop(this);
   toast = (msg) => toast(this, msg);
   banner = (title, sub) => banner(this, title, sub);
   updateHud = (force) => updateHud(this, force);
@@ -472,16 +466,6 @@ class Game {
     this.sfx.build();
   }
 
-  buyHeavyAmmo(n) {
-    const cost = HEAVY.price * n;
-    if (this.money < cost) return;
-    if (this.online.active) return this.online.buy('heavy', 'ammo', n);
-    this.money -= cost;
-    this.player.heavyAmmo += HEAVY.pack * n;
-    this.sfx.buy();
-    this.renderShop();
-  }
-
   onRobotHit(dmg) {
     const rb = this.robot;
     this.sfx.blockHit('metal');
@@ -492,29 +476,6 @@ class Game {
     rb.leave(p, this.world);
     rb.hp = 0;
     this.toast('¡Robot destruido! Repáralo en la tienda');
-  }
-
-  buyRobot() {
-    const rb = this.robot;
-    if (rb.owned || this.money < ROBOT.price) return;
-    if (this.online.active) return this.online.buy('robot', 'buy');
-    this.money -= ROBOT.price;
-    rb.deploy(this.player, this.world);
-    this.sfx.buy();
-    this.toast(this.input.mode === 'touch' ? 'Robot listo: acércate y toca ROBOT' : 'Robot listo: acércate y pulsa E');
-    this.renderShop();
-  }
-
-  repairRobot() {
-    const rb = this.robot;
-    const cost = rb.repairCost;
-    if (!rb.owned || cost <= 0 || this.money < cost) return;
-    if (this.online.active) return this.online.buy('robot', 'repair');
-    this.money -= cost;
-    rb.hp = ROBOT.hp;
-    this.sfx.build();
-    this.toast('Robot reparado');
-    this.renderShop();
   }
 
   // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
@@ -1236,242 +1197,6 @@ class Game {
     if (this.director.nextRound(this)) this.updateHud(false);
   }
 
-  openShop() {
-    this.shopPending = false;
-    this.input.reset();
-    this.setState('shop');
-    this.$('shop-kicker').textContent = `Oleada ${this.director.wave} superada`;
-    this.renderShop();
-  }
-
-  closeShop() {
-    if (this.state !== 'shop') return;
-    this.saveProgress();
-    this.input.reset();
-    this.last = performance.now();
-    this.setState('play');
-    if (BUILD_ORDER.some((k) => this.inv[k] > 0)) {
-      this.toast(this.input.mode === 'touch' ? 'Toca Construir para colocar' : 'Pulsa F para colocar · V para cambiar');
-    }
-  }
-
-  renderShop() {
-    this.$('shop-money').textContent = `$${this.money}`;
-    const p = this.player;
-    const buyBtn = (attrs, price, label, extra = '') => {
-      const poor = this.money < price;
-      return `<button class="btn buy${extra}${poor ? ' poor' : ''}" ${attrs} ${poor ? 'disabled' : ''}>${label}</button>`;
-    };
-    // armas: de la más barata a la más potente
-    const guns = WEAPON_ORDER.filter((id) => WEAPONS[id].price).map((id) => {
-      const d = WEAPONS[id];
-      const owned = p.has(id);
-      return `<div class="shop-item${owned ? ' owned' : ''}">
-        <canvas class="shop-ic" data-gun="${id}" width="96" height="96"></canvas>
-        <div class="shop-txt"><b>${d.name}</b><span>${d.desc}</span><small>Daño ${d.damage}${d.pellets > 1 ? `×${d.pellets}` : ''} · ${d.rate} disp/s · cargador ${d.mag}</small></div>
-        ${owned ? `<button class="btn buy sell" data-sell="${id}">Vender $${Math.round(d.price * SELL_RATE)}</button>` : buyBtn(`data-gun-buy="${id}"`, d.price, `$${d.price}`)}
-      </div>`;
-    });
-    // munición sin límite para cada arma que tengas
-    const ammo = p.weapons
-      .filter((w) => w.reserve !== Infinity)
-      .map((w) => {
-        const d = w.def;
-        const mag = p.magSize(d);
-        return `<div class="shop-item">
-        <canvas class="shop-ic" data-gun="${w.id}" width="96" height="96"></canvas>
-        <div class="shop-txt"><b>${d.rocket ? 'Cohetes' : 'Balas'} · ${d.name}</b><span>${d.rocket ? `1 cohete por $${d.ammoPrice}` : `Cargador de ${mag} balas por $${d.ammoPrice}`}. Sin límite de reserva.</span><small>Reserva: ${w.reserve} ${d.rocket ? 'cohetes' : 'balas'}</small></div>
-        <div class="buy-col">
-          ${buyBtn(`data-ammo="${w.id}" data-n="1"`, d.ammoPrice, `+1 · $${d.ammoPrice}`, ' sm')}
-          ${buyBtn(`data-ammo="${w.id}" data-n="10"`, d.ammoPrice * 10, `+10 · $${d.ammoPrice * 10}`, ' sm')}
-        </div>
-      </div>`;
-      });
-    // en cooperativo la torreta pesada es del anfitrión
-    const noHeavy = this.coop.isGuest;
-    const gear = SHOP_ORDER.filter((k) => !(noHeavy && SHOP[k].manned)).map((k) => {
-      const it = SHOP[k];
-      const poor = this.money < it.price;
-      return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
-        <canvas class="shop-ic" data-ic="${k}" width="96" height="96"></canvas>
-        <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${this.inv[k]}${it.hp > 1 ? ` · Resistencia ${it.hp}` : ''}</small></div>
-        <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
-      </div>`;
-    });
-    this.$('shop-items').innerHTML = `
-      <h3 class="shop-sec">Armas</h3>${guns.join('')}
-      <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}${noHeavy ? '' : this.heavyAmmoItem()}
-      <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
-      <h3 class="shop-sec">Robot de combate</h3>${this.robotShopItem()}`;
-    this.$('shop-items')
-      .querySelectorAll('canvas[data-ic]')
-      .forEach((c) => this.drawShopIcon(c, c.dataset.ic));
-    const rc = this.$('shop-items').querySelector('canvas[data-robot]');
-    if (rc) {
-      const g = rc.getContext('2d');
-      const demo = new Robot();
-      demo.x = 48 / 0.95;
-      demo.y = 48 / 0.95;
-      demo.angle = 0;
-      demo.legAngle = 0;
-      g.setTransform(0.95, 0, 0, 0.95, 0, 0);
-      drawRobot(g, demo, this.player, 0);
-    }
-    this.$('shop-items')
-      .querySelectorAll('canvas[data-gun]')
-      .forEach((c) => {
-        const g = c.getContext('2d');
-        g.setTransform(2.1, 0, 0, 2.1, 4, 48);
-        g.shadowColor = 'rgba(230,224,210,0.85)';
-        g.shadowBlur = 3;
-        drawGunIcon(g, c.dataset.gun);
-      });
-  }
-
-  heavyAmmoItem() {
-    const buy = (n) => {
-      const price = HEAVY.price * n;
-      const poor = this.money < price;
-      return `<button class="btn buy sm${poor ? ' poor' : ''}" data-heavy-ammo="${n}" ${poor ? 'disabled' : ''}>+${HEAVY.pack * n} · $${price}</button>`;
-    };
-    return `<div class="shop-item">
-      <canvas class="shop-ic" data-ic="heavy" width="96" height="96"></canvas>
-      <div class="shop-txt"><b>Balas · Torreta pesada</b><span>Cinta de ${HEAVY.pack} balas perforantes por $${HEAVY.price}. Las usa cualquier torreta pesada que montes.</span><small>Tienes: ${this.player.heavyAmmo} balas</small></div>
-      <div class="buy-col">${buy(1)}${buy(5)}</div>
-    </div>`;
-  }
-
-  robotShopItem() {
-    if (this.coop.isGuest) return '<p class="shop-empty">En cooperativo el robot es del anfitrión.</p>';
-    const rb = this.robot;
-    let btn;
-    let info;
-    if (!rb.owned) {
-      const poor = this.money < ROBOT.price;
-      btn = `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="buy" ${poor ? 'disabled' : ''}>$${ROBOT.price}</button>`;
-      info = `Vida ${ROBOT.hp} · se repara aquí`;
-    } else {
-      const cost = rb.repairCost;
-      const poor = this.money < cost;
-      btn =
-        cost > 0
-          ? `<button class="btn buy${poor ? ' poor' : ''}" data-robot-act="repair" ${poor ? 'disabled' : ''}>Reparar $${cost}</button>`
-          : '<button class="btn buy" disabled>Listo</button>';
-      info = rb.broken ? 'DESTRUIDO: repáralo para volver a usarlo' : `Vida ${Math.ceil(rb.hp)} / ${ROBOT.hp}`;
-    }
-    return `<div class="shop-item hot">
-      <canvas class="shop-ic" data-robot width="96" height="96"></canvas>
-      <div class="shop-txt"><b>Robot de combate</b><span>Del doble de tamaño de un gordo. Súbete (E) y camina entre la horda con tu arma en su brazo. No se cura solo: repáralo después de cada oleada.</span><small>${info}</small></div>
-      ${btn}
-    </div>`;
-  }
-
-  buyWeapon(id) {
-    const d = WEAPONS[id];
-    const p = this.player;
-    if (!d || !d.price || p.has(id) || this.money < d.price) return;
-    if (this.online.active) return this.online.buy('gun', id);
-    this.money -= d.price;
-    p.unlock(id);
-    this.sfx.buy();
-    this.toast(`${d.name} comprada`);
-    this.renderShop();
-  }
-
-  sellWeapon(id) {
-    const p = this.player;
-    const d = WEAPONS[id];
-    if (!d || !d.price) return;
-    if (this.online.active) return p.has(id) && this.online.buy('sell', id);
-    if (!p.removeWeapon(id)) return;
-    const gain = Math.round(d.price * SELL_RATE);
-    this.money += gain;
-    this.sfx.buy();
-    this.toast(`${d.name} vendida: +$${gain}`);
-    this.renderShop();
-  }
-
-  buyAmmo(id, n) {
-    const p = this.player;
-    const w = p.weapons.find((x) => x.id === id);
-    if (!w || w.reserve === Infinity) return;
-    const cost = w.def.ammoPrice * n;
-    if (this.money < cost) return;
-    if (this.online.active) return this.online.buy('ammo', id, n);
-    this.money -= cost;
-    w.reserve += p.magSize(w.def) * n;
-    this.sfx.buy();
-    this.renderShop();
-  }
-
-  drawShopIcon(c, k) {
-    const g = c.getContext('2d');
-    g.setTransform(1.6, 0, 0, 1.6, 0, 0);
-    if (k === 'molotov') {
-      g.setTransform(0, -4.2, 4.2, 0, 48, 52);
-      drawBottle(g, true);
-      return;
-    }
-    if (k === 'grenade') {
-      g.setTransform(4.5, 0, 0, 4.5, 0, 0);
-      drawGrenades(g, { grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] });
-      return;
-    }
-    if (k === 'heavy') {
-      // el cañón sobresale del trípode: se centra todo el conjunto
-      g.setTransform(1.15, 0, 0, 1.15, 33 - 1.15 * 20, 48 - 1.15 * 20);
-      drawBlocks(
-        g,
-        { blocks: [{ kind: k, x: 0, y: 0, w: 40, h: 40, hp: 1, max: 1, hitT: 0, ang: 0 }] },
-        {
-          x0: -1e4,
-          y0: -1e4,
-          x1: 1e4,
-          y1: 1e4,
-        },
-      );
-      return;
-    }
-    const def = SHOP[k];
-    const w = def.w;
-    const h = def.h;
-    const s = Math.min(44 / w, 44 / h, 1);
-    g.setTransform(1.6 * s, 0, 0, 1.6 * s, 1.6 * (30 - (w * s) / 2), 1.6 * (30 - (h * s) / 2));
-    if (def.ground)
-      drawGround(
-        g,
-        { scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
-        {
-          x0: -1e4,
-          y0: -1e4,
-          x1: 1e4,
-          y1: 1e4,
-        },
-      );
-    else
-      drawBlocks(
-        g,
-        { blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
-        {
-          x0: -1e4,
-          y0: -1e4,
-          x1: 1e4,
-          y1: 1e4,
-        },
-      );
-  }
-
-  buy(k) {
-    const it = SHOP[k];
-    if (!it || this.money < it.price) return;
-    if (this.online.active) return this.online.buy('item', k);
-    this.money -= it.price;
-    this.inv[k]++;
-    if (!THROWABLES.includes(k) && this.inv[this.buildSel] <= 0) this.buildSel = k;
-    this.sfx.buy();
-    this.renderShop();
-  }
-
   tryBuild() {
     if (this.coop.isGuest) return this.coop.guestBuild();
     if (this.inv[this.buildSel] <= 0) {
@@ -1589,6 +1314,7 @@ class Game {
   bindUi() {
     const on = (id, fn) => this.$(id).addEventListener('click', fn);
     bindHud(this);
+    bindShop(this);
     on('btn-start', () => {
       this.tryFullscreen();
       this.showClass(false);
@@ -1630,7 +1356,6 @@ class Game {
       this.syncSoundLabel();
     });
     this.syncSoundLabel();
-    on('btn-shop-done', () => this.closeShop());
     on('btn-account', () => this.showAccount());
     on('btn-look', () => this.showLook());
     on('btn-look-done', () => this.setState('menu'));
@@ -1696,23 +1421,6 @@ class Game {
       if (this.accounts.current) this.setupMenu();
     });
     this.$('acct-form').addEventListener('submit', (e) => this.submitAccount(e));
-    on('btn-round-shop', () => {
-      if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
-    });
-    this.$('shop-items').addEventListener('click', (e) => {
-      const sell = closest(e.target, '[data-sell]');
-      if (sell) return this.sellWeapon(sell.dataset.sell);
-      const g = closest(e.target, '[data-gun-buy]');
-      if (g) return this.buyWeapon(g.dataset.gunBuy);
-      const a = closest(e.target, '[data-ammo]');
-      if (a) return this.buyAmmo(a.dataset.ammo, Number(a.dataset.n));
-      const hva = closest(e.target, '[data-heavy-ammo]');
-      if (hva) return this.buyHeavyAmmo(Number(hva.dataset.heavyAmmo));
-      const rbt = closest(e.target, '[data-robot-act]');
-      if (rbt) return rbt.dataset.robotAct === 'buy' ? this.buyRobot() : this.repairRobot();
-      const b = closest(e.target, '[data-buy]');
-      if (b) this.buy(b.dataset.buy);
-    });
   }
 
   syncSoundLabel() {
