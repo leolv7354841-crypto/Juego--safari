@@ -197,3 +197,13 @@ export function bindHud(game) {
     game.player.select(Number(b.dataset.i));
   });
 }
+
+// Indicador de conexión del cooperativo y de la partida en línea (se actualiza una vez por segundo).
+export function updateNetStat(game, dt) {
+  const ns = game.$('net-stat');
+  if ((game.coop.active || game.online.active) && game.state !== 'menu') {
+    const txt = game.online.active ? game.online.stats(dt) : game.coop.stats(dt);
+    if (txt) ns.textContent = txt;
+    ns.hidden = false;
+  } else ns.hidden = true;
+}

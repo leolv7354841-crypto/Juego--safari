@@ -1,5 +1,5 @@
 import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
-import { Abilities, isClass } from './sim/abilities.js';
+import { isClass } from './sim/abilities.js';
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
@@ -20,19 +20,19 @@ import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { render, resize, adaptQuality } from './render/scene.js';
 import { saveProgress, loadProgress } from './save.js';
-import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
 import * as Act from './actions.js';
+import { setState, pause, resume, stepState, updatePlay, updateMenu, emitFires } from './states.js';
 import { setupMenu, start, bindMenu } from './ui/menu.js';
 import { bindOver, gameOver } from './ui/over.js';
-import { openLevelUp, chooseUpgrade } from './ui/levelup.js';
-import { drawLookPreview, bindLook } from './ui/look.js';
-import { chooseClass, renderClassRows, bindClass } from './ui/class.js';
+import { openLevelUp } from './ui/levelup.js';
+import { bindLook } from './ui/look.js';
+import { renderClassRows, bindClass } from './ui/class.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
 import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
-import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
+import { toast, banner, updateHud, updateNetStat, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
 import { cleanLook } from './render/sprites.js';
@@ -137,7 +137,7 @@ class Game {
   recordScore = () => Ev.recordScore(this);
   addXp = (n) => Ev.addXp(this, n);
   setAcid = (t) => Ev.setAcid(this, t);
-  updateAcid = (dt) => this.updateAcid(dt);
+  updateAcid = (dt) => Ev.updateAcid(this, dt);
 
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
@@ -157,6 +157,12 @@ class Game {
   toggleRobot = () => Act.toggleRobot(this);
   tryGrenade = (kind) => Act.tryGrenade(this, kind);
   startNextRound = () => Act.startNextRound(this);
+  setState = (name) => setState(this, name);
+  pause = () => pause(this);
+  resume = () => resume(this);
+  update = (dt) => updatePlay(this, dt);
+  updateMenu = (dt) => updateMenu(this, dt);
+  emitFires = (dt) => emitFires(this, dt);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -219,36 +225,6 @@ class Game {
     this.cache = {};
   }
 
-  setState(s) {
-    this.state = s;
-    this.music.setPaused(s !== 'play' && s !== 'menu' && s !== 'look' && s !== 'class');
-    this.root.className = this.root.className.replace(/\bstate-\w+/g, '').trim() + ' state-' + s;
-    this.$('screen-pause').hidden = s !== 'pause';
-    this.$('screen-level').hidden = s !== 'levelup';
-    this.$('screen-over').hidden = s !== 'over';
-    this.$('screen-shop').hidden = s !== 'shop';
-    this.$('screen-account').hidden = s !== 'account';
-    this.$('screen-board').hidden = s !== 'board';
-    this.$('screen-look').hidden = s !== 'look';
-    this.$('screen-coop').hidden = s !== 'coop';
-    this.$('screen-online').hidden = s !== 'online';
-    this.$('screen-class').hidden = s !== 'class';
-  }
-
-  pause() {
-    if (this.state !== 'play') return;
-    this.input.reset();
-    this.setState('pause');
-  }
-
-  resume() {
-    if (this.state !== 'pause') return;
-    this.sfx.unlock();
-    this.input.reset();
-    this.last = performance.now();
-    this.setState('play');
-  }
-
   /* ---------- progreso guardado ---------- */
 
   /* ---------- eventos de combate ---------- */
@@ -296,134 +272,15 @@ class Game {
       adaptQuality(this, dt);
       this.coop.tick(dt);
       this.online.tick(dt);
-      // indicador de conexión del cooperativo (se actualiza una vez por segundo)
-      const ns = this.$('net-stat');
-      if ((this.coop.active || this.online.active) && this.state !== 'menu') {
-        const txt = this.online.active ? this.online.stats(dt) : this.coop.stats(dt);
-        if (txt) ns.textContent = txt;
-        ns.hidden = false;
-      } else ns.hidden = true;
+      updateNetStat(this, dt);
       // en línea el mundo sigue aunque haya otra pantalla encima (mejoras, tienda, pausa)
       if (this.online.active) this.online.update(dt);
-      else if (this.state === 'play') {
-        if (this.coop.isGuest) this.coop.guestUpdate(dt);
-        else this.update(dt);
-      }
-      if (this.state === 'menu') this.updateMenu(dt);
-      else if (this.state === 'look') {
-        this.updateMenu(dt);
-        drawLookPreview(this, dt);
-      } else if (this.state === 'class') {
-        const s = this.input.consume('slot');
-        if (s) chooseClass(this, CLASS_ORDER[s - 1]);
-        this.updateMenu(dt);
-      } else if (this.state === 'levelup') {
-        const s = this.input.consume('slot');
-        if (s) chooseUpgrade(this, s - 1);
-      } else if (this.state === 'pause') {
-        if (this.input.consume('pause')) this.resume();
-      }
+      stepState(this, dt);
       render(this);
     } catch (err) {
       console.error(err);
     }
     requestAnimationFrame((t) => this.loop(t));
-  }
-
-  updateMenu(dt) {
-    this.time += dt;
-    this.menuT += dt;
-    const { x, y } = this.world.spawn;
-    this.horde.update(dt, this);
-    this.particles.update(dt);
-    this.emitFires(dt);
-    this.camera.update(dt, x + Math.cos(this.menuT * 0.12) * 140, y + Math.sin(this.menuT * 0.12) * 90, false);
-    this.input.consume('pause');
-  }
-
-  emitFires(dt) {
-    const v = this.view;
-    for (const f of this.world.fires) {
-      if (f.x < v.x0 - 80 || f.x > v.x1 + 80 || f.y < v.y0 - 80 || f.y > v.y1 + 80) continue;
-      if (Math.random() < dt * 16 * f.s) this.particles.ember(f.x, f.y, f.s);
-    }
-  }
-
-  update(dt) {
-    this.time += dt;
-    const p = this.player;
-    if (this.input.consume('pause')) {
-      this.pause();
-      return;
-    }
-    if (p.alive) {
-      p.update(dt, this);
-      if (this.input.consume('ability')) Act.useAbility(this);
-      Abilities.update(dt, this, p);
-      if (this.input.consume('build')) Act.tryBuild(this);
-      if (this.input.consume('cycleBuild')) Act.cycleBuild(this);
-      if (this.input.consume('grenade')) Act.tryGrenade(this);
-      if (this.input.consume('molotov')) Act.tryGrenade(this, 'molotov');
-      if (this.input.consume('robot')) Act.toggleRobot(this);
-      this.robot.update(dt, p, this);
-      if (this.input.consume('nextRound')) Act.startNextRound(this);
-    }
-    this.structures.update(dt, this);
-    this.flowT -= dt;
-    if (this.flowT <= 0) {
-      this.world.updateFlow(p.x, p.y);
-      const peer = this.coop.isHost ? this.coop.peer : null;
-      if (peer && peer.alive) this.world.computeField(this.world.main2, peer.x, peer.y);
-      this.flowT = 0.2;
-    }
-    // un campo de flanqueo por fotograma (repartido): los zombis rodean por rutas reales
-    if (p.alive) this.world.updateAnchors(p.x, p.y);
-    this.director.update(dt, this);
-    // zombi dorado: de vez en cuando durante una ronda, nunca dos a la vez
-    if (this.director.state === 'active' && p.alive) {
-      this.goldenT = Rules.goldenTick(this, this.goldenT, dt, this.toast);
-    }
-    this.horde.update(dt, this);
-    this.bullets.update(dt, this);
-    this.horde.removeDead();
-    this.pickups.update(dt, this);
-    this.particles.update(dt);
-    this.decals.update(dt);
-    this.emitFires(dt);
-    // gemidos y pasos según cuántos zombis hay cerca (con tope para no saturar)
-    const nc = this.horde.nearCount;
-    if (this.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
-      this.sfx.groan(Math.min(3, 0.5 + nc / 10));
-    this.stepT -= dt;
-    if (nc > 0 && this.stepT <= 0) {
-      this.sfx.footstep(Math.min(1, nc / 20));
-      this.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
-    }
-    this.music.setDanger(p.alive ? this.horde.danger : 0, dt);
-    // muerto en cooperativo: la cámara sigue suave a tu compañero hasta que revivas
-    if (!p.alive && this.coop.peer && this.coop.peer.alive)
-      this.camera.update(dt, this.coop.peer.x, this.coop.peer.y, false);
-    else {
-      const look = this.input.mode === 'mouse' ? 50 : 24;
-      this.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
-    }
-    this.muzzle = Math.max(0, this.muzzle - dt * 14);
-    this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);
-    Ev.updateAcid(this, dt);
-    this.updateHud(false);
-    if (!p.alive) {
-      if (this.coop.active && this.coop.peer && this.coop.peer.alive) return;
-      this.deathT -= dt;
-      if (this.deathT <= 0) this.gameOver();
-      return;
-    }
-    // en cooperativo las mejoras se eligen entre oleadas (el juego no se pausa para el otro)
-    if (this.pendingLevels > 0 && (!this.coop.active || this.director.state === 'waiting')) this.openLevelUp();
-    else if (this.shopPending) this.openShop();
-    else {
-      this.saveT = (this.saveT || 0) + dt;
-      if (this.saveT > (this.director.state === 'active' ? 4 : 2)) this.saveProgress();
-    }
   }
 }
 

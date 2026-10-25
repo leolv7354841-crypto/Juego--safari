@@ -3,7 +3,6 @@ import { rollUpgrades, ICONS } from '../sim/upgrades.js';
 
 export function openLevelUp(game) {
   game.setState('levelup');
-  game.input.reset();
   game.sfx.level();
   const lvl = game.level - game.pendingLevels + 1;
   game.$('level-kicker').textContent = `Nivel ${lvl} alcanzado`;

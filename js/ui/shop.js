@@ -18,7 +18,6 @@ import { closest, on } from './dom.js';
 
 export function openShop(game) {
   game.shopPending = false;
-  game.input.reset();
   game.setState('shop');
   game.$('shop-kicker').textContent = `Oleada ${game.director.wave} superada`;
   renderShop(game);
