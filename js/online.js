@@ -453,6 +453,11 @@ export class Online {
     for (const b of st.blocks) {
       b.hitT -= dt;
       if (b.flash) b.flash = Math.max(0, b.flash - dt);
+      // torreta pesada de otro: el cañón se acerca al ángulo de la última foto
+      if (b.manned && b.manned !== p && b.ta !== undefined) {
+        b.ang = angleTo(b.ang, b.ta, dt * 12);
+        b.recoil = Math.max(0, (b.recoil || 0) - dt * 10);
+      }
     }
     for (const w of st.wires) w.hitT -= dt;
     g.particles.update(dt);
@@ -593,6 +598,7 @@ export class Online {
     this.left = s.lft | 0;
     this.applyPeers(s.pl || [], ts);
     this.applyRobots(s.rb || []);
+    this.applyHeavy(s);
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], ts);
     const pk = s.pk || [];
     g.pickups.list = [];
@@ -806,12 +812,45 @@ export class Online {
           const b = st.blocks[i];
           if (q[5] < b.hp) b.hitT = 0.12;
           b.hp = q[5];
-          b.ang = q[6] / 100;
+          // el cañón de la torreta pesada propia gira con la predicción, no con la foto
+          if (b.manned !== g.player) b.ang = q[6] / 100;
         });
       }
     }
     if (Array.isArray(s.wir)) st.wires = s.wir.filter((q) => Array.isArray(q) && SHOP[q[0]] && SHOP[q[0]].ground).map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
     if (Array.isArray(s.sc)) st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
+  }
+
+  // Torretas pesadas: la que maneja él (su cuerpo queda detrás del cañón, también al predecir)
+  // y las de los demás (el cañón gira hacia el ángulo de la foto, ver update).
+  applyHeavy(s) {
+    const g = this.game;
+    const p = g.player;
+    const st = Array.isArray(s.st) ? s.st : [];
+    p.heavyAmmo = Math.max(0, st[10] | 0);
+    const heavy = g.structures.blocks.filter((b) => b.kind === 'heavy');
+    const at = (x, y) => heavy.find((b) => b.x === x && b.y === y) || null;
+    const old = p.manned;
+    for (const b of heavy) b.manned = null;
+    for (const q of this.peers.values()) q.manned = null;
+    const hv = Array.isArray(s.hv) ? s.hv : [];
+    for (let i = 0; i + 4 < hv.length; i += 5) {
+      const b = at(hv[i], hv[i + 1]);
+      const q = this.peers.get(hv[i + 3]);
+      if (!b || !q) continue;
+      b.manned = q;
+      q.manned = b;
+      b.ta = hv[i + 2] / 100;
+      if (hv[i + 4]) {
+        b.side = hv[i + 4];
+        b.flash = 0.05;
+        b.recoil = 1;
+      }
+    }
+    const mine = p.alive && Number(st[11]) >= 0 ? at(st[11], st[12]) : null;
+    if (mine && old && old !== mine && old.x === mine.x && old.y === mine.y) mine.ang = old.ang;
+    p.manned = mine;
+    if (mine) mine.manned = p;
   }
 
   // Robots: el propio en game.robot (tienda, barra de vida, dibujo) y los de los demás aparte.

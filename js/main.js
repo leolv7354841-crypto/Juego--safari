@@ -565,8 +565,10 @@ class Game {
   // Subirse o bajarse del robot (E o el botón ROBOT). Junto a una torreta pesada, la monta.
   toggleRobot() {
     const p = this.player;
+    // en línea la monta y la deja el servidor (que repite estas comprobaciones)
+    if (this.online.active && (p.manned || (!p.inRobot && this.structures.nearHeavy(p)))) return this.online.act('robot');
     if (p.manned) return this.leaveHeavy();
-    if (!p.inRobot && !this.online.active && !this.coop.isGuest) {
+    if (!p.inRobot && !this.coop.isGuest) {
       const h = this.structures.nearHeavy(p);
       if (h) return this.mountHeavy(h);
     }
@@ -598,25 +600,21 @@ class Game {
 
   mountHeavy(b) {
     const p = this.player;
-    p.manned = b;
-    b.manned = p;
-    p.reloadT = 0;
-    p.target = null;
+    this.structures.mountHeavy(p, b);
     this.sfx.build();
     this.camera.shake(0.12);
     if (p.heavyAmmo <= 0) this.toast('Torreta sin balas: cómpralas en la tienda');
   }
 
   leaveHeavy() {
-    const p = this.player;
-    if (p.manned) p.manned.manned = null;
-    p.manned = null;
+    this.structures.leaveHeavy(this.player);
     this.sfx.build();
   }
 
   buyHeavyAmmo(n) {
     const cost = HEAVY.price * n;
     if (this.money < cost) return;
+    if (this.online.active) return this.online.buy('heavy', 'ammo', n);
     this.money -= cost;
     this.player.heavyAmmo += HEAVY.pack * n;
     this.sfx.buy();
@@ -1395,8 +1393,8 @@ class Game {
         </div>
       </div>`;
     });
-    // la torreta pesada sólo se maneja en solitario o como anfitrión del cooperativo
-    const noHeavy = this.online.active || this.coop.isGuest;
+    // en cooperativo la torreta pesada es del anfitrión
+    const noHeavy = this.coop.isGuest;
     const gear = SHOP_ORDER.filter((k) => !(noHeavy && SHOP[k].manned)).map((k) => {
       const it = SHOP[k];
       const poor = this.money < it.price;
@@ -2210,9 +2208,9 @@ class Game {
       if (p.inRobot) this.robot.draw(ctx, p, this.time);
       else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
-      this.structures.drawMannedHeavy(ctx);
       this.coop.drawPeer(ctx);
       this.online.drawPeers(ctx);
+      this.structures.drawMannedHeavy(ctx);
     }
     this.horde.draw(ctx, v, base, 'giant');
     this.bullets.draw(ctx);

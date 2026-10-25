@@ -16,7 +16,7 @@ import { Robot } from '../../../js/robot.js';
 import { bulletHit } from '../../../js/combat.js';
 import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
-import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, ABILITY, CLASS_ORDER, xpForLevel } from '../../../js/config.js';
+import { GOLDEN, DROPS, WORLD_SIZE, WEAPON_ORDER, NET, WEAPONS, BOUNTY, SELL_RATE, SHOP, SHOP_ORDER, BUILD_ORDER, THROWABLES, ROBOT, ROCKET, MONEY_LOSS, ABILITY, CLASS_ORDER, HEAVY, xpForLevel } from '../../../js/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
 import { Abilities, isClass } from '../../../js/abilities.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
@@ -370,6 +370,7 @@ export class ServerSim {
     if (!s || !s.p.alive || this.director.state !== 'waiting') return false;
     if (k === 'item') return this.buyItem(s, wid);
     if (k === 'robot') return this.buyRobot(s, wid);
+    if (k === 'heavy') return this.buyHeavyAmmo(s, n);
     const d = Object.hasOwn(WEAPONS, wid) ? (WEAPONS as any)[wid] : null;
     if (!d) return false;
     const p = s.p;
@@ -397,10 +398,18 @@ export class ServerSim {
   // Barricadas, trampas, granadas y molotovs: van a su inventario y los usa cuando quiere.
   buyItem(s: Slot, k: string) {
     const it = Object.hasOwn(SHOP, k) ? (SHOP as any)[k] : null;
-    // la torreta pesada se maneja a mano: en línea no se vende
-    if (!it || it.manned || s.money < it.price) return false;
+    if (!it || s.money < it.price) return false;
     s.money -= it.price;
     s.inv[k]++;
+    return true;
+  }
+
+  // Balas de la torreta pesada: las usa cualquiera que monte (de 1 o 5 cintas).
+  buyHeavyAmmo(s: Slot, n: number) {
+    const cost = HEAVY.price * n;
+    if ((n !== 1 && n !== 5) || s.money < cost) return false;
+    s.money -= cost;
+    s.p.heavyAmmo += HEAVY.pack * n;
     return true;
   }
 
@@ -469,10 +478,24 @@ export class ServerSim {
     }
   }
 
-  // Subirse o bajarse de su robot (las mismas reglas que en solitario).
+  // Subirse o bajarse de su robot (las mismas reglas que en solitario); junto a una torreta
+  // pesada libre, la monta.
   toggleRobot(s: Slot) {
     const rb = s.robot;
     const p = s.p;
+    const st = this.structures;
+    if (p.manned) {
+      st.leaveHeavy(p);
+      this.game.sfx.build();
+      return;
+    }
+    const h = p.inRobot ? null : st.nearHeavy(p);
+    if (h) {
+      st.mountHeavy(p, h);
+      this.game.sfx.build();
+      if (p.heavyAmmo <= 0) s.toasts.push('Torreta sin balas: cómpralas en la tienda');
+      return;
+    }
     if (!rb.owned) return s.toasts.push('Compra el robot de combate en la tienda');
     if (rb.piloted) {
       rb.leave(p, this.world);
@@ -561,6 +584,7 @@ export class ServerSim {
     for (const s of this.slots.values()) {
       if (s.p.alive || s.p.counted) continue;
       s.p.counted = true;
+      this.structures.leaveHeavy(s.p);
       s.deaths++;
       s.queue.length = 0;
       s.acts.length = 0;
@@ -609,12 +633,15 @@ export class ServerSim {
     const s = this.slots.get(id);
     if (!s) return;
     s.away = away;
+    if (away) this.structures.leaveHeavy(s.p);
     s.queue.length = 0;
     s.acts.length = 0;
     s.last = { ...s.last, mx: 0, my: 0, f: 0 };
   }
 
   remove(id: string) {
+    const s = this.slots.get(id);
+    if (s) this.structures.leaveHeavy(s.p);
     this.slots.delete(id);
   }
 
@@ -789,7 +816,7 @@ export class ServerSim {
       q: ++this.snapN, t: this.tick, ts: Math.round(now), ack: s.ack,
       me: packBody(me),
       st: [Math.ceil(me.hp), me.stats.maxHp, me.alive ? 1 : 0, me.wi, r100(Math.max(0, me.reloadT)), r100(me.reloadProg || 0), s.kills, s.money,
-        Math.round(s.acidT * 10), me.inRobot ? 1 : 0],
+        Math.round(s.acidT * 10), me.inRobot ? 1 : 0, me.heavyAmmo, me.manned ? me.manned.x : -1, me.manned ? me.manned.y : -1],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
       o: [ox, oy], z, zx, zh, pl,
       pk: this.pickups.list.flatMap((it: any) => (near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [])),
@@ -799,6 +826,11 @@ export class ServerSim {
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
       iv: SHOP_ORDER.map((k: string) => s.inv[k]),
       rb,
+      // torretas pesadas que manejan los demás: dónde, ángulo del cañón, quién y cañón que disparó
+      hv: st.blocks.flatMap((b: any) => {
+        const q = b.kind === 'heavy' && b.manned && b.manned !== me && near(b.x, b.y) ? this.slotOf(b.manned) : null;
+        return q ? [b.x, b.y, r100(b.ang), q.idx, b.flash > 0 ? b.side : 0] : [];
+      }),
       // granadas en el aire, fuego, cohetes clavados y explosiones (sólo lo cercano)
       gr: st.grenades.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), Math.round(q.h), r100(q.rot), q.kind === 'molotov' ? 1 : 0, q.t > q.dur ? 1 : 0] : [])),
       fi: st.fires.flatMap((f: any) => (near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [])),
