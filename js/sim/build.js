@@ -2,7 +2,7 @@
 import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.js';
 import { TAU, rand, clamp, roundRect } from '../core/util.js';
 import { OUT, flameSprite } from '../render/sprites.js';
-import { drawRocket } from './bullets.js';
+import { drawRocket } from '../render/bullets.js';
 
 const SNAP = 20;
 const TRAP_WIRE = { slow: 0.35, dps: 14 };

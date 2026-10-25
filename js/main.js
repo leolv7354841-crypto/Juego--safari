@@ -37,6 +37,8 @@ import { Horde } from './sim/zombies.js';
 import { Bullets } from './sim/bullets.js';
 import { Particles, Decals } from './render/particles.js';
 import { Pickups } from './sim/pickups.js';
+import { drawPickups } from './render/pickups.js';
+import { drawBullets } from './render/bullets.js';
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Input } from './ui/input.js';
@@ -2367,7 +2369,7 @@ class Game {
     this.decals.drawPools(ctx, v);
     this.decals.draw(ctx, v);
     this.structures.drawBlocks(ctx, v);
-    this.pickups.draw(ctx, v, this.time);
+    drawPickups(ctx, this.pickups.list, v, this.time);
     if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0)
       this.structures.drawGhost(ctx, this, this.buildSel, this.time);
     this.horde.draw(ctx, v, base, 'small');
@@ -2385,7 +2387,7 @@ class Game {
       this.structures.drawMannedHeavy(ctx);
     }
     this.horde.draw(ctx, v, base, 'giant');
-    this.bullets.draw(ctx);
+    drawBullets(ctx, this.bullets.list);
     this.coop.drawRemoteBullets(ctx);
     this.online.drawRemoteBullets(ctx);
     this.structures.drawGrenades(ctx);

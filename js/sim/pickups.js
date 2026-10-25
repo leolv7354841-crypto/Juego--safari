@@ -1,8 +1,7 @@
-import { drawPickup } from '../render/sprites.js';
 import { rand, pick } from '../core/util.js';
 import { CRATE_WEAPONS, WEAPONS } from '../core/config.js';
 
-const LIFE = 22;
+export const LIFE = 22;
 
 export class Pickups {
   constructor() {
@@ -107,14 +106,5 @@ export class Pickups {
     }
     game.sfx.pickup();
     return true;
-  }
-
-  draw(ctx, view, time) {
-    for (const it of this.list) {
-      if (it.x < view.x0 - 20 || it.x > view.x1 + 20 || it.y < view.y0 - 20 || it.y > view.y1 + 20) continue;
-      // parpadea cuando está por desaparecer
-      if (it.t > LIFE - 4 && Math.sin(it.t * 18) > 0) continue;
-      drawPickup(ctx, it.k, it.x, it.y, time + it.x);
-    }
   }
 }
