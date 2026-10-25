@@ -47,8 +47,9 @@ import { setChunkView, drawGround as drawWorldGround, drawOverhead } from './ren
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
-import { CROWN_SVG } from './ui/icons.js';
 import { saveProgress, loadProgress } from './save.js';
+import { showAccount, bindAccount } from './ui/account.js';
+import { refreshHall, bindBoard } from './ui/board.js';
 import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
 import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
@@ -104,7 +105,7 @@ class Game {
     this.newWorld();
     this.setupMenu();
     // al entrar: crear cuenta o elegir una
-    if (!this.accounts.current) this.showAccount();
+    if (!this.accounts.current) showAccount(this);
     // como Artifact de Claude: progreso en la nube y clasificación global
     // clasificación mundial: sube tu mejor marca al abrir el juego (por si antes no hubo conexión)
     if (this.accounts.current) this.accounts.pushOnline(this.accounts.current);
@@ -114,7 +115,7 @@ class Game {
       const cur = this.accounts.current;
       if (cur && cur.best) await this.accounts.pushScore(cur);
       if (cur && (await this.accounts.cloudPull()) && this.state === 'menu') this.setupMenu();
-      else if (this.state === 'menu') this.refreshHall();
+      else if (this.state === 'menu') refreshHall(this);
     });
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
@@ -224,7 +225,7 @@ class Game {
     }
     this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
     this.$('btn-start').classList.toggle('primary', !save);
-    this.refreshHall();
+    refreshHall(this);
     const best = storage.get('dz-best', null);
     this.$('best').textContent = best
       ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}`
@@ -1042,153 +1043,6 @@ class Game {
 
   /* ---------- cuentas y clasificación ---------- */
 
-  showAccount() {
-    this.setState('account');
-    const acc = this.accounts;
-    this.$('acct-error').textContent = '';
-    this.$('acct-name-in').value = acc.current ? acc.current.name : '';
-    this.$('acct-pin-in').value = '';
-    const names = Object.values(acc.list).map((a) => a.name);
-    const box = this.$('acct-known');
-    box.innerHTML = '';
-    box.hidden = !names.length;
-    for (const n of names) {
-      const b = document.createElement('button');
-      b.className = 'chip';
-      b.type = 'button';
-      b.textContent = n;
-      b.addEventListener('click', () => {
-        this.$('acct-name-in').value = n;
-        this.$('acct-pin-in').focus();
-      });
-      box.appendChild(b);
-    }
-    this.$('acct-cloud').hidden = !acc.cloud;
-  }
-
-  async submitAccount(e) {
-    e.preventDefault();
-    const err = this.accounts.login(this.$('acct-name-in').value, this.$('acct-pin-in').value);
-    if (err) {
-      this.$('acct-error').textContent = err;
-      return;
-    }
-    this.sfx.unlock();
-    await this.accounts.cloudPull();
-    this.newWorld();
-    this.setupMenu();
-  }
-
-  async showBoard() {
-    this.setState('board');
-    const acc = this.accounts;
-    const tab = this.boardTab || (acc.hasGlobal ? 'global' : 'local');
-    this.syncBoardTabs('board', tab);
-    this.$('board-note').textContent = acc.hasGlobal
-      ? 'Mundial: récords de todos los que juegan. Dispositivo: cuentas guardadas en este navegador.'
-      : 'Récords de las cuentas creadas en este navegador. Para competir entre dispositivos hace falta un servidor (ver README).';
-    const target = { podium: this.$('board-podium'), list: this.$('board-list'), me: null, max: 50 };
-    if (tab === 'global') this.renderBoard(null, target, 'Cargando…');
-    const rows = await this.boardRows(tab);
-    if (this.state === 'board')
-      this.renderBoard(
-        rows,
-        target,
-        tab === 'global' ? 'Todavía no hay récords globales.' : 'Todavía no hay récords. ¡Termina una oleada!',
-      );
-  }
-
-  syncBoardTabs(prefix, tab) {
-    const g = this.$(prefix + '-tab-global');
-    g.hidden = !this.accounts.hasGlobal;
-    g.classList.toggle('on', tab === 'global');
-    this.$(prefix + '-tab-local').classList.toggle('on', tab === 'local');
-  }
-
-  async boardRows(tab) {
-    return tab === 'global' ? await this.accounts.globalBoard() : this.accounts.localBoard();
-  }
-
-  // Salón de la fama del menú principal + tu puesto junto al nombre.
-  async refreshHall() {
-    const acc = this.accounts;
-    const tab = this.boardTab || (acc.hasGlobal ? 'global' : 'local');
-    this.syncBoardTabs('hall', tab);
-    const target = { podium: this.$('hall-podium'), list: this.$('hall-list'), me: this.$('hall-me'), max: 8 };
-    const local = acc.localBoard();
-    this.renderBoard(tab === 'local' ? local : null, target, tab === 'global' ? 'Cargando…' : '');
-    const online = tab === 'global' ? await acc.globalBoard() : local;
-    if (this.state !== 'menu') return;
-    // si la mundial falla, muestra la de este dispositivo y avisa por qué
-    const rows = online || local;
-    if (tab === 'global') this.renderBoard(rows, target, 'Todavía no hay récords. ¡Termina una oleada!');
-    const err = tab === 'global' && !online ? acc.onlineError || 'No se pudo cargar la clasificación mundial.' : null;
-    if (err) {
-      const li = document.createElement('li');
-      li.className = 'board-empty online-err';
-      li.textContent = err;
-      this.$('hall-list').appendChild(li);
-    }
-    const badge = this.$('acct-rank');
-    const cur = acc.current;
-    const i = cur && rows ? rows.findIndex((r) => acc.isMine(r)) : -1;
-    badge.hidden = !cur;
-    badge.className = 'rank-badge' + (i === 0 ? ' r1' : i === 1 ? ' r2' : i === 2 ? ' r3' : i < 0 ? ' none' : '');
-    badge.textContent = i >= 0 ? `Top #${i + 1}${tab === 'global' && online ? ' mundial' : ''}` : 'Sin rango';
-  }
-
-  renderBoard(rows, t, empty) {
-    const cur = this.accounts.current;
-    const el = (tag, cls, text) => {
-      const e = document.createElement(tag);
-      if (cls) e.className = cls;
-      if (text != null) e.textContent = text;
-      return e;
-    };
-    const list = rows || [];
-    const top = list.length ? Math.max(1, list[0].wave) : 1;
-    // podio: 2.º, 1.º, 3.º
-    t.podium.innerHTML = '';
-    for (const i of [1, 0, 2]) {
-      const r = list[i];
-      const pod = el('div', `pod p${i + 1}${r ? '' : ' empty'}${r && this.accounts.isMine(r) ? ' me' : ''}`);
-      if (i === 0) pod.appendChild(el('div', 'pod-crown')).innerHTML = CROWN_SVG;
-      pod.appendChild(el('div', 'pod-medal', String(i + 1)));
-      pod.appendChild(el('b', 'pod-name', r ? r.name : rows ? (i === 0 ? '¡Sé el primero!' : 'Libre') : '…'));
-      const wv = pod.appendChild(el('span', 'pod-wave'));
-      wv.appendChild(el('b', null, r ? String(r.wave) : '—'));
-      wv.appendChild(document.createTextNode(' oleada'));
-      pod.appendChild(el('span', 'pod-kills', r ? `${r.kills} bajas · ${fmtTime(r.time || 0)}` : ' '));
-      pod.appendChild(el('div', 'pod-base'));
-      t.podium.appendChild(pod);
-    }
-    t.list.innerHTML = '';
-    if (!list.length && empty) {
-      t.list.appendChild(el('li', 'board-empty', empty));
-    }
-    list.slice(3, t.max).forEach((r, k) => {
-      const li = el('li', this.accounts.isMine(r) ? 'me' : '');
-      li.appendChild(el('b', 'rk', String(k + 4)));
-      li.appendChild(el('span', 'nm', r.name));
-      li.appendChild(el('span', 'st', `Oleada ${r.wave} · ${r.kills} bajas · ${fmtTime(r.time || 0)}`));
-      const bar = li.appendChild(el('i', 'bar-w'));
-      bar.style.setProperty('--w', `${Math.round((r.wave / top) * 100)}%`);
-      t.list.appendChild(li);
-    });
-    if (t.me) {
-      t.me.innerHTML = '';
-      const i = cur ? list.findIndex((r) => this.accounts.isMine(r)) : -1;
-      if (cur && i >= 0) {
-        t.me.appendChild(el('span', 'me-tag', 'Tu puesto'));
-        t.me.appendChild(el('b', 'me-rank', `#${i + 1}`));
-        t.me.appendChild(el('span', 'me-st', `Oleada ${list[i].wave} · ${list[i].kills} bajas`));
-      } else if (cur && rows) {
-        t.me.appendChild(el('span', 'me-tag', 'Tu puesto'));
-        t.me.appendChild(el('span', 'me-st', 'Supera una oleada para entrar al salón'));
-      }
-    }
-  }
-
   startNextRound() {
     if (this.online.active) return this.online.send('next');
     if (this.coop.isGuest) return this.coop.send({ t: 'next' });
@@ -1315,6 +1169,8 @@ class Game {
     const on = (id, fn) => this.$(id).addEventListener('click', fn);
     bindHud(this);
     bindShop(this);
+    bindAccount(this);
+    bindBoard(this);
     on('btn-start', () => {
       this.tryFullscreen();
       this.showClass(false);
@@ -1356,7 +1212,6 @@ class Game {
       this.syncSoundLabel();
     });
     this.syncSoundLabel();
-    on('btn-account', () => this.showAccount());
     on('btn-look', () => this.showLook());
     on('btn-look-done', () => this.setState('menu'));
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -1364,7 +1219,6 @@ class Game {
       this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }),
     );
     on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
-    on('btn-leaderboard', () => this.showBoard());
     on('btn-coop', () => this.showCoop());
     on('btn-online', () => this.showOnline());
     on('btn-ol-create', () => this.onlineCreate());
@@ -1400,27 +1254,6 @@ class Game {
       e.preventDefault();
       this.coopJoin();
     });
-    on('btn-board-back', () => this.setupMenu());
-    on('board-tab-local', () => {
-      this.boardTab = 'local';
-      this.showBoard();
-    });
-    on('board-tab-global', () => {
-      this.boardTab = 'global';
-      this.showBoard();
-    });
-    on('hall-tab-local', () => {
-      this.boardTab = 'local';
-      this.refreshHall();
-    });
-    on('hall-tab-global', () => {
-      this.boardTab = 'global';
-      this.refreshHall();
-    });
-    on('btn-acct-back', () => {
-      if (this.accounts.current) this.setupMenu();
-    });
-    this.$('acct-form').addEventListener('submit', (e) => this.submitAccount(e));
   }
 
   syncSoundLabel() {
