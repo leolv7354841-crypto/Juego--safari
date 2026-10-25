@@ -67,7 +67,7 @@ export function renderShop(game) {
     </div>`;
     });
   // en cooperativo la torreta pesada es del anfitrión
-  const noHeavy = game.coop.isGuest;
+  const noHeavy = !game.mode.hasHeavy();
   const gear = SHOP_ORDER.filter((k) => !(noHeavy && SHOP[k].manned)).map((k) => {
     const it = SHOP[k];
     const poor = game.money < it.price;
@@ -123,7 +123,7 @@ export function heavyAmmoItem(game) {
 }
 
 export function robotShopItem(game) {
-  if (game.coop.isGuest) return '<p class="shop-empty">En cooperativo el robot es del anfitrión.</p>';
+  if (!game.mode.hasRobot()) return '<p class="shop-empty">En cooperativo el robot es del anfitrión.</p>';
   const rb = game.robot;
   let btn;
   let info;
@@ -151,7 +151,7 @@ export function buyWeapon(game, id) {
   const d = WEAPONS[id];
   const p = game.player;
   if (!d || !d.price || p.has(id) || game.money < d.price) return;
-  if (game.online.active) return game.online.buy('gun', id);
+  if (game.mode.viaServer()) return game.online.buy('gun', id);
   game.money -= d.price;
   p.unlock(id);
   game.sfx.buy();
@@ -163,7 +163,7 @@ export function sellWeapon(game, id) {
   const p = game.player;
   const d = WEAPONS[id];
   if (!d || !d.price) return;
-  if (game.online.active) return p.has(id) && game.online.buy('sell', id);
+  if (game.mode.viaServer()) return p.has(id) && game.online.buy('sell', id);
   if (!p.removeWeapon(id)) return;
   const gain = Math.round(d.price * SELL_RATE);
   game.money += gain;
@@ -178,7 +178,7 @@ export function buyAmmo(game, id, n) {
   if (!w || w.reserve === Infinity) return;
   const cost = w.def.ammoPrice * n;
   if (game.money < cost) return;
-  if (game.online.active) return game.online.buy('ammo', id, n);
+  if (game.mode.viaServer()) return game.online.buy('ammo', id, n);
   game.money -= cost;
   w.reserve += p.magSize(w.def) * n;
   game.sfx.buy();
@@ -245,7 +245,7 @@ export function drawShopIcon(game, c, k) {
 export function buy(game, k) {
   const it = SHOP[k];
   if (!it || game.money < it.price) return;
-  if (game.online.active) return game.online.buy('item', k);
+  if (game.mode.viaServer()) return game.online.buy('item', k);
   game.money -= it.price;
   game.inv[k]++;
   if (!THROWABLES.includes(k) && game.inv[game.buildSel] <= 0) game.buildSel = k;
@@ -256,7 +256,7 @@ export function buy(game, k) {
 export function buyHeavyAmmo(game, n) {
   const cost = HEAVY.price * n;
   if (game.money < cost) return;
-  if (game.online.active) return game.online.buy('heavy', 'ammo', n);
+  if (game.mode.viaServer()) return game.online.buy('heavy', 'ammo', n);
   game.money -= cost;
   game.player.heavyAmmo += HEAVY.pack * n;
   game.sfx.buy();
@@ -266,7 +266,7 @@ export function buyHeavyAmmo(game, n) {
 export function buyRobot(game) {
   const rb = game.robot;
   if (rb.owned || game.money < ROBOT.price) return;
-  if (game.online.active) return game.online.buy('robot', 'buy');
+  if (game.mode.viaServer()) return game.online.buy('robot', 'buy');
   game.money -= ROBOT.price;
   rb.deploy(game.player, game.world);
   game.sfx.buy();
@@ -278,7 +278,7 @@ export function repairRobot(game) {
   const rb = game.robot;
   const cost = rb.repairCost;
   if (!rb.owned || cost <= 0 || game.money < cost) return;
-  if (game.online.active) return game.online.buy('robot', 'repair');
+  if (game.mode.viaServer()) return game.online.buy('robot', 'repair');
   game.money -= cost;
   rb.hp = ROBOT.hp;
   game.sfx.build();

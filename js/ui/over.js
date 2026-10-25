@@ -4,7 +4,7 @@ import { on } from './dom.js';
 import { showClass } from './class.js';
 
 export function gameOver(game) {
-  if (game.coop.isHost) game.coop.send({ t: 'over' });
+  game.mode.onGameOver();
   game.setState('over');
   const p = game.player;
   const total = game.totalKills();
@@ -54,11 +54,11 @@ export function gameOver(game) {
 export function bindOver(game) {
   // en cooperativo reinicia el anfitrión (el invitado espera)
   const again = () => {
-    if (game.online.active) return game.toast('En línea la partida sigue mientras quede alguien vivo');
-    if (game.coop.isHost) return game.coop.restart();
-    if (game.coop.isGuest) return game.toast('Espera a que el anfitrión reinicie la partida');
+    const why = game.mode.restartBlocked();
+    if (why) return game.toast(why);
+    if (game.mode.restart()) return;
     // venías del cooperativo: al menú, donde sigue tu partida normal
-    if (game.coopRun) {
+    if (game.mode.detached) {
       game.newWorld();
       return game.setupMenu();
     }

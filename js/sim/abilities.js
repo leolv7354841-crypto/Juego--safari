@@ -42,13 +42,13 @@ export const Abilities = {
   },
 
   // Lanza la habilidad. owner: dueño de las bajas (en línea, el id del jugador).
-  // Con game.remoteSim (invitado o cliente en línea) el misil lo crea quien simula.
+  // Sin autoridad (invitado o cliente en línea) el misil lo crea quien simula.
   /** @param {string | null} [owner] */
   use(game, p, tx, ty, owner = null) {
     if (!this.ready(p)) return false;
     p.abCd = cooldownOf(p);
     if (p.cls === 'bomber') {
-      if (!game.remoteSim) game.structures.launchMissile(game, p, tx, ty, owner);
+      if (game.mode.authority()) game.structures.launchMissile(game, p, tx, ty, owner);
     } else if (p.cls === 'berserker') {
       p.rageT = ABILITY.berserker.time;
       p.rageAcc = 0;
@@ -125,6 +125,6 @@ export const Abilities = {
     if (p === game.player) game.camera.shake(0.05);
     game.particles.muzzleSmoke(ox, oy, p.angle);
     // invitado en cooperativo: las balas que de verdad hacen daño las crea el anfitrión
-    if (game.coop && game.coop.isGuest) game.coop.sendShot(ox, oy, fired, d, p.stats);
+    game.mode.reportShot(ox, oy, fired, d, p.stats);
   },
 };

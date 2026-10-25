@@ -7,7 +7,7 @@ export function openLevelUp(game) {
   const lvl = game.level - game.pendingLevels + 1;
   game.$('level-kicker').textContent = `Nivel ${lvl} alcanzado`;
   // en línea las ofrece el servidor (es quien aplica la mejora)
-  game.choices = game.online.active ? game.online.upChoices() : rollUpgrades(game.player, lvl, game.taken);
+  game.choices = game.mode.viaServer() ? game.online.upChoices() : rollUpgrades(game.player, lvl, game.taken);
   const wrap = game.$('cards');
   wrap.classList.remove('ready');
   wrap.innerHTML = '';
@@ -31,7 +31,7 @@ export function chooseUpgrade(game, i) {
   if (game.state !== 'levelup' || performance.now() < game.levelReadyAt) return;
   const u = game.choices[i];
   if (!u) return;
-  if (game.online.active) {
+  if (game.mode.viaServer()) {
     // la siguiente tanda (si quedan niveles) llega con la próxima foto del servidor
     game.online.pickUpgrade(i);
     game.taken[u.id] = (game.taken[u.id] || 0) + 1;

@@ -40,8 +40,7 @@ function juego(over = {}) {
       consume: () => 0,
     },
     sfx: { unlock() {} },
-    online: { active: false },
-    coop: { isGuest: false },
+    mode: { step: () => false },
     last: 0,
     pantallas,
     $: (id) => {
@@ -158,12 +157,9 @@ test('stepState ejecuta el update del estado actual', () => {
   assert.equal(g.state, 'over');
 });
 
-test('en línea la partida no la actualiza el cliente; el invitado solo predice', () => {
+test('si el modo avanza el fotograma (invitado, en línea) no corre la simulación local', () => {
   let guest = 0;
-  const g = juego({ state: 'play', online: { active: true }, coop: { isGuest: true, guestUpdate: () => guest++ } });
-  stepState(g, 0.016);
-  assert.equal(guest, 0);
-  g.online.active = false;
+  const g = juego({ state: 'play', mode: { step: () => ++guest > 0 } });
   stepState(g, 0.016);
   assert.equal(guest, 1);
 });

@@ -409,7 +409,7 @@ export class Structures {
     game.sfx.acid();
     game.camera.shake(0.2, x, y);
     for (const p of game.targets || [game.player]) if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
-    if (game.coop && game.coop.isHost) game.coop.acidAt(x, y, R);
+    game.mode.onAcid(x, y, R);
   }
 
   // fling > 0: la onda lanza a volar a los que sobreviven (cohetes de bazuca)

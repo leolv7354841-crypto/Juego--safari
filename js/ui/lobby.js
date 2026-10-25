@@ -170,7 +170,7 @@ export async function openInvite(game) {
 }
 
 export function toggleDiag(game) {
-  if (!game.online.active) return;
+  if (!game.mode.viaServer()) return;
   const el = game.$('net-diag');
   el.hidden = !el.hidden;
 }
@@ -238,7 +238,7 @@ export async function coopJoin(game) {
     coopStatus(game, '¡Conectado! Esperando al anfitrión…');
     // si el anfitrión no arranca en un rato, algo falló
     const t0 = performance.now();
-    while (!game.coop.active && game.state === 'coop') {
+    while (!game.mode.inGroup() && game.state === 'coop') {
       if (performance.now() - t0 > 20000) throw new Error('tiempo');
       await new Promise((r) => setTimeout(r, 250));
     }
@@ -270,7 +270,7 @@ export function bindLobby(game) {
   // tocar el indicador de conexión abre el panel de diagnóstico (también con F3)
   game.$('net-stat').addEventListener('click', () => toggleDiag(game));
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'F3' && game.online.active) {
+    if (e.code === 'F3' && game.mode.viaServer()) {
       e.preventDefault();
       toggleDiag(game);
     }

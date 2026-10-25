@@ -376,7 +376,7 @@ export class Player {
     if (this.heavyAmmo <= 0) {
       game.sfx.empty();
       this.fireCd = 0.5;
-      if (!game.remoteSim) game.toast('Torreta sin balas: cómpralas en la tienda');
+      if (game.mode.authority()) game.toast('Torreta sin balas: cómpralas en la tienda');
       return;
     }
     this.heavyAmmo--;
@@ -497,7 +497,7 @@ export class Player {
     game.particles.muzzleSmoke(sx, sy, this.angle);
     game.sfx.shot(d.id);
     // invitado en cooperativo: el anfitrión crea las balas que de verdad hacen daño
-    if (game.coop && game.coop.isGuest) game.coop.sendShot(ox, oy, fired, d, this.stats);
+    game.mode.reportShot(ox, oy, fired, d, this.stats);
     if (w.mag === 0 && w.reserve > 0) this.startReload(game);
   }
 }

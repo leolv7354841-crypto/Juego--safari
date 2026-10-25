@@ -5,14 +5,14 @@ import * as Rules from './sim/rules.js';
 
 export function hitZombie(game, z, b, hx, hy) {
   // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
-  if (z.dead || game.remoteSim) return;
+  if (z.dead || !game.mode.authority()) return;
   // quién lo hirió (cooperativo: las bajas del compañero le dan el dinero a él)
   if (Rules.hitZombie(game, z, b, hx, hy, () => game.player.shotsHit++)) killZombie(game, z);
 }
 
 export function killZombie(game, z) {
   // cooperativo: las bajas del compañero le dan el dinero a él
-  const byPeer = z.lastOwner === 'peer' && game.coop.isHost;
+  const byPeer = z.lastOwner === 'peer' && !!game.mode.hostedPeer();
   Rules.killZombie(game, z, {
     kills: game.kills,
     xp: (zb) => addXp(game, zb.def.xp),
@@ -121,9 +121,9 @@ export function addXp(game, n) {
 }
 
 export function onPlayerDeath(game) {
-  if (game.coop.active) return game.coop.onLocalDeath();
+  if (game.mode.onLocalDeath()) return;
   // la partida venía del cooperativo (tu compañero se fue): se pierde sólo esa
-  if (game.coopRun) {
+  if (!game.mode.savesProgress()) {
     recordScore(game);
     game.deathT = 1.6;
     game.input.reset();
@@ -175,7 +175,8 @@ export function onRobotHit(game, dmg) {
 
 // Alrededor de quién aparecen los zombis (cooperativo: de cualquiera de los dos).
 export function spawnFocus(game) {
-  const peer = game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+  const hosted = game.mode.hostedPeer();
+  const peer = hosted && hosted.alive ? hosted : null;
   if (!peer) return game.player;
   if (!game.player.alive) return peer;
   return Math.random() < 0.5 ? game.player : peer;

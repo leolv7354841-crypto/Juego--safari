@@ -30,6 +30,7 @@ import { turretBullet } from '../sim/build.js';
 import { UPGRADES } from '../sim/upgrades.js';
 import { Abilities } from '../sim/abilities.js';
 import { rand, TAU, angleTo } from '../core/util.js';
+import { OnlineClient, Solo } from './mode.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
@@ -330,7 +331,7 @@ export class Online {
     const g = this.game;
     g.sfx.unlock();
     g.resetRun();
-    g.coopRun = true;
+    g.mode = new OnlineClient(g);
     g.director.coop = true;
     g.director.state = 'break';
     const p = g.player;
@@ -364,6 +365,7 @@ export class Online {
   stopPlay() {
     const g = this.game;
     this.playing = false;
+    g.mode = new Solo(g, true);
     this.peers.clear();
     this.zs.clear();
     this.robots.clear();

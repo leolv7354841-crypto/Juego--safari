@@ -7,6 +7,7 @@ import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
 import { Online } from './net/online.js';
+import { Solo } from './net/mode.js';
 import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
 import { Structures } from './sim/build.js';
@@ -60,6 +61,7 @@ class Game {
     this.bullets = new Bullets();
     this.structures = new Structures();
     this.robot = new Robot();
+    this.mode = new Solo(this);
     this.coop = new Coop(this);
     this.online = new Online(this);
     this.base = { z: 1, tx: 0, ty: 0 };
@@ -174,12 +176,6 @@ class Game {
   updateHud = (force) => updateHud(this, force);
   moneyPop = (text, kind) => moneyPop(this, text, kind);
 
-  // ¿Simula otro (el anfitrión del cooperativo o el servidor en línea)? Entonces aquí no se
-  // calcula daño: las balas propias son de adorno.
-  get remoteSim() {
-    return this.coop.isGuest || this.online.active;
-  }
-
   /* ---------- partidas ---------- */
 
   newWorld(seed) {
@@ -198,8 +194,8 @@ class Game {
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
-    // partida del cooperativo: nunca toca el guardado de tu partida normal
-    this.coopRun = false;
+    // una partida nueva siempre empieza en solitario (los modos de grupo lo cambian al arrancar)
+    this.mode = new Solo(this);
     this.robot.reset();
     this.setAcid(0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
@@ -251,7 +247,7 @@ class Game {
       this.online.tick(dt);
       updateNetStat(this, dt);
       // en línea el mundo sigue aunque haya otra pantalla encima (mejoras, tienda, pausa)
-      if (this.online.active) this.online.update(dt);
+      if (this.mode.viaServer()) this.online.update(dt);
       stepState(this, dt);
       render(this);
     } catch (err) {

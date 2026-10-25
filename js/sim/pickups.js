@@ -22,8 +22,8 @@ export class Pickups {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)
     // en línea (servidor): recoge el jugador vivo más cercano de game.targets
     const targets = game.targets || null;
-    const peer =
-      !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    const hosted = targets ? null : game.mode.hostedPeer();
+    const peer = hosted && hosted.alive ? hosted : null;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const it = this.list[i];
       it.t += dt;

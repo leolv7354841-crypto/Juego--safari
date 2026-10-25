@@ -282,8 +282,8 @@ export class Horde {
     const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
     const p0 = targets ? IDLE : game.player;
-    const peer =
-      !targets && game.coop && game.coop.isHost && game.coop.peer && game.coop.peer.alive ? game.coop.peer : null;
+    const hosted = targets ? null : game.mode.hostedPeer();
+    const peer = hosted && hosted.alive ? hosted : null;
     // objetivo actual: Player, compañero remoto o el IDLE sin jugadores (por eso any)
     /** @type {any} */
     let p = p0;

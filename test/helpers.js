@@ -1,5 +1,7 @@
 // Ayudas comunes de las pruebas del núcleo.
 
+import { Solo } from '../js/net/mode.js';
+
 export const silent = new Proxy({}, { get: () => () => {} });
 
 // Un `game` mínimo con lo que tocan combat/director/player.move.
@@ -7,6 +9,7 @@ export function fakeGame(extra = {}) {
   const calls = { splat: 0, hit: 0, banner: [] };
   return {
     calls,
+    mode: new Solo(null),
     decals: { splat: () => calls.splat++ },
     particles: { hit: () => calls.hit++ },
     sfx: silent,

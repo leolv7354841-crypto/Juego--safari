@@ -84,7 +84,7 @@ export function killZombie(game, z, h) {
   if (z.type === 'fat' && live) game.structures.queueDeathBlast(z.type, z.x, z.y);
   h.xp(z);
   if (live) h.bounty(z);
-  const hasGuns = game.coop.active || (game.player && game.player.weapons.length > 1);
+  const hasGuns = game.mode.inGroup() || (game.player && game.player.weapons.length > 1);
   const r = Math.random();
   if (z.type === 'giant') {
     game.camera.shake(0.5, z.x, z.y);
@@ -180,13 +180,13 @@ export function acidStep(game, p, h, dt, onTick, onDeath) {
  * @param {string | null} [owner]
  */
 export function rocketBlast(game, x, y, owner = null) {
-  if (game.remoteSim) return;
+  if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
 }
 
 /** Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante. */
 export function rocketHit(game, z, x, y, b) {
-  if (game.remoteSim) return;
+  if (!game.mode.authority()) return;
   if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) game.structures.stickRocket(game, z, x, y, b);
   else rocketBlast(game, x, y, b.owner);
 }

@@ -52,7 +52,7 @@ export class Lighting {
       g.drawImage(this.soft, game.camera.x - 320, game.camera.y - 320, 640, 640);
     }
     // linterna del compañero (cooperativo)
-    const q = game.coop && game.coop.active ? game.coop.peer : null;
+    const q = game.mode.companion();
     if (q && q.alive && game.state !== 'menu') {
       g.globalAlpha = 0.7;
       g.drawImage(this.soft, q.x - 200, q.y - 200, 400, 400);

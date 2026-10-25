@@ -13,6 +13,7 @@ import { Player } from '../../../js/sim/player.js';
 import { Structures } from '../../../js/sim/build.js';
 import { Robot } from '../../../js/sim/robot.js';
 import { applyMove, packBody, TICK } from '../../../js/net/netcode.js';
+import { ServerMode } from '../../../js/net/mode.js';
 import {
   IN_RELOAD,
   IN_FIRE,
@@ -246,7 +247,7 @@ export class ServerSim {
       decals: recorder('d', (n) => DECAL_SYNC.includes(n)),
       sfx: recorder('s', (n) => SFX_SYNC.includes(n)),
       camera: { viewW: 1280, viewH: 760, shake: rec('c', 'shake'), kick: noop },
-      coop: { isHost: false, isGuest: false, active: true, peer: null },
+      mode: new ServerMode(null),
       structures: this.structures,
       // el punto al que apunta el jugador que se está moviendo (sale del ángulo que mandó)
       mouseWorld: () => {

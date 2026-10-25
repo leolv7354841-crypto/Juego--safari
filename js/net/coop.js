@@ -10,12 +10,13 @@
 import { drawRobot } from '../render/robot.js';
 import { Net } from './net.js';
 import { Player } from '../sim/player.js';
-import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from '../core/config.js';
+import { ZOMBIES, WEAPONS, SHOP, GOLDEN, ABILITY, NET } from '../core/config.js';
 import { zombieSprites, drawSurvivor, cleanLook } from '../render/sprites.js';
 import { Abilities } from '../sim/abilities.js';
 import { Bullets } from '../sim/bullets.js';
 import { rand, angleTo, TAU } from '../core/util.js';
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
+import { CoopHost, CoopGuest, Solo } from './mode.js';
 
 const SNAP_HZ = 12;
 const IN_HZ = 20;
@@ -177,7 +178,7 @@ export class Coop {
     this.clock = new Clock();
     this.snapSeq = 0;
     this.peerAck = 0;
-    g.coopRun = true;
+    g.mode = new CoopHost(g);
     g.director.coop = true;
     const s = g.world.spawn;
     this.peer = new Player(s.x + 46, s.y + 10);
@@ -217,7 +218,7 @@ export class Coop {
     this.mode = 'guest';
     this.clock = new Clock();
     this.lastSeq = 0;
-    g.coopRun = true;
+    g.mode = new CoopGuest(g);
     this.peerName = m.name || 'Anfitrión';
     this.peerLook = cleanLook(m.look);
     g.director.coop = true;
@@ -803,44 +804,24 @@ export class Coop {
     });
   }
 
-  guestBuild() {
+  // game.mode.sendBuild: la pieza se descuenta cuando el anfitrión confirma ('built')
+  guestBuild(kind) {
     const g = this.game;
     if (this.pendingBuild) return;
-    if (g.inv[g.buildSel] <= 0) {
-      const next = BUILD_ORDER.find((k) => g.inv[k] > 0);
-      if (!next) return g.toast('Compra barricadas en la tienda');
-      g.buildSel = next;
-    }
-    if (!g.structures.placement(g, g.buildSel).ok) return g.toast('No cabe ahí');
-    this.pendingBuild = g.buildSel;
+    this.pendingBuild = kind;
     const p = g.player;
     this.send({
       t: 'build',
-      kind: g.buildSel,
+      kind,
       x: Math.round(p.x),
       y: Math.round(p.y),
       a: Math.round(p.angle * 1000) / 1000,
     });
   }
 
-  guestThrow(kind) {
-    const g = this.game;
-    const p = g.player;
-    if (g.inv[kind] <= 0)
-      return g.toast(
-        kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda',
-      );
-    let tx = p.x + Math.cos(p.angle) * 220;
-    let ty = p.y + Math.sin(p.angle) * 220;
-    if (g.input.mode === 'mouse') {
-      const m = g.mouseWorld();
-      tx = m.x;
-      ty = m.y;
-    } else if (p.target && !p.target.dead) {
-      tx = p.target.x;
-      ty = p.target.y;
-    }
-    g.inv[kind]--;
+  // game.mode.sendThrow: tryGrenade ya eligió el blanco y descontó la granada
+  guestThrow(kind, tx, ty) {
+    const p = this.game.player;
     this.send({
       t: 'throw',
       kind,
@@ -1314,6 +1295,8 @@ export class Coop {
     this.uninstall();
     this.net.onClose = null;
     this.net.close();
+    // el cooperativo termina pero la partida sigue sin guardarse (viene de un grupo)
+    if (this.mode) g.mode = new Solo(g, true);
     this.mode = null;
     this.peer = null;
     this.zmap.clear();

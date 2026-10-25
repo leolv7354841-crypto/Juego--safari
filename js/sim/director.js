@@ -127,7 +127,7 @@ export class Director {
     const cam = game.camera;
     const p = game.player;
     if (p && p.alive) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
-    const peer = game.coop && game.coop.isHost && game.coop.peer;
+    const peer = game.mode.hostedPeer();
     if (peer && peer.alive)
       out.push({ x: peer.x, y: peer.y, hw: Math.max(vw, peer.vw || 0), hh: Math.max(vh, peer.vh || 0) });
     if (!out.length && p) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
@@ -148,10 +148,7 @@ export class Director {
       for (const p of game.targets) if (p.alive && p.field && world.reachable(x, y, p.field)) return true;
       return false;
     }
-    return (
-      world.reachable(x, y) ||
-      (!!(game.coop && game.coop.isHost && game.coop.peer) && world.reachable(x, y, world.main2))
-    );
+    return world.reachable(x, y) || (!!game.mode.hostedPeer() && world.reachable(x, y, world.main2));
   }
 
   // Durante toda la ronda: el zombi que nadie ve y quedó lejos de todos (WAVES.lost) o atascado

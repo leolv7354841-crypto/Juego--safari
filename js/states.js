@@ -72,7 +72,7 @@ export function updatePlay(game, dt) {
   game.flowT -= dt;
   if (game.flowT <= 0) {
     game.world.updateFlow(p.x, p.y);
-    const peer = game.coop.isHost ? game.coop.peer : null;
+    const peer = game.mode.hostedPeer();
     if (peer && peer.alive) game.world.computeField(game.world.main2, peer.x, peer.y);
     game.flowT = 0.2;
   }
@@ -101,8 +101,8 @@ export function updatePlay(game, dt) {
   }
   game.music.setDanger(p.alive ? game.horde.danger : 0, dt);
   // muerto en cooperativo: la cámara sigue suave a tu compañero hasta que revivas
-  if (!p.alive && game.coop.peer && game.coop.peer.alive)
-    game.camera.update(dt, game.coop.peer.x, game.coop.peer.y, false);
+  const mate = game.mode.companion();
+  if (!p.alive && mate && mate.alive) game.camera.update(dt, mate.x, mate.y, false);
   else {
     const look = game.input.mode === 'mouse' ? 50 : 24;
     game.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
@@ -112,13 +112,13 @@ export function updatePlay(game, dt) {
   updateAcid(game, dt);
   game.updateHud(false);
   if (!p.alive) {
-    if (game.coop.active && game.coop.peer && game.coop.peer.alive) return;
+    if (mate && mate.alive) return;
     game.deathT -= dt;
     if (game.deathT <= 0) gameOver(game);
     return;
   }
   // en cooperativo las mejoras se eligen entre oleadas (el juego no se pausa para el otro)
-  if (game.pendingLevels > 0 && (!game.coop.active || game.director.state === 'waiting')) openLevelUp(game);
+  if (game.pendingLevels > 0 && (!game.mode.inGroup() || game.director.state === 'waiting')) openLevelUp(game);
   else if (game.shopPending) openShop(game);
   else {
     game.saveT = (game.saveT || 0) + dt;
@@ -137,9 +137,7 @@ export const STATES = {
   play: {
     music: true,
     update: (game, dt) => {
-      if (game.online.active) return;
-      if (game.coop.isGuest) game.coop.guestUpdate(dt);
-      else updatePlay(game, dt);
+      if (!game.mode.step(dt)) updatePlay(game, dt);
     },
   },
   pause: {

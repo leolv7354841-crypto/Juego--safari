@@ -9,7 +9,7 @@ import { isClass } from './sim/abilities.js';
 // Se guarda cada pocos segundos, también a mitad de ronda (con los zombis vivos),
 // y al cerrar o minimizar la página. Al terminar una ronda se crea además un punto de control.
 export function saveProgress(game) {
-  if (game.coop.active || game.coopRun) return;
+  if (!game.mode.savesProgress()) return;
   const p = game.player;
   const ds = game.director.state;
   if (!p || !p.alive || (ds !== 'waiting' && ds !== 'active')) return;

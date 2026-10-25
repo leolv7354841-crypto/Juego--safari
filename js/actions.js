@@ -9,9 +9,8 @@ export function useAbility(game) {
   if (!p.cls || !p.alive) return;
   if (p.abCd > 0) return game.toast(`Habilidad lista en ${Math.ceil(p.abCd)} s`);
   const t = abilityTarget(game, p);
-  // en línea la usa el servidor; aquí se ve al instante (el misil llega con la siguiente foto)
-  if (game.online.active) game.online.act('ab', { tx: Math.round(t.x), ty: Math.round(t.y) });
-  else if (game.coop.isGuest && p.cls === 'bomber') game.coop.guestMissile(t.x, t.y);
+  // en línea la usa el servidor y en cooperativo el anfitrión; aquí se ve al instante (el misil llega con la siguiente foto)
+  game.mode.sendAbility(p, t);
   Abilities.use(game, p, t.x, t.y, null);
   game.updateHud(false);
 }
@@ -20,13 +19,14 @@ export function useAbility(game) {
 export function toggleRobot(game) {
   const p = game.player;
   // en línea la monta y la deja el servidor (que repite estas comprobaciones)
-  if (game.online.active && (p.manned || (!p.inRobot && game.structures.nearHeavy(p)))) return game.online.act('robot');
+  if (game.mode.viaServer() && (p.manned || (!p.inRobot && game.structures.nearHeavy(p))))
+    return game.online.act('robot');
   if (p.manned) return leaveHeavy(game);
-  if (!p.inRobot && !game.coop.isGuest) {
+  if (!p.inRobot && game.mode.hasHeavy()) {
     const h = game.structures.nearHeavy(p);
     if (h) return mountHeavy(game, h);
   }
-  if (game.coop.isGuest) return game.toast('En cooperativo el robot es del anfitrión');
+  if (!game.mode.hasRobot()) return game.toast('En cooperativo el robot es del anfitrión');
   const rb = game.robot;
   if (!rb.owned) {
     if (game.structures.blocks.some((b) => b.kind === 'heavy'))
@@ -34,7 +34,7 @@ export function toggleRobot(game) {
     return game.toast('Compra el robot de combate en la tienda');
   }
   // en línea se sube o se baja en el servidor (que repite estas mismas comprobaciones)
-  if (game.online.active) {
+  if (game.mode.viaServer()) {
     if (!rb.piloted && rb.broken) return game.toast('Robot destruido: repáralo en la tienda');
     if (!rb.piloted && !rb.near(p)) return game.toast('Acércate al robot para subirte');
     return game.online.act('robot');
@@ -65,15 +65,13 @@ export function leaveHeavy(game) {
 }
 
 export function startNextRound(game) {
-  if (game.online.active) return game.online.send('next');
-  if (game.coop.isGuest) return game.coop.send({ t: 'next' });
-  if (game.state !== 'play' || (!game.player.alive && !game.coop.active)) return;
+  if (game.mode.sendNextRound()) return;
+  if (game.state !== 'play' || (!game.player.alive && !game.mode.inGroup())) return;
   game.sfx.unlock();
   if (game.director.nextRound(game)) game.updateHud(false);
 }
 
 export function tryBuild(game) {
-  if (game.coop.isGuest) return game.coop.guestBuild();
   if (game.inv[game.buildSel] <= 0) {
     const next = BUILD_ORDER.find((k) => game.inv[k] > 0);
     if (!next) {
@@ -82,9 +80,9 @@ export function tryBuild(game) {
     }
     game.buildSel = next;
   }
-  // en línea lo coloca el servidor (y descuenta la pieza); aquí sólo se avisa si no cabe
-  if (game.online.active) {
-    if (game.structures.placement(game, game.buildSel).ok) game.online.act('build', { kind: game.buildSel });
+  // en línea lo coloca el servidor y en cooperativo el anfitrión (y descuentan la pieza); aquí sólo se avisa si no cabe
+  if (!game.mode.canBuild()) {
+    if (game.structures.placement(game, game.buildSel).ok) game.mode.sendBuild(game.buildSel);
     else game.toast('No cabe ahí');
     return;
   }
@@ -109,7 +107,6 @@ export function cycleBuild(game) {
 }
 
 export function tryGrenade(game, kind = 'grenade') {
-  if (game.coop.isGuest) return game.coop.guestThrow(kind);
   if (game.inv[kind] <= 0) {
     game.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
     return;
@@ -129,8 +126,8 @@ export function tryGrenade(game, kind = 'grenade') {
     ty = p.y + Math.sin(p.angle) * 220;
   }
   game.inv[kind]--;
-  // en línea la lanza el servidor; la cuenta se corrige con su siguiente foto
-  if (game.online.active) return game.online.act('throw', { kind, tx: Math.round(tx), ty: Math.round(ty) });
+  // en línea la lanza el servidor y en cooperativo el anfitrión; la cuenta se corrige con su siguiente foto
+  if (game.mode.sendThrow(kind, tx, ty)) return;
   if (kind === 'molotov') game.structures.throwMolotov(game, tx, ty);
   else game.structures.throwGrenade(game, tx, ty);
 }

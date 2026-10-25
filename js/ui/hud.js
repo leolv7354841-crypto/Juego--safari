@@ -201,8 +201,8 @@ export function bindHud(game) {
 // Indicador de conexión del cooperativo y de la partida en línea (se actualiza una vez por segundo).
 export function updateNetStat(game, dt) {
   const ns = game.$('net-stat');
-  if ((game.coop.active || game.online.active) && game.state !== 'menu') {
-    const txt = game.online.active ? game.online.stats(dt) : game.coop.stats(dt);
+  if (game.mode.inGroup() && game.state !== 'menu') {
+    const txt = game.mode.netStats(dt);
     if (txt) ns.textContent = txt;
     ns.hidden = false;
   } else ns.hidden = true;

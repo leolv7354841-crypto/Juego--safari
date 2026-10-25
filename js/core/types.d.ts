@@ -8,6 +8,7 @@ import type { Pickups } from '../sim/pickups.js';
 import type { Player } from '../sim/player.js';
 import type { Structures } from '../sim/build.js';
 import type { Robot } from '../sim/robot.js';
+import type { Mode } from '../net/mode.js';
 
 export type Vec = { x: number; y: number };
 
@@ -118,9 +119,10 @@ export interface GameHost {
   robot?: Robot;
   time: number;
   state: string;
-  // En línea (servidor): jugadores en vez de game.player / coop.peer.
+  // En línea (servidor): jugadores en vez de game.player / el compañero del cooperativo.
   targets?: Player[] | null;
-  remoteSim?: boolean;
+  // Quién manda en esta partida (js/net/mode.js)
+  mode: Mode;
   hurtFlash: number;
   muzzle: number;
   camera: {
@@ -130,7 +132,7 @@ export interface GameHost {
     kick(...a: any[]): void;
     [k: string]: any;
   };
-  coop: { isHost: boolean; isGuest: boolean; active: boolean; peer: any; [k: string]: any };
+  coop: { peerPickup(it: any): boolean; [k: string]: any };
   // any: lo cumplen las clases Particles/Sfx/Decals y las grabadoras del servidor
   particles: any;
   decals: any;

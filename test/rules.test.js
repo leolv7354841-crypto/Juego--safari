@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BOUNTY, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.js';
 import { ACID } from '../js/sim/build.js';
+import { CoopGuest, CoopHost, Solo } from '../js/net/mode.js';
 import * as Rules from '../js/sim/rules.js';
 import { bullet, fakeGame, silent, zombie } from './helpers.js';
 
@@ -11,7 +12,7 @@ function mundo(extra = {}) {
   const calls = { drops: [], toasts: [], gold: [], bounty: [], xp: [], shake: 0, blast: 0, rockets: 0 };
   const game = fakeGame({
     state: 'play',
-    coop: { active: false, isHost: false, isGuest: false },
+    mode: new Solo(null),
     player: { weapons: [{}, {}] },
     camera: { shake: () => calls.shake++ },
     pickups: { drop: (k) => calls.drops.push(k) },
@@ -123,7 +124,7 @@ test('sin armas de repuesto ni cooperativo no cae munición', () => {
   }
   assert.ok(!calls.drops.includes('ammo'));
   // con cooperativo sí
-  const w = mundo({ player: { weapons: [{}] }, coop: { active: true, isHost: true, isGuest: false } });
+  const w = mundo({ player: { weapons: [{}] }, mode: new CoopHost(null) });
   Math.random = () => 0;
   try {
     Rules.killZombie(w.game, muerto('normal'), w.hooks);
@@ -223,7 +224,7 @@ test('el ácido puede matar y entonces avisa una vez y se apaga', () => {
 });
 
 test('los cohetes no explotan en quien solo mira (invitado o cliente en línea)', () => {
-  const { game, calls } = mundo({ remoteSim: true });
+  const { game, calls } = mundo({ mode: new CoopGuest(null) });
   Rules.rocketBlast(game, 0, 0);
   Rules.rocketHit(game, muerto('fat'), 0, 0, bullet());
   assert.equal(calls.blast, 0);
