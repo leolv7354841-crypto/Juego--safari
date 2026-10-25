@@ -54,8 +54,9 @@ import { setChunkView, drawGround as drawWorldGround, drawOverhead } from './ren
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
-import { CROWN_SVG, SHORT, ITEM_ICONS } from './ui/icons.js';
+import { CROWN_SVG } from './ui/icons.js';
 import { saveProgress, loadProgress } from './save.js';
+import { toast, banner, updateHud, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
 import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
@@ -142,6 +143,10 @@ class Game {
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
   loadProgress = (kind) => loadProgress(this, kind);
+  toast = (msg) => toast(this, msg);
+  banner = (title, sub) => banner(this, title, sub);
+  updateHud = (force) => updateHud(this, force);
+  moneyPop = (text, kind) => moneyPop(this, text, kind);
 
   // ¿Simula otro (el anfitrión del cooperativo o el servidor en línea)? Entonces aquí no se
   // calcula daño: las balas propias son de adorno.
@@ -604,18 +609,6 @@ class Game {
     this.moneyPop(`-$${loss}`, 'loss');
     this.sfx.moneyLost();
     this.updateHud(false);
-  }
-
-  // Indicador flotante de dinero junto al contador (rojo al perder, dorado al ganar).
-  moneyPop(text, kind) {
-    const host = this.$('money-pops');
-    if (!host) return;
-    if (host.childElementCount > 5) host.firstElementChild.remove();
-    const el = document.createElement('span');
-    el.className = 'money-pop ' + kind;
-    el.textContent = text;
-    host.appendChild(el);
-    setTimeout(() => el.remove(), 1300);
   }
 
   // Alrededor de quién aparecen los zombis (cooperativo: de cualquiera de los dos).
@@ -1595,15 +1588,12 @@ class Game {
 
   bindUi() {
     const on = (id, fn) => this.$(id).addEventListener('click', fn);
+    bindHud(this);
     on('btn-start', () => {
       this.tryFullscreen();
       this.showClass(false);
     });
-    on('btn-ability', () => {
-      if (this.state === 'play') this.useAbility();
-    });
     on('btn-class-back', () => this.setupMenu());
-    on('btn-pause', () => this.pause());
     on('btn-resume', () => this.resume());
     // en cooperativo reinicia el anfitrión (el invitado espera)
     const again = () => {
@@ -1706,10 +1696,6 @@ class Game {
       if (this.accounts.current) this.setupMenu();
     });
     this.$('acct-form').addEventListener('submit', (e) => this.submitAccount(e));
-    on('btn-next-round', () => this.startNextRound());
-    on('btn-upgrade', () => {
-      if (this.state === 'play' && this.online.upReady) this.openLevelUp();
-    });
     on('btn-round-shop', () => {
       if (this.state === 'play' && this.director.state === 'waiting') this.openShop();
     });
@@ -1727,18 +1713,6 @@ class Game {
       const b = closest(e.target, '[data-buy]');
       if (b) this.buy(b.dataset.buy);
     });
-    this.$('inv').addEventListener('pointerdown', (e) => {
-      const b = closest(e.target, '[data-k]');
-      if (!b) return;
-      e.preventDefault();
-      this.buildSel = b.dataset.k;
-    });
-    this.$('slots').addEventListener('pointerdown', (e) => {
-      const b = closest(e.target, '.slot[data-i]');
-      if (!b) return;
-      e.preventDefault();
-      this.player.select(Number(b.dataset.i));
-    });
   }
 
   syncSoundLabel() {
@@ -1753,162 +1727,6 @@ class Game {
       if (r && r.catch) r.catch(() => {});
     } catch {
       /* Safari en iPhone no admite pantalla completa para páginas */
-    }
-  }
-
-  toast(msg) {
-    const el = this.$('toast');
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(this.toastT);
-    this.toastT = setTimeout(() => el.classList.remove('show'), 1500);
-  }
-
-  banner(title, sub) {
-    this.$('banner-title').textContent = title;
-    this.$('banner-sub').textContent = sub || '';
-    const el = this.$('banner');
-    el.classList.add('show');
-    clearTimeout(this.bannerT);
-    this.bannerT = setTimeout(() => el.classList.remove('show'), 2600);
-  }
-
-  set(key, el, prop, value) {
-    if (this.cache[key] === value) return;
-    this.cache[key] = value;
-    if (prop === 'text') el.textContent = value;
-    else el.style[prop] = value;
-  }
-
-  updateHud(force) {
-    if (force) this.cache = {};
-    const p = this.player;
-    const $ = this.$;
-    this.set('hpw', $('hp-fill'), 'transform', `scaleX(${(p.hp / p.stats.maxHp).toFixed(3)})`);
-    this.set('hpv', $('hp-val'), 'text', String(Math.ceil(p.hp)));
-    const low = p.hp < p.stats.maxHp * 0.3;
-    if (this.cache.low !== low) {
-      this.cache.low = low;
-      $('hp-bar').classList.toggle('low', low);
-    }
-    const rb = this.robot;
-    if (this.cache.rbOwned !== rb.owned) {
-      this.cache.rbOwned = rb.owned;
-      $('rb-bar').hidden = !rb.owned;
-    }
-    // el botón táctil también monta y desmonta la torreta pesada
-    const heavy = p.manned ? null : this.structures.nearHeavy(p);
-    const rbBtn = rb.owned || !!p.manned || !!heavy;
-    if (this.cache.rbBtn !== rbBtn) {
-      this.cache.rbBtn = rbBtn;
-      $('btn-robot').classList.toggle('gone', !rbBtn);
-    }
-    if (rb.owned) {
-      this.set('rbw', $('rb-fill'), 'transform', `scaleX(${Math.max(0, rb.hp / ROBOT.hp).toFixed(3)})`);
-      this.set('rbv', $('rb-val'), 'text', rb.broken ? 'ROTO' : String(Math.ceil(rb.hp)));
-    }
-    this.set('rbon', $('btn-robot'), 'text', rb.piloted || p.manned ? 'Bajar' : heavy ? 'Torreta' : 'Robot');
-    // habilidad de clase: icono, segundos que faltan y arco de espera en el botón táctil
-    const cls = p.cls;
-    if (this.cache.cls !== cls) {
-      this.cache.cls = cls;
-      $('btn-ability').hidden = !cls;
-      $('btn-ab-touch').classList.toggle('gone', !cls);
-      if (cls) {
-        $('ab-ic').innerHTML = CLASSES[cls].icon;
-        $('btn-ab-touch').innerHTML = CLASSES[cls].icon;
-        $('ab-nm').textContent = CLASSES[cls].name;
-      }
-    }
-    if (cls) {
-      const ready = !(p.abCd > 0) && p.alive;
-      this.set('abcd', $('ab-cd'), 'text', p.abCd > 0 ? `${Math.ceil(p.abCd)} s` : 'Lista');
-      if (this.cache.abReady !== ready) {
-        this.cache.abReady = ready;
-        $('btn-ability').classList.toggle('ready', ready);
-        $('btn-ab-touch').classList.toggle('ready', ready);
-      }
-      const k = ready ? '1' : (1 - (p.abCd || 0) / cooldownOf(p)).toFixed(2);
-      if (this.cache.abk !== k) {
-        this.cache.abk = k;
-        $('btn-ab-touch').style.setProperty('--k', k);
-        $('btn-ability').style.setProperty('--k', k);
-      }
-    }
-    this.set('stw', $('st-fill'), 'transform', `scaleX(${(p.stamina / p.stats.maxStamina).toFixed(3)})`);
-    if (this.cache.ex !== p.exhausted) {
-      this.cache.ex = p.exhausted;
-      $('st-bar').classList.toggle('exhausted', p.exhausted);
-      if (p.exhausted) this.input.setRun(false);
-    }
-    this.set('xpw', $('xp-fill'), 'width', `${((this.xp / this.xpNeed) * 100).toFixed(1)}%`);
-    this.set('lvl', $('lvl'), 'text', String(this.level));
-    this.set('time', $('time'), 'text', fmtTime(this.time));
-    this.set('kills', $('kills'), 'text', String(this.totalKills()));
-    this.set('wave', $('wave'), 'text', String(Math.max(1, this.director.wave)));
-    // montado en la torreta pesada se ven sus balas
-    const w = p.manned ? { def: WEAPONS.heavy, mag: p.heavyAmmo, reserve: 0 } : p.weapon;
-    this.set('wname', $('wname'), 'text', w.def.name);
-    this.set('mag', $('mag'), 'text', String(w.mag));
-    this.set('res', $('reserve'), 'text', w.reserve === Infinity ? '∞' : String(w.reserve));
-    const empty = w.mag === 0;
-    if (this.cache.empty !== empty) {
-      this.cache.empty = empty;
-      $('mag').parentElement.classList.toggle('empty', empty);
-    }
-    const rl = p.reloadT > 0 ? 1 - p.reloadT / p.reloadDur : 0;
-    this.set('rl', $('reload-fill'), 'width', `${(rl * 100).toFixed(0)}%`);
-    const inv = this.inv;
-    const isig =
-      BUILD_ORDER.map((k) => inv[k]).join() +
-      '|' +
-      inv.grenade +
-      '|' +
-      inv.molotov +
-      '|' +
-      this.buildSel +
-      '|' +
-      this.money;
-    if (this.cache.inv !== isig) {
-      this.cache.inv = isig;
-      // granadas siempre visibles; de las estructuras sólo las que tienes (son muchas)
-      const items = [
-        `<span class="it gren${inv.grenade ? '' : ' zero'}" title="Granadas">${ITEM_ICONS.grenade}<b>${inv.grenade}</b></span>`,
-        `<span class="it gren${inv.molotov ? '' : ' zero'}" title="Molotovs">${ITEM_ICONS.molotov}<b>${inv.molotov}</b></span>`,
-      ];
-      for (const k of BUILD_ORDER) {
-        if (!inv[k]) continue;
-        const cls = `it${k === this.buildSel ? ' on' : ''}`;
-        items.push(
-          `<button class="${cls}" data-k="${k}" title="${SHOP[k].name}">${ITEM_ICONS[k]}<b>${inv[k]}</b></button>`,
-        );
-      }
-      items.push(`<span class="it money" title="Dinero">$<b id="money">${this.money}</b></span>`);
-      $('inv').innerHTML = items.join('');
-      $('build-count').textContent = inv[this.buildSel] > 0 ? inv[this.buildSel] : '0';
-      $('btn-build').classList.toggle('off', !BUILD_ORDER.some((k) => inv[k] > 0));
-      $('gren-count').textContent = inv.grenade;
-      $('btn-grenade').classList.toggle('off', inv.grenade <= 0);
-      $('molo-count').textContent = inv.molotov;
-      $('btn-molotov').classList.toggle('off', inv.molotov <= 0);
-    }
-    const sig = p.manned ? 'heavy' : p.weapons.map((x) => x.id).join() + '|' + p.wi;
-    if (this.cache.slots !== sig) {
-      this.cache.slots = sig;
-      $('slots').innerHTML = p.manned
-        ? `<button class="slot on">${WEAPONS.heavy.name}</button>`
-        : p.weapons
-            .map(
-              (x, i) =>
-                `<button class="slot${i === p.wi ? ' on' : ''}" data-i="${i}">${i + 1} ${i === p.wi ? x.def.name : SHORT[x.id]}</button>`,
-            )
-            .join('');
-    }
-    const prep = this.director.state === 'waiting' && p.alive;
-    if (this.cache.prep !== prep) {
-      this.cache.prep = prep;
-      $('round-panel').classList.toggle('show', prep);
-      if (prep) $('round-kicker').textContent = `Ronda ${this.director.wave} superada`;
     }
   }
 
