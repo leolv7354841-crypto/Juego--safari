@@ -30,6 +30,12 @@ export async function esperarEstado(page, esperado) {
 // Empieza una partida solo y espera a estar jugando.
 export async function jugarSolo(page) {
   await page.locator('#btn-start').click();
+  // una partida nueva pide elegir clase antes de salir (se toma la primera)
+  await expect.poll(() => estado(page)).toMatch(/^(class|play)$/);
+  if ((await estado(page)) === 'class') {
+    await expect(page.locator('#class-cards.ready')).toBeVisible();
+    await page.locator('#class-cards .card').first().click();
+  }
   await esperarEstado(page, 'play');
 }
 
