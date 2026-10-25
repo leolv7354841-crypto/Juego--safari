@@ -1,18 +1,6 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
 import { drawRobot } from './render/robot.js';
-import {
-  xpForLevel,
-  BOUNTY,
-  SHOP,
-  BUILD_ORDER,
-  THROWABLES,
-  GOLDEN,
-  MONEY_LOSS,
-  DROPS,
-  WORLD_SIZE,
-  ROCKET,
-  CLASS_ORDER,
-} from './core/config.js';
+import { xpForLevel, SHOP, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
 import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
@@ -20,7 +8,7 @@ import { Coop } from './net/coop.js';
 import { Online } from './net/online.js';
 import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
-import { Structures, ACID } from './sim/build.js';
+import { Structures } from './sim/build.js';
 import {
   drawMissiles,
   drawStuck,
@@ -32,8 +20,7 @@ import {
   drawGrenades,
   drawBars,
 } from './render/build.js';
-import { bulletHit } from './sim/combat.js';
-import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './core/util.js';
+import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './core/util.js';
 import { World } from './sim/world.js';
 import { Player } from './sim/player.js';
 import { Horde } from './sim/zombies.js';
@@ -48,6 +35,8 @@ import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
+import * as Rules from './sim/rules.js';
+import * as Ev from './events.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
@@ -90,6 +79,9 @@ class Game {
       p: rand(0, TAU),
     }));
     this.state = 'menu';
+    // quemadura de ácido (ver events.js)
+    this.acidT = 0;
+    this.acidTick = 0;
     this.time = 0;
     this.menuT = 0;
     this.muzzle = 0;
@@ -133,6 +125,24 @@ class Game {
     if (this.accounts.current) openInvite(this);
   }
 
+  // Eventos de combate que llaman los módulos de simulación y de red (ver events.js).
+  hitZombie = (z, b, hx, hy) => Ev.hitZombie(this, z, b, hx, hy);
+  killZombie = (z) => Ev.killZombie(this, z);
+  rocketHit = (z, x, y, b) => Ev.rocketHit(this, z, x, y, b);
+  rocketBlast = (x, y, owner) => Ev.rocketBlast(this, x, y, owner);
+  onSuperPunch = (z, x, y) => Ev.onSuperPunch(this, z, x, y);
+  applyAcid = () => Ev.applyAcid(this);
+  onGoldenExpired = (z) => Ev.onGoldenExpired(this, z);
+  onZombieHit = (z, target) => Ev.onZombieHit(this, z, target);
+  onGiantStep = (z) => Ev.onGiantStep(this, z);
+  onPlayerDeath = () => Ev.onPlayerDeath(this);
+  onWaveCleared = () => Ev.onWaveCleared(this);
+  onRobotHit = (dmg) => Ev.onRobotHit(this, dmg);
+  spawnFocus = () => Ev.spawnFocus(this);
+  totalKills = () => Ev.totalKills(this);
+  recordScore = () => Ev.recordScore(this);
+  addXp = (n) => Ev.addXp(this, n);
+
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
   loadProgress = (kind) => loadProgress(this, kind);
@@ -174,7 +184,7 @@ class Game {
     // partida del cooperativo: nunca toca el guardado de tu partida normal
     this.coopRun = false;
     this.robot.reset();
-    this.setAcid(0);
+    Ev.setAcid(this, 0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
@@ -283,68 +293,6 @@ class Game {
   /* ---------- progreso guardado ---------- */
 
   /* ---------- eventos de combate ---------- */
-
-  hitZombie(z, b, hx, hy) {
-    // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
-    if (z.dead || this.remoteSim) return;
-    // quién lo hirió (cooperativo: las bajas del compañero le dan el dinero a él)
-    z.lastOwner = b.owner || null;
-    bulletHit(this, z, b, hx, hy);
-    if (b.shot && !b.shot.hit) {
-      b.shot.hit = true;
-      this.player.shotsHit++;
-    }
-    if (z.hp <= 0) this.killZombie(z);
-  }
-
-  killZombie(z) {
-    if (z.dead) return;
-    z.dead = true;
-    this.kills[z.type] = (this.kills[z.type] || 0) + 1;
-    if (z.burn > 0) z.burnt = true;
-    this.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
-    const byPeer = z.lastOwner === 'peer' && this.coop.isHost;
-    if (z.type === 'golden' && this.state !== 'menu') {
-      // recompensa única del zombi dorado (para quien lo mató)
-      const reward = randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
-      if (byPeer) this.coop.send({ t: 'earn', n: reward, gold: 1 });
-      else {
-        this.money += reward;
-        this.moneyEarned += reward;
-        this.moneyPop(`+$${reward}`, 'gold');
-        this.sfx.gold();
-        this.toast(`¡Zombi dorado! +$${reward}`);
-      }
-      this.particles.pickupFx(z.x, z.y, '#f0c040');
-    }
-    this.particles.death(z.x, z.y, z.r);
-    // el gordo revienta en ácido y el super blindado estalla
-    if (z.type === 'fat' && this.state !== 'menu') this.structures.queueDeathBlast(z.type, z.x, z.y);
-    this.addXp(z.def.xp);
-    if (this.state !== 'menu') {
-      if (byPeer) this.coop.earn(BOUNTY[z.type]);
-      else {
-        this.money += BOUNTY[z.type];
-        this.moneyEarned += BOUNTY[z.type];
-      }
-    }
-    const p = this.player;
-    const hasGuns = p.weapons.length > 1 || this.coop.active;
-    const r = Math.random();
-    if (z.type === 'giant') {
-      this.camera.shake(0.5, z.x, z.y);
-      this.particles.ring(z.x, z.y, z.r, '170,160,140');
-      this.pickups.drop('crate', z.x, z.y);
-      this.pickups.drop('med', z.x + 24, z.y);
-      this.sfx.kill(true);
-      this.toast('Gigante abatido');
-    } else {
-      const drop = DROPS[z.type] || DROPS.normal;
-      if (r < drop.ammo && hasGuns) this.pickups.drop('ammo', z.x, z.y);
-      else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
-      this.sfx.kill(z.type === 'fat' || z.type === 'heavy');
-    }
-  }
 
   /* ---------- habilidad de clase ---------- */
 
@@ -471,79 +419,6 @@ class Game {
     this.sfx.build();
   }
 
-  onRobotHit(dmg) {
-    const rb = this.robot;
-    this.sfx.blockHit('metal');
-    if (!rb.damage(dmg)) return;
-    // se acabó el blindaje: explota y sales despedido
-    const p = this.player;
-    this.structures.explode(this, { x: rb.x, y: rb.y }, 170, 450, 1);
-    rb.leave(p, this.world);
-    rb.hp = 0;
-    this.toast('¡Robot destruido! Repáralo en la tienda');
-  }
-
-  // Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante.
-  rocketHit(z, x, y, b) {
-    if (this.remoteSim) return;
-    if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(this, z, x, y, b);
-    else this.rocketBlast(x, y, b.owner);
-  }
-
-  rocketBlast(x, y, owner = null) {
-    if (this.remoteSim) return;
-    this.structures.explode(this, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
-  }
-
-  // Super golpe del blindado (al jugador o a una estructura).
-  onSuperPunch(z, x, y) {
-    this.particles.dust(x, y, 18);
-    this.camera.shake(0.35, x, y);
-    this.sfx.punch();
-  }
-
-  // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.
-  applyAcid() {
-    if (this.state === 'menu' || !this.player.alive || this.player.inRobot || this.player.boostT > 0) return;
-    if (!(this.acidT > 0)) this.acidTick = 0;
-    this.acidT = ACID.burn;
-    this.hurtFlash = Math.min(1, this.hurtFlash + 0.3);
-    this.sfx.sizzle();
-    this.toast('¡Ácido! Te estás quemando');
-  }
-
-  setAcid(t) {
-    this.acidT = t;
-    const k = t > 0 ? Math.min(1, t / 0.8) : 0;
-    const q = Math.round(k * 10);
-    if (q === this.acidQ) return;
-    this.acidQ = q;
-    // desenfoque real del lienzo (Chrome y Safari); el HUD queda nítido
-    this.canvas.style.filter = q ? `blur(${(q * 0.32).toFixed(2)}px) saturate(${(1 - q * 0.04).toFixed(2)})` : '';
-  }
-
-  updateAcid(dt) {
-    if (!(this.acidT > 0)) return;
-    const p = this.player;
-    this.acidTick += dt;
-    while (this.acidTick >= 1 && p.alive) {
-      this.acidTick -= 1;
-      // daño directo y fijo: 2 de vida por segundo
-      p.hp -= ACID.dps;
-      p.damageTaken += ACID.dps;
-      p.hurtT = 0.2;
-      this.hurtFlash = Math.min(1, this.hurtFlash + 0.15);
-      this.particles.acidBurst(p.x, p.y, 18);
-      this.sfx.sizzle();
-      if (p.hp <= 0) {
-        p.hp = 0;
-        p.alive = false;
-        this.onPlayerDeath();
-      }
-    }
-    this.setAcid(p.alive ? Math.max(0, this.acidT - dt) : 0);
-  }
-
   drawAcid(ctx, W, H) {
     if (!(this.acidT > 0)) return;
     const k = Math.min(1, this.acidT / 0.8);
@@ -553,92 +428,6 @@ class Game {
     g.addColorStop(1, `rgba(60,130,20,${0.6 * k * pulse})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-  }
-
-  // El dorado se fue sin que lo mataras: no da nada ni cuenta como baja.
-  onGoldenExpired(z) {
-    z.dead = true;
-    this.particles.dust(z.x, z.y, 20);
-    this.particles.pickupFx(z.x, z.y, '#8a7a40');
-    this.toast('El zombi dorado escapó');
-  }
-
-  // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
-  onZombieHit(z, target) {
-    // el golpe al compañero se lo cobra su propio celular
-    if (target && target.remote) return this.coop.send({ t: 'hit' });
-    // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
-    if (this.state === 'menu' || this.player.inRobot || this.player.boostT > 0) return;
-    const loss = Math.min(this.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
-    if (loss <= 0) return;
-    this.money -= loss;
-    this.moneyPop(`-$${loss}`, 'loss');
-    this.sfx.moneyLost();
-    this.updateHud(false);
-  }
-
-  // Alrededor de quién aparecen los zombis (cooperativo: de cualquiera de los dos).
-  spawnFocus() {
-    const peer = this.coop.isHost && this.coop.peer && this.coop.peer.alive ? this.coop.peer : null;
-    if (!peer) return this.player;
-    if (!this.player.alive) return peer;
-    return Math.random() < 0.5 ? this.player : peer;
-  }
-
-  spawnGolden() {
-    const d = this.director;
-    for (let i = 0; i < 20; i++) {
-      const c = d.edgePoint(this, rand(60, 140));
-      if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (this.world.pointBlocked(c.x, c.y, 16) || !d.canReach(this, c.x, c.y) || d.seen(d.views(this), c.x, c.y, 16))
-        continue;
-      this.horde.spawn('golden', c.x, c.y, 1, d.speedMult);
-      this.sfx.goldenSpawn();
-      this.toast('¡Apareció un zombi dorado! Atrápalo antes de que escape');
-      return true;
-    }
-    return false;
-  }
-
-  onGiantStep(z) {
-    const p = this.player;
-    const d = Math.hypot(p.x - z.x, p.y - z.y);
-    const vol = clamp(1 - d / 750, 0, 1);
-    this.particles.dust(z.x - Math.cos(z.angle) * 10, z.y - Math.sin(z.angle) * 10, z.r);
-    if (vol > 0 && this.state === 'play') {
-      this.camera.shake(0.16 * vol);
-      this.sfx.stomp(vol);
-    }
-  }
-
-  addXp(n) {
-    this.xp += n;
-    while (this.xp >= this.xpNeed) {
-      this.xp -= this.xpNeed;
-      this.level++;
-      this.xpNeed = xpForLevel(this.level);
-      this.pendingLevels++;
-    }
-  }
-
-  onPlayerDeath() {
-    if (this.coop.active) return this.coop.onLocalDeath();
-    // la partida venía del cooperativo (tu compañero se fue): se pierde sólo esa
-    if (this.coopRun) {
-      this.recordScore();
-      this.deathT = 1.6;
-      this.input.reset();
-      this.camera.shake(0.6);
-      return;
-    }
-    // al morir se pierde la partida: la siguiente empieza desde cero (el récord sí se guarda)
-    storage.remove(this.accounts.saveKey());
-    storage.remove(this.accounts.checkKey());
-    this.accounts.cloudClear();
-    this.recordScore();
-    this.deathT = 1.6;
-    this.input.reset();
-    this.camera.shake(0.6);
   }
 
   mouseWorld() {
@@ -700,34 +489,6 @@ class Game {
   }
 
   /* ---------- tienda y construcción ---------- */
-
-  totalKills() {
-    const k = this.kills;
-    return k.normal + (k.swat || 0) + k.sprinter + k.fat + (k.heavy || 0) + (k.golden || 0) + k.giant;
-  }
-
-  onWaveCleared() {
-    this.coop.onWaveCleared();
-    this.shopPending = true;
-    this.sfx.level();
-    this.saveProgress();
-    this.recordScore();
-  }
-
-  // Mejor marca de la cuenta: oleada alcanzada y bajas.
-  recordScore() {
-    if (this.state === 'menu') return;
-    if (
-      this.accounts.recordScore({
-        wave: this.director.wave,
-        kills: this.totalKills(),
-        time: Math.round(this.time),
-        level: this.level,
-      })
-    ) {
-      this.toast('Nuevo récord de tu cuenta');
-    }
-  }
 
   /* ---------- cooperativo: sala ---------- */
 
@@ -882,7 +643,7 @@ class Game {
     if (this.coop.isHost) this.coop.send({ t: 'over' });
     this.setState('over');
     const p = this.player;
-    const total = this.totalKills();
+    const total = Ev.totalKills(this);
     const acc = p.shotsFired ? Math.round((p.shotsHit / p.shotsFired) * 100) : 0;
     const rows = [
       ['Tiempo sobrevivido', fmtTime(this.time)],
@@ -1157,12 +918,7 @@ class Game {
     this.director.update(dt, this);
     // zombi dorado: de vez en cuando durante una ronda, nunca dos a la vez
     if (this.director.state === 'active' && p.alive) {
-      this.goldenT -= dt;
-      if (this.goldenT <= 0) {
-        const alive = this.horde.list.some((z) => z.type === 'golden' && !z.dead);
-        if (!alive && this.spawnGolden()) this.goldenT = rand(GOLDEN.every[0], GOLDEN.every[1]);
-        else this.goldenT = 5;
-      }
+      this.goldenT = Rules.goldenTick(this, this.goldenT, dt, this.toast);
     }
     this.horde.update(dt, this);
     this.bullets.update(dt, this);
@@ -1190,7 +946,7 @@ class Game {
     }
     this.muzzle = Math.max(0, this.muzzle - dt * 14);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);
-    this.updateAcid(dt);
+    Ev.updateAcid(this, dt);
     this.updateHud(false);
     if (!p.alive) {
       if (this.coop.active && this.coop.peer && this.coop.peer.alive) return;

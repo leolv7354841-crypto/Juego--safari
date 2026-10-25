@@ -10,9 +10,8 @@ import { Bullets } from '../../../js/sim/bullets.js';
 import { Director } from '../../../js/sim/director.js';
 import { Pickups } from '../../../js/sim/pickups.js';
 import { Player } from '../../../js/sim/player.js';
-import { Structures, ACID } from '../../../js/sim/build.js';
+import { Structures } from '../../../js/sim/build.js';
 import { Robot } from '../../../js/sim/robot.js';
-import { bulletHit } from '../../../js/sim/combat.js';
 import { applyMove, packBody, TICK } from '../../../js/net/netcode.js';
 import {
   IN_RELOAD,
@@ -26,20 +25,15 @@ import {
 } from '../../../js/net/protocol.js';
 import {
   GOLDEN,
-  DROPS,
-  WORLD_SIZE,
   WEAPON_ORDER,
   NET,
   WEAPONS,
-  BOUNTY,
   SELL_RATE,
   SHOP,
   SHOP_ORDER,
   BUILD_ORDER,
   THROWABLES,
   ROBOT,
-  ROCKET,
-  MONEY_LOSS,
   ABILITY,
   CLASS_ORDER,
   HEAVY,
@@ -47,7 +41,8 @@ import {
 } from '../../../js/core/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.js';
 import { Abilities, isClass } from '../../../js/sim/abilities.js';
-import { rand, randInt, TAU } from '../../../js/core/util.js';
+import * as Rules from '../../../js/sim/rules.js';
+import { TAU } from '../../../js/core/util.js';
 import type { Cmd, Act } from '../validate.ts';
 
 const FX_MAX = 300;
@@ -266,19 +261,10 @@ export class ServerSim {
       onZombieHit: (_z: any, p: any) => this.onZombieHit(p),
       onRobotHit: (dmg: number, p: any) => this.onRobotHit(dmg, p),
       applyAcid: (p: any) => this.applyAcid(p),
-      rocketHit: (z: any, x: number, y: number, b: any) => {
-        // en gordos y super blindados el cohete se clava; en el resto estalla al instante
-        if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) this.structures.stickRocket(g, z, x, y, b);
-        else g.rocketBlast(x, y, b.owner);
-      },
-      rocketBlast: (x: number, y: number, owner: string | null = null) =>
-        this.structures.explode(g, { x, y, owner }, ROCKET.radius, ROCKET.power, 1),
+      rocketHit: (z: any, x: number, y: number, b: any) => Rules.rocketHit(g, z, x, y, b),
+      rocketBlast: (x: number, y: number, owner: string | null = null) => Rules.rocketBlast(g, x, y, owner),
       updateHud: noop,
-      onSuperPunch: (_z: any, x: number, y: number) => {
-        g.particles.dust(x, y, 18);
-        g.camera.shake(0.35, x, y);
-        g.sfx.punch();
-      },
+      onSuperPunch: (_z: any, x: number, y: number) => Rules.superPunch(g, x, y),
       onGiantStep: (z: any) => {
         g.particles.dust(z.x - Math.cos(z.angle) * 10, z.y - Math.sin(z.angle) * 10, z.r);
         g.sfx.stomp(0.7);
@@ -360,67 +346,38 @@ export class ServerSim {
   /* ---------- combate ---------- */
 
   hitZombie(z: any, b: any, hx: number, hy: number) {
-    if (z.dead) return;
-    z.lastOwner = b.owner || null;
-    bulletHit(this.game, z, b, hx, hy);
-    if (b.shot && !b.shot.hit) {
-      b.shot.hit = true;
-      const s = this.slots.get(b.owner);
+    const shotHit = (bb: any) => {
+      const s = this.slots.get(bb.owner);
       if (s) s.p.shotsHit++;
-    }
-    if (z.hp <= 0) this.killZombie(z);
+    };
+    if (Rules.hitZombie(this.game, z, b, hx, hy, shotHit)) this.killZombie(z);
   }
 
   killZombie(z: any) {
-    if (z.dead) return;
-    const g = this.game;
-    z.dead = true;
-    this.kills[z.type] = (this.kills[z.type] || 0) + 1;
-    if (z.burn > 0) z.burnt = true;
-    g.decals.corpse(z, z.lastDx || 0, z.lastDy || 0);
     const by = this.slots.get(z.lastOwner);
-    if (by) {
-      by.kills++;
-      by.money += BOUNTY[z.type as keyof typeof BOUNTY] || 0;
-    }
-    // la experiencia es del equipo (todos suben de nivel juntos)
-    for (const s of this.slots.values()) this.addXp(s, z.def.xp);
-    if (z.type === 'golden') {
+    Rules.killZombie(this.game, z, {
+      kills: this.kills,
+      // la experiencia es del equipo (todos suben de nivel juntos)
+      xp: (zb: any) => {
+        for (const s of this.slots.values()) this.addXp(s, zb.def.xp);
+      },
+      bounty: (zb: any) => {
+        if (!by) return;
+        by.kills++;
+        by.money += Rules.bountyOf(zb.type);
+      },
       // recompensa única del zombi dorado para quien lo mató (como en solitario)
-      if (by) {
-        const reward = randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
+      golden: (_zb: any, reward: number) => {
+        if (!by) return;
         by.money += reward;
         by.toasts.push(`¡Zombi dorado! +$${reward}`);
-      }
-      g.particles.pickupFx(z.x, z.y, '#f0c040');
-    }
-    g.particles.death(z.x, z.y, z.r);
-    // el gordo revienta en ácido
-    if (z.type === 'fat') this.structures.queueDeathBlast(z.type, z.x, z.y);
-    const r = Math.random();
-    if (z.type === 'giant') {
-      g.camera.shake(0.5, z.x, z.y);
-      g.particles.ring(z.x, z.y, z.r, '170,160,140');
-      this.pickups.drop('crate', z.x, z.y);
-      this.pickups.drop('med', z.x + 24, z.y);
-      g.sfx.kill(true);
-      this.toastAll('Gigante abatido');
-    } else {
-      const drop = (DROPS as any)[z.type] || DROPS.normal;
-      if (r < drop.ammo) this.pickups.drop('ammo', z.x, z.y);
-      else if (r < drop.ammo + drop.med) this.pickups.drop('med', z.x, z.y);
-      g.sfx.kill(z.type === 'fat' || z.type === 'heavy');
-    }
+      },
+      toast: (m: string) => this.toastAll(m),
+    });
   }
 
   addXp(s: Slot, n: number) {
-    s.xp += n;
-    while (s.xp >= s.xpNeed) {
-      s.xp -= s.xpNeed;
-      s.level++;
-      s.xpNeed = xpForLevel(s.level);
-      s.pending++;
-    }
+    s.pending += Rules.gainXp(s, n);
   }
 
   /* ---------- mejoras (en cualquier momento) y tienda (entre oleadas) ---------- */
@@ -607,20 +564,14 @@ export class ServerSim {
   onRobotHit(dmg: number, p: any) {
     const s = this.slotOf(p);
     if (!s) return;
-    const rb = s.robot;
-    this.game.sfx.blockHit('metal');
-    if (!rb.damage(dmg)) return;
-    this.structures.explode(this.game, { x: rb.x, y: rb.y }, 170, 450, 1);
-    rb.leave(p, this.world);
-    rb.hp = 0;
-    s.toasts.push('¡Robot destruido! Repáralo en la tienda');
+    if (Rules.robotHit(this.game, s.robot, dmg, p)) s.toasts.push('¡Robot destruido! Repáralo en la tienda');
   }
 
   // Cada golpe de zombi cuesta dinero (como en solitario; dentro del robot, no).
   onZombieHit(p: any) {
     const s = this.slotOf(p);
     if (!s || p.inRobot || p.boostT > 0) return;
-    const loss = Math.min(s.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+    const loss = Rules.hitLoss(s.money);
     if (loss <= 0) return;
     s.money -= loss;
     s.lost += loss;
@@ -629,28 +580,20 @@ export class ServerSim {
   // Ácido del gordo: quema unos segundos (vida fija por segundo).
   applyAcid(p: any) {
     const s = this.slotOf(p);
-    if (!s || !p.alive || p.inRobot || p.boostT > 0) return;
-    if (!(s.acidT > 0)) s.acidTick = 0;
-    s.acidT = ACID.burn;
+    if (!s || !Rules.canBurn(this.game, p)) return;
+    Rules.startAcid(s);
   }
 
   updateAcid(s: Slot) {
     if (!(s.acidT > 0)) return;
-    const p = s.p;
-    s.acidTick += TICK;
-    while (s.acidTick >= 1 && p.alive) {
-      s.acidTick -= 1;
-      p.hp -= ACID.dps;
-      p.damageTaken += ACID.dps;
-      p.hurtT = 0.2;
-      this.game.particles.acidBurst(p.x, p.y, 18);
-      if (p.hp <= 0) {
-        p.hp = 0;
-        p.alive = false;
-        this.onPlayerDeath();
-      }
-    }
-    s.acidT = p.alive ? Math.max(0, s.acidT - TICK) : 0;
+    s.acidT = Rules.acidStep(
+      this.game,
+      s.p,
+      s,
+      TICK,
+      () => {},
+      () => this.onPlayerDeath(),
+    );
   }
 
   // Un jugador recoge un objeto (mismas reglas que en solitario; el aviso es sólo para él).
@@ -782,12 +725,7 @@ export class ServerSim {
     const d = this.director;
     d.update(TICK, g);
     if (d.state === 'active' && live.some((s) => s.p.alive)) {
-      this.goldenT -= TICK;
-      if (this.goldenT <= 0) {
-        const alive = this.horde.list.some((z: any) => z.type === 'golden' && !z.dead);
-        if (!alive && this.spawnGolden()) this.goldenT = rand(GOLDEN.every[0], GOLDEN.every[1]);
-        else this.goldenT = 5;
-      }
+      this.goldenT = Rules.goldenTick(g, this.goldenT, TICK, (m) => this.toastAll(m));
     }
     this.offerUpgrades();
     if (d.state === 'waiting') {
@@ -830,25 +768,6 @@ export class ServerSim {
     if (!s) return;
     s.p.vw = w;
     s.p.vh = h;
-  }
-
-  spawnGolden() {
-    const d = this.director;
-    for (let i = 0; i < 20; i++) {
-      const c = d.edgePoint(this.game, rand(60, 140));
-      if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (
-        this.world.pointBlocked(c.x, c.y, 16) ||
-        !d.canReach(this.game, c.x, c.y) ||
-        d.seen(d.views(this.game), c.x, c.y, 16)
-      )
-        continue;
-      this.horde.spawn('golden', c.x, c.y, 1, d.speedMult);
-      this.game.sfx.goldenSpawn();
-      this.toastAll('¡Apareció un zombi dorado! Atrápalo antes de que escape');
-      return true;
-    }
-    return false;
   }
 
   /* ---------- fotos para cada jugador ---------- */

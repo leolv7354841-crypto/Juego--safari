@@ -123,7 +123,13 @@ export interface GameHost {
   remoteSim?: boolean;
   hurtFlash: number;
   muzzle: number;
-  camera: { viewW: number; viewH: number; shake(n: number): void; kick(...a: any[]): void; [k: string]: any };
+  camera: {
+    viewW: number;
+    viewH: number;
+    shake(n: number, x?: number, y?: number): void;
+    kick(...a: any[]): void;
+    [k: string]: any;
+  };
   coop: { isHost: boolean; isGuest: boolean; active: boolean; peer: any; [k: string]: any };
   // any: lo cumplen las clases Particles/Sfx/Decals y las grabadoras del servidor
   particles: any;
