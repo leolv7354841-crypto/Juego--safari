@@ -53,6 +53,7 @@ import { Pickups } from './sim/pickups.js';
 import { drawPickups } from './render/pickups.js';
 import { drawBullets } from './render/bullets.js';
 import { drawHorde } from './render/zombies.js';
+import { setChunkView, drawGround as drawWorldGround, drawOverhead } from './render/world.js';
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Input } from './ui/input.js';
@@ -232,8 +233,7 @@ class Game {
 
   newWorld(seed) {
     this.world = new World(seed);
-    this.world.setChunkScale(this.chunkScale);
-    this.world.maxChunks = this.maxChunks;
+    setChunkView(this.world, this.chunkScale, this.maxChunks);
   }
 
   resetRun() {
@@ -2177,8 +2177,7 @@ class Game {
     this.chunkScale = cam.zoom * this.dpr;
     this.maxChunks = (Math.ceil(cam.viewW / 512) + 2) * (Math.ceil(cam.viewH / 512) + 2) + 2;
     if (this.world) {
-      this.world.setChunkScale(this.chunkScale);
-      this.world.maxChunks = this.maxChunks;
+      setChunkView(this.world, this.chunkScale, this.maxChunks);
     }
     this.redVignette = this.makeVignette('150,20,15', 0.85);
   }
@@ -2392,7 +2391,7 @@ class Game {
     ctx.fillStyle = '#0c0e0b';
     ctx.fillRect(0, 0, W, H);
     ctx.setTransform(z, 0, 0, z, tx, ty);
-    this.world.drawGround(ctx, v.x0, v.y0, v.x1, v.y1);
+    drawWorldGround(ctx, this.world, v.x0, v.y0, v.x1, v.y1);
     drawGround(ctx, this.structures, v);
     this.decals.drawPools(ctx, v);
     this.decals.draw(ctx, v);
@@ -2419,7 +2418,7 @@ class Game {
     this.coop.drawRemoteBullets(ctx);
     this.online.drawRemoteBullets(ctx);
     drawGrenades(ctx, this.structures);
-    this.world.drawOverhead(ctx, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
+    drawOverhead(ctx, this.world, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
     this.particles.draw(ctx, v);
 
     this.lighting.render(this, base, v);

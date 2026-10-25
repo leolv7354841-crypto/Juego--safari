@@ -721,3 +721,6 @@ export const ZOMBIE_VARIANTS = {
   bull: 3,
   giant: 2,
 };
+
+// Colores de carrocería de los coches abandonados (el mundo elige uno al generarse).
+export const CAR_COLORS = ['#7d2f2a', '#c75f43', '#3f566b', '#6b6d68', '#b8b1a0', '#2f3a32', '#8a6a3a', '#4b4f63'];
