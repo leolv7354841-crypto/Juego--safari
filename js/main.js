@@ -19,7 +19,6 @@ import {
   CLASS_ORDER,
   WAVES,
   START_WEAPON,
-  CAMERA,
   HEAVY,
   ZOMBIE_VARIANTS,
 } from './core/config.js';
@@ -57,6 +56,7 @@ import { drawHorde } from './render/zombies.js';
 import { setChunkView, drawGround as drawWorldGround, drawOverhead } from './render/world.js';
 import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
+import { Camera } from './render/camera.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
 import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
@@ -103,48 +103,6 @@ const ITEM_ICONS = {
   mine: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#4a5236" stroke="#141612"/><circle cx="6" cy="6" r="1.4" fill="#ff5a3a"/></svg>',
   wire: '<svg viewBox="0 0 12 12"><path d="M0 6l2-3 2 6 2-6 2 6 2-6 2 3" fill="none" stroke="#c9c4b6" stroke-width="1.2"/></svg>',
 };
-
-class Camera {
-  constructor() {
-    this.x = 0;
-    this.y = 0;
-    this.zoom = 1;
-    this.trauma = 0;
-    this.kx = 0;
-    this.ky = 0;
-    this.sx = 0;
-    this.sy = 0;
-    this.viewW = 800;
-    this.viewH = 600;
-  }
-  // Temblor de fuerza a (0..1). Con lugar (x, y) se apaga con la distancia a la cámara; sin lugar
-  // es algo que le pasa a este jugador (su golpe, su muerte). La fuente más fuerte manda y las demás
-  // suman poco, así que muchos golpes seguidos no dejan la cámara temblando al tope.
-  shake(a, x, y) {
-    if (typeof x === 'number' && typeof y === 'number') {
-      const d = Math.hypot(x - this.x, y - this.y);
-      a *= clamp(1 - (d - CAMERA.near) / (CAMERA.far - CAMERA.near), 0, 1);
-    }
-    if (!(a > 0)) return;
-    this.trauma = Math.min(1, Math.max(this.trauma, a) + a * CAMERA.stack * (1 - this.trauma));
-  }
-  kick(x, y) {
-    this.kx += x;
-    this.ky += y;
-  }
-  update(dt, tx, ty, snap) {
-    const a = snap ? 1 : 1 - Math.exp(-dt * 7);
-    this.x += (tx - this.x) * a;
-    this.y += (ty - this.y) * a;
-    this.trauma = Math.max(0, this.trauma - dt * 1.5);
-    const k = Math.exp(-dt * 16);
-    this.kx *= k;
-    this.ky *= k;
-    const s = this.trauma * this.trauma * CAMERA.shake;
-    this.sx = rand(-s, s) + this.kx;
-    this.sy = rand(-s, s) + this.ky;
-  }
-}
 
 /** @param {EventTarget | null} t @param {string} sel @returns {HTMLElement | null} */
 const closest = (t, sel) => /** @type {HTMLElement} */ (t).closest(sel);
