@@ -1,9 +1,24 @@
-import { PLAYER_BASE, WEAPONS, WORLD_SIZE, WEAPON_ORDER, ROBOT } from './config.js';
+import {
+  PLAYER_BASE,
+  WEAPONS,
+  WORLD_SIZE,
+  WEAPON_ORDER,
+  ROBOT,
+  ABILITY,
+  START_WEAPON,
+  ZOMBIE_SPEED,
+  WAVES,
+  HEAVY,
+} from './config.js';
 import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
 import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
+// px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
+export const WALK = PLAYER_BASE.walk * ((ZOMBIE_SPEED[0] + ZOMBIE_SPEED[1]) / 2) * WAVES.speed;
+// El que maneja la torreta pesada se para detrás del cañón, a esta distancia del centro.
+export const HEAVY_BACK = 30;
 const GUN_TIP = {
   pistol: 22.5,
   smg: 29.7,
@@ -41,13 +56,14 @@ export class Player {
       ammoMult: 1,
       pierce: 0,
       reloadMult: 1,
+      cdMult: 1,
     };
     this.hp = this.stats.maxHp;
     this.stamina = this.stats.maxStamina;
     this.exhausted = false;
     this.running = false;
     this.sinceRun = 10;
-    this.weapons = [this.makeWeapon('pistol')];
+    this.weapons = [this.makeWeapon(START_WEAPON)];
     this.wi = 0;
     this.fireCd = 0;
     this.reloadT = 0;
@@ -61,6 +77,15 @@ export class Player {
     this.shotsFired = 0;
     this.shotsHit = 0;
     this.damageTaken = 0;
+    // clase elegida al empezar y su habilidad (ver abilities.js)
+    this.cls = null;
+    this.abCd = 0;
+    this.boostT = 0;
+    this.rageT = 0;
+    this.rageAcc = 0;
+    // torreta pesada que maneja (estructura de build.js) y sus balas compradas
+    this.manned = null;
+    this.heavyAmmo = 0;
   }
 
   get weapon() {
@@ -92,10 +117,10 @@ export class Player {
     return true;
   }
 
-  // Quita un arma (vender). La pistola no se puede quitar.
+  // Quita un arma (vender). El arma inicial no se puede quitar.
   removeWeapon(id) {
     const i = this.weapons.findIndex((w) => w.id === id);
-    if (i <= 0 || id === 'pistol') return false;
+    if (i < 0 || id === START_WEAPON) return false;
     this.weapons.splice(i, 1);
     if (this.wi === i) this.wi = 0;
     else if (this.wi > i) this.wi--;
@@ -132,7 +157,8 @@ export class Player {
   }
 
   hurt(dmg, game) {
-    if (!this.alive) return;
+    // Booster: inmune mientras dura el impulso
+    if (!this.alive || this.boostT > 0) return;
     // compañero en cooperativo: su vida la lleva su propio celular
     if (this.remote) {
       this.hurtT = 0.3;
@@ -144,11 +170,14 @@ export class Player {
       game.onRobotHit(dmg, this);
       return;
     }
+    // el escudo de la torreta pesada aguanta parte del golpe
+    if (this.manned) dmg *= 1 - HEAVY.shield;
     const real = dmg * (1 - this.stats.armor);
     this.hp -= real;
     this.damageTaken += real;
     this.hurtT = 0.3;
-    game.camera.shake(0.28);
+    // el temblor es de quien recibe el golpe (en cooperativo el anfitrión también simula al invitado)
+    if (this === game.player) game.camera.shake(0.28);
     game.hurtFlash = Math.min(1, game.hurtFlash + 0.5);
     game.sfx.hurt();
     if (this.hp <= 0) {
@@ -194,9 +223,23 @@ export class Player {
     if (this.exhausted && this.stamina > st.maxStamina * 0.3) this.exhausted = false;
 
     // --- movimiento ---
-    let speed = PLAYER_BASE.walkSpeed * st.speedMult;
+    // en la torreta pesada no caminas: te quedas detrás del cañón, que gira contigo
+    if (this.manned) {
+      const b = this.manned;
+      this.x = b.x + b.w / 2 - Math.cos(b.ang) * HEAVY_BACK;
+      this.y = b.y + b.h / 2 - Math.sin(b.ang) * HEAVY_BACK;
+      this.vx = this.vy = this.kx = this.ky = 0;
+      this.speedNow = 0;
+      this.legAngle = b.ang;
+      return;
+    }
+    let speed = WALK * st.speedMult;
     if (this.running) speed *= PLAYER_BASE.runMult;
     if (this.exhausted) speed *= 0.85;
+    if (this.boostT > 0) {
+      this.boostT = Math.max(0, this.boostT - dt);
+      speed *= ABILITY.booster.speed;
+    }
     if (this.inRobot) {
       speed *= ROBOT.speed;
       // con el peso del robot casi nada lo empuja
@@ -227,6 +270,7 @@ export class Player {
 
   // Apuntado, recarga y disparo (mv = dirección de movimiento de este fotograma).
   act(dt, game, mv) {
+    if (this.manned) return this.actMounted(dt, game, mv);
     const input = game.input;
     const mag = Math.hypot(mv.x, mv.y);
     const moving = mag > 0.12;
@@ -277,6 +321,87 @@ export class Player {
     const slot = input.consume('slot');
     if (slot) this.select(slot - 1);
     if (input.firing) this.tryFire(game);
+  }
+
+  // Montado en la torreta pesada: el cañón gira despacio hacia la mira y dispara sus balas.
+  actMounted(dt, game, mv) {
+    const b = this.manned;
+    // la torreta reventó: quedas de pie donde estabas
+    if (b.hp <= 0) {
+      b.manned = null;
+      this.manned = null;
+      return;
+    }
+    const d = WEAPONS.heavy;
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    let want = b.ang;
+    if (game.input.mode === 'mouse') {
+      const m = game.mouseWorld();
+      want = Math.atan2(m.y - cy, m.x - cx);
+      this.target = null;
+    } else {
+      this.target = game.horde.findTarget(cx, cy, d.range * 0.92, this.target);
+      if (this.target) want = Math.atan2(this.target.y - cy, this.target.x - cx);
+      else if (Math.hypot(mv.x, mv.y) > 0.12) want = Math.atan2(mv.y, mv.x);
+    }
+    b.ang = angleTo(b.ang, want, dt * HEAVY.turn);
+    this.angle = b.ang;
+    this.fireCd -= dt;
+    this.flashT -= dt;
+    this.hurtT -= dt;
+    this.recoil = Math.max(0, this.recoil - dt * 8);
+    this.bloom = Math.max(0, this.bloom - dt * 0.5);
+    b.recoil = Math.max(0, (b.recoil || 0) - dt * 10);
+    b.flash = Math.max(0, (b.flash || 0) - dt);
+    // las teclas de arma no hacen nada aquí
+    game.input.consume('reload');
+    game.input.consume('swap');
+    game.input.consume('slot');
+    if (!game.input.firing || this.fireCd > 0) return;
+    if (this.heavyAmmo <= 0) {
+      game.sfx.empty();
+      this.fireCd = 0.5;
+      if (!game.remoteSim) game.toast('Torreta sin balas: cómpralas en la tienda');
+      return;
+    }
+    this.heavyAmmo--;
+    this.fireCd = 1 / (d.rate * this.stats.rateMult);
+    // los dos cañones disparan alternados
+    b.side = b.side === 1 ? -1 : 1;
+    const ca = Math.cos(b.ang);
+    const sa = Math.sin(b.ang);
+    const sx = cx + ca * 40 - sa * b.side * 7;
+    const sy = cy + sa * 40 + ca * b.side * 7;
+    const a = b.ang + rand(-1, 1) * (d.spread + this.bloom);
+    game.bullets.spawn({
+      x: sx,
+      y: sy,
+      dx: Math.cos(a),
+      dy: Math.sin(a),
+      speed: d.speed * rand(0.97, 1.03),
+      life: d.range,
+      dmg: d.damage * this.stats.dmgMult,
+      pierce: d.pierce,
+      knock: d.knock,
+      shot: { hit: false },
+      hits: null,
+      rocket: false,
+    });
+    this.shotsFired++;
+    this.bloom = Math.min(0.12, this.bloom + d.bloom);
+    b.recoil = 1;
+    b.flash = 0.05;
+    if (this === game.player) {
+      game.camera.shake(d.shake);
+      game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    }
+    game.muzzle = 1;
+    game.muzzleX = sx;
+    game.muzzleY = sy;
+    game.particles.casing(cx - sa * b.side * 12, cy + ca * b.side * 12, b.ang + (Math.PI / 2) * b.side);
+    game.particles.muzzleSmoke(sx, sy, b.ang);
+    game.sfx.shot('heavy');
   }
 
   tryFire(game) {
@@ -345,8 +470,11 @@ export class Player {
     this.flashT = 0.05;
     this.kx -= ca * d.knock * 0.5;
     this.ky -= sa * d.knock * 0.5;
-    game.camera.shake(d.shake);
-    game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    // la cámara sólo se mueve con los disparos propios
+    if (this === game.player) {
+      game.camera.shake(d.shake);
+      game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+    }
     game.muzzle = 1;
     game.muzzleX = sx;
     game.muzzleY = sy;

@@ -16,6 +16,20 @@ export function cleanLookCode(raw: unknown): string {
   return typeof raw === 'string' && LOOK_RE.test(raw) ? raw : '';
 }
 
+// Clase de la partida (ver CLASS_ORDER en js/config.js). Si no es válida: '' (el servidor pone una).
+const CLASSES = ['bomber', 'berserker', 'booster'];
+export function cleanClass(raw: unknown): string {
+  return typeof raw === 'string' && CLASSES.includes(raw) ? raw : '';
+}
+
+// Media pantalla del cliente en px del mundo [ancho, alto] (llega con el ping). null si no sirve.
+export function cleanView(raw: unknown): [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const [w, h] = raw;
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+  return [Math.min(1600, Math.max(100, Math.round(w))), Math.min(1600, Math.max(100, Math.round(h)))];
+}
+
 export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
 
 // Una entrada: [secuencia, mx, my, bits, ángulo, arma]. null si está mal formada.
@@ -39,8 +53,9 @@ export function cleanCmd(raw: unknown): Cmd | null {
   return { s, mx, my, f, a, w };
 }
 
-// Acción de un jugador ligada a su última entrada (s): construir, lanzar o subir al robot.
-export type Act = { s: number; k: 'build' | 'throw' | 'robot'; kind: string; tx: number; ty: number };
+// Acción de un jugador ligada a su última entrada (s): construir, lanzar, subir al robot o
+// usar la habilidad de su clase (ab, hacia tx/ty).
+export type Act = { s: number; k: 'build' | 'throw' | 'robot' | 'ab'; kind: string; tx: number; ty: number };
 
 const KIND_RE = /^[a-z]{1,12}$/;
 
@@ -48,12 +63,13 @@ export function cleanAct(raw: any): Act | null {
   if (!raw || typeof raw !== 'object') return null;
   const { s, k } = raw;
   if (!Number.isSafeInteger(s) || s < 0) return null;
-  if (k !== 'build' && k !== 'throw' && k !== 'robot') return null;
-  const kind = k === 'robot' ? '' : raw.kind;
-  if (typeof kind !== 'string' || (k !== 'robot' && !KIND_RE.test(kind))) return null;
+  if (k !== 'build' && k !== 'throw' && k !== 'robot' && k !== 'ab') return null;
+  const bare = k === 'robot' || k === 'ab';
+  const kind = bare ? '' : raw.kind;
+  if (typeof kind !== 'string' || (!bare && !KIND_RE.test(kind))) return null;
   let tx = 0;
   let ty = 0;
-  if (k === 'throw') {
+  if (k === 'throw' || k === 'ab') {
     tx = raw.tx;
     ty = raw.ty;
     if (

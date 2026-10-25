@@ -32,9 +32,13 @@ import {
   ROBOT,
   ROCKET,
   MONEY_LOSS,
+  ABILITY,
+  CLASS_ORDER,
+  HEAVY,
   xpForLevel,
 } from '../../../js/config.js';
 import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
+import { Abilities, isClass } from '../../../js/abilities.js';
 import { rand, randInt, TAU } from '../../../js/util.js';
 import type { Cmd, Act } from '../validate.ts';
 
@@ -65,6 +69,7 @@ export const STAT_KEYS = [
   'ammoMult',
   'pierce',
   'reloadMult',
+  'cdMult',
 ];
 
 type Fx = { e: unknown[]; x?: number; y?: number; by: string | null };
@@ -131,7 +136,7 @@ export class ServerSim {
   kills: Record<string, number> = {};
   snapN = 0;
 
-  constructor(seed: number, players: { id: string; idx: number; name: string }[]) {
+  constructor(seed: number, players: { id: string; idx: number; name: string; cls?: string }[]) {
     this.seed = seed;
     this.world = new World(seed);
     this.horde = new Horde();
@@ -148,6 +153,8 @@ export class ServerSim {
       const p: any = new Player(s.x + Math.cos(a) * 44 * Math.min(1, i), s.y + Math.sin(a) * 44 * Math.min(1, i));
       this.world.collide(p, p.r, true);
       p.field = this.newField();
+      // clase elegida en el lobby (si no eligió, bomber)
+      p.cls = isClass(pl.cls) ? pl.cls : CLASS_ORDER[0];
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
       this.slots.set(pl.id, {
         id: pl.id,
@@ -261,7 +268,7 @@ export class ServerSim {
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => {
         g.particles.dust(x, y, 18);
-        g.camera.shake(0.35);
+        g.camera.shake(0.35, x, y);
         g.sfx.punch();
       },
       onGiantStep: (z: any) => {
@@ -279,6 +286,8 @@ export class ServerSim {
         const s = alive.length ? alive[(Math.random() * alive.length) | 0] : null;
         return s ? s.p : this.world.spawn;
       },
+      // la bala de la torreta no va en la foto: cada cliente lanza la suya al recibir el disparo
+      onTurretShot: (x: number, y: number, a: number) => this.record('t', 'shot', [x, y, a]),
       banner: rec('g', 'banner'),
       toast: (m: string) => (this.toastTo ? this.slots.get(this.toastTo)?.toasts.push(m) : this.toastAll(m)),
     };
@@ -291,7 +300,13 @@ export class ServerSim {
     let x: number | undefined;
     let y: number | undefined;
     let packed: unknown[] = args;
-    if (tag === 'd' && n === 'corpse') {
+    // temblor: sólo los que tienen lugar (cada cliente lo apaga con la distancia a su cámara);
+    // los de un jugador (su golpe, su muerte) los pone su propio cliente
+    if (tag === 'c' && (typeof args[1] !== 'number' || typeof args[2] !== 'number')) return;
+    if (tag === 'c') {
+      x = args[1];
+      y = args[2];
+    } else if (tag === 'd' && n === 'corpse') {
       const z = args[0];
       x = z.x;
       y = z.y;
@@ -308,7 +323,11 @@ export class ServerSim {
         args[1],
         args[2],
       ];
-    } else if ((tag === 'p' || tag === 'd') && typeof args[0] === 'number' && typeof args[1] === 'number') {
+    } else if (
+      (tag === 'p' || tag === 'd' || tag === 't') &&
+      typeof args[0] === 'number' &&
+      typeof args[1] === 'number'
+    ) {
       x = args[0];
       y = args[1];
     } else if ((tag === 's' || tag === 'c') && this.lastPos.ok && n !== 'wave') {
@@ -372,7 +391,7 @@ export class ServerSim {
     if (z.type === 'fat') this.structures.queueDeathBlast(z.type, z.x, z.y);
     const r = Math.random();
     if (z.type === 'giant') {
-      g.camera.shake(0.5);
+      g.camera.shake(0.5, z.x, z.y);
       g.particles.ring(z.x, z.y, z.r, '170,160,140');
       this.pickups.drop('crate', z.x, z.y);
       this.pickups.drop('med', z.x + 24, z.y);
@@ -432,16 +451,17 @@ export class ServerSim {
     if (!s || !s.p.alive || this.director.state !== 'waiting') return false;
     if (k === 'item') return this.buyItem(s, wid);
     if (k === 'robot') return this.buyRobot(s, wid);
+    if (k === 'heavy') return this.buyHeavyAmmo(s, n);
     const d = Object.hasOwn(WEAPONS, wid) ? (WEAPONS as any)[wid] : null;
     if (!d) return false;
     const p = s.p;
     if (k === 'gun') {
-      if (p.has(wid) || s.money < d.price) return false;
+      if (!d.price || p.has(wid) || s.money < d.price) return false;
       s.money -= d.price;
       p.unlock(wid);
       s.toasts.push(`${d.name} comprada`);
     } else if (k === 'sell') {
-      if (wid === 'pistol' || !p.removeWeapon(wid)) return false;
+      if (!d.price || !p.removeWeapon(wid)) return false;
       const gain = Math.round(d.price * SELL_RATE);
       s.money += gain;
       s.toasts.push(`${d.name} vendida: +$${gain}`);
@@ -462,6 +482,15 @@ export class ServerSim {
     if (!it || s.money < it.price) return false;
     s.money -= it.price;
     s.inv[k]++;
+    return true;
+  }
+
+  // Balas de la torreta pesada: las usa cualquiera que monte (de 1 o 5 cintas).
+  buyHeavyAmmo(s: Slot, n: number) {
+    const cost = HEAVY.price * n;
+    if ((n !== 1 && n !== 5) || s.money < cost) return false;
+    s.money -= cost;
+    s.p.heavyAmmo += HEAVY.pack * n;
     return true;
   }
 
@@ -518,16 +547,36 @@ export class ServerSim {
         if (a.kind === 'molotov') this.structures.throwMolotov(g, a.tx, a.ty, s.id);
         else this.structures.throwGrenade(g, a.tx, a.ty, s.id);
       } else if (a.k === 'robot') this.toggleRobot(s);
+      else if (a.k === 'ab') {
+        // la megarráfaga y el impulso ya los vio en su pantalla; el misil, no
+        if (p.cls !== 'bomber') this.actor = s.id;
+        Abilities.use(g, p, a.tx, a.ty, s.id);
+      }
     } finally {
       g.player = null;
+      this.actor = null;
       this.toastTo = null;
     }
   }
 
-  // Subirse o bajarse de su robot (las mismas reglas que en solitario).
+  // Subirse o bajarse de su robot (las mismas reglas que en solitario); junto a una torreta
+  // pesada libre, la monta.
   toggleRobot(s: Slot) {
     const rb = s.robot;
     const p = s.p;
+    const st = this.structures;
+    if (p.manned) {
+      st.leaveHeavy(p);
+      this.game.sfx.build();
+      return;
+    }
+    const h = p.inRobot ? null : st.nearHeavy(p);
+    if (h) {
+      st.mountHeavy(p, h);
+      this.game.sfx.build();
+      if (p.heavyAmmo <= 0) s.toasts.push('Torreta sin balas: cómpralas en la tienda');
+      return;
+    }
     if (!rb.owned) return s.toasts.push('Compra el robot de combate en la tienda');
     if (rb.piloted) {
       rb.leave(p, this.world);
@@ -562,7 +611,7 @@ export class ServerSim {
   // Cada golpe de zombi cuesta dinero (como en solitario; dentro del robot, no).
   onZombieHit(p: any) {
     const s = this.slotOf(p);
-    if (!s || p.inRobot) return;
+    if (!s || p.inRobot || p.boostT > 0) return;
     const loss = Math.min(s.money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
     if (loss <= 0) return;
     s.money -= loss;
@@ -572,7 +621,7 @@ export class ServerSim {
   // Ácido del gordo: quema unos segundos (vida fija por segundo).
   applyAcid(p: any) {
     const s = this.slotOf(p);
-    if (!s || !p.alive || p.inRobot) return;
+    if (!s || !p.alive || p.inRobot || p.boostT > 0) return;
     if (!(s.acidT > 0)) s.acidTick = 0;
     s.acidT = ACID.burn;
   }
@@ -616,6 +665,7 @@ export class ServerSim {
     for (const s of this.slots.values()) {
       if (s.p.alive || s.p.counted) continue;
       s.p.counted = true;
+      this.structures.leaveHeavy(s.p);
       s.deaths++;
       s.queue.length = 0;
       s.acts.length = 0;
@@ -664,12 +714,15 @@ export class ServerSim {
     const s = this.slots.get(id);
     if (!s) return;
     s.away = away;
+    if (away) this.structures.leaveHeavy(s.p);
     s.queue.length = 0;
     s.acts.length = 0;
     s.last = { ...s.last, mx: 0, my: 0, f: 0 };
   }
 
   remove(id: string) {
+    const s = this.slots.get(id);
+    if (s) this.structures.leaveHeavy(s.p);
     this.slots.delete(id);
   }
 
@@ -754,6 +807,7 @@ export class ServerSim {
     const before = this.bullets.list.length;
     applyMove(p, cmd, g);
     p.act(TICK, g, { x: cmd.mx, y: cmd.my });
+    Abilities.update(TICK, g, p);
     // las balas que acaba de disparar son suyas (bajas y aciertos)
     for (let i = before; i < this.bullets.list.length; i++) this.bullets.list[i].owner = s.id;
     g.input.cmd = null;
@@ -762,13 +816,26 @@ export class ServerSim {
     this.toastTo = null;
   }
 
+  // Media pantalla que mandó el jugador: el director no hace aparecer zombis dentro de ella.
+  setView(id: string, w: number, h: number) {
+    const s = this.slots.get(id);
+    if (!s) return;
+    s.p.vw = w;
+    s.p.vh = h;
+  }
+
   spawnGolden() {
     const d = this.director;
     for (let i = 0; i < 20; i++) {
       const c = d.edgePoint(this.game, rand(60, 140));
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
-      if (this.world.pointBlocked(c.x, c.y, 16) || !this.world.reachable(c.x, c.y)) continue;
-      this.horde.spawn('golden', c.x, c.y, 1, 1);
+      if (
+        this.world.pointBlocked(c.x, c.y, 16) ||
+        !d.canReach(this.game, c.x, c.y) ||
+        d.seen(d.views(this.game), c.x, c.y, 16)
+      )
+        continue;
+      this.horde.spawn('golden', c.x, c.y, 1, d.speedMult);
       this.game.sfx.goldenSpawn();
       this.toastAll('¡Apareció un zombi dorado! Atrápalo antes de que escape');
       return true;
@@ -789,6 +856,13 @@ export class ServerSim {
     const me = s.p;
     const V = NET.view;
     const near = (x: number, y: number) => Math.abs(x - me.x) < V && Math.abs(y - me.y) < V;
+    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
+    const ZW = Math.max(NET.zombieView[0], (me.vw || 0) + 150);
+    const ZH = Math.max(NET.zombieView[1], (me.vh || 0) + 150);
+    const nearZ = (o: any) =>
+      o.type === 'golden' || o.type === 'giant'
+        ? near(o.x, o.y)
+        : Math.abs(o.x - me.x) < ZW && Math.abs(o.y - me.y) < ZH;
     const ox = Math.round(me.x);
     const oy = Math.round(me.y);
     const z: number[] = [];
@@ -796,7 +870,7 @@ export class ServerSim {
     // vida de los zombis heridos, en %, para su barra (sólo los que la muestran)
     const zh: number[] = [];
     for (const o of this.horde.list) {
-      if (o.dead || !near(o.x, o.y)) continue;
+      if (o.dead || !nearZ(o)) continue;
       const flags =
         (o.flash > 0 ? 1 : 0) |
         (o.burn > 0 ? 2 : 0) |
@@ -837,6 +911,7 @@ export class ServerSim {
         Math.ceil(p.hp),
         q.away ? 1 : 0,
         p.inRobot ? 1 : 0,
+        (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
       );
     }
     // robots de todos (el propio también): estacionados o con su piloto dentro
@@ -882,6 +957,9 @@ export class ServerSim {
         s.money,
         Math.round(s.acidT * 10),
         me.inRobot ? 1 : 0,
+        me.heavyAmmo,
+        me.manned ? me.manned.x : -1,
+        me.manned ? me.manned.y : -1,
       ],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
       o: [ox, oy],
@@ -893,7 +971,7 @@ export class ServerSim {
         near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
       ),
       b: this.bullets.list.flatMap((b: any) =>
-        b.owner !== id && near(b.x, b.y)
+        b.owner !== id && !b.turret && near(b.x, b.y)
           ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0]
           : [],
       ),
@@ -906,6 +984,11 @@ export class ServerSim {
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
       iv: SHOP_ORDER.map((k: string) => s.inv[k]),
       rb,
+      // torretas pesadas que manejan los demás: dónde, ángulo del cañón, quién y cañón que disparó
+      hv: st.blocks.flatMap((b: any) => {
+        const q = b.kind === 'heavy' && b.manned && b.manned !== me && near(b.x, b.y) ? this.slotOf(b.manned) : null;
+        return q ? [b.x, b.y, r100(b.ang), q.idx, b.flash > 0 ? b.side : 0] : [];
+      }),
       // granadas en el aire, fuego, cohetes clavados y explosiones (sólo lo cercano)
       gr: st.grenades.flatMap((q: any) =>
         near(q.x, q.y)
@@ -935,6 +1018,14 @@ export class ServerSim {
             ]
           : [],
       ),
+      // misiles del Bomber (la mira en el suelo es grande: se mandan con margen)
+      ms: st.missiles.flatMap((q: any) =>
+        Math.abs(q.x - me.x) < V + ABILITY.bomber.radius && Math.abs(q.y - me.y) < V + ABILITY.bomber.radius
+          ? [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)]
+          : [],
+      ),
+      // habilidad propia: clase, espera (décimas) y megarráfaga en curso
+      ab: [CLASS_ORDER.indexOf(me.cls), Math.ceil((me.abCd || 0) * 10), r100(me.rageT || 0)],
       bl: st.blasts.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.t)] : [])),
     };
     this.structSnap(s, snap);

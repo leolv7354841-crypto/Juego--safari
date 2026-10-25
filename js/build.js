@@ -1,6 +1,6 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET } from './config.js';
-import { TAU, rand, clamp } from './util.js';
+import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from './config.js';
+import { TAU, rand, clamp, roundRect } from './util.js';
 import { OUT, flameSprite } from './sprites.js';
 import { drawRocket } from './bullets.js';
 
@@ -13,13 +13,26 @@ const BLAST_R = 140;
 export const ACID = { radius: 105, burn: 5, dps: 2 };
 const near = [];
 
-// Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
-function nearestPlayer(game, x, y) {
-  let best = Infinity;
-  for (const p of game.targets || [game.player]) best = Math.min(best, Math.hypot(p.x - x, p.y - y));
-  return best;
+// Bala de la torreta (la misma en el servidor y, de adorno, en los clientes en línea).
+export function turretBullet(x, y, a, owner = null) {
+  return {
+    x,
+    y,
+    dx: Math.cos(a),
+    dy: Math.sin(a),
+    speed: 1100,
+    life: TURRET_RANGE + 40,
+    dmg: 34,
+    pierce: 1,
+    knock: 40,
+    shot: null,
+    hits: null,
+    owner,
+    turret: true,
+  };
 }
 
+// Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
 export class Structures {
   constructor() {
     this.blocks = [];
@@ -30,12 +43,14 @@ export class Structures {
     this.pending = [];
     this.fires = [];
     this.stuck = [];
+    this.missiles = [];
   }
 
   clear() {
     this.pending.length = 0;
     this.fires.length = 0;
     this.stuck.length = 0;
+    this.missiles.length = 0;
     this.blocks.length = 0;
     this.wires.length = 0;
     this.grenades.length = 0;
@@ -85,7 +100,7 @@ export class Structures {
     }
     if (ok && !def.ground) {
       for (const b of this.blocks) {
-        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || b.kind === 'turret')) {
+        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || SHOP[b.kind].turret)) {
           ok = false;
           break;
         }
@@ -146,7 +161,7 @@ export class Structures {
     for (let i = this.blocks.length - 1; i >= 0; i--) {
       const b = this.blocks[i];
       if (b === o) return o;
-      if (b.kind !== 'turret' && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
+      if (!SHOP[b.kind].turret && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
     }
     return o;
   }
@@ -205,6 +220,83 @@ export class Structures {
     const ey = p.y + Math.sin(a) * d;
     const dur = 0.25 + d / 650;
     this.grenades.push({ sx: p.x, sy: p.y, ex, ey, x: p.x, y: p.y, h: 0, t: 0, dur, fuse: dur + 0.55, rot: 0, owner });
+  }
+
+  /* ---------- misil balístico (habilidad del Bomber) ---------- */
+
+  // Cae del cielo donde apunta el jugador (como mucho a ABILITY.bomber.range de él).
+  launchMissile(game, p, tx, ty, owner = null) {
+    const M = ABILITY.bomber;
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const d = Math.min(Math.hypot(dx, dy), M.range);
+    const a = Math.atan2(dy, dx);
+    this.missiles.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, t: 0, dur: M.fall, owner });
+    game.sfx.missile();
+  }
+
+  updateMissiles(dt, game) {
+    const M = ABILITY.bomber;
+    for (let i = this.missiles.length - 1; i >= 0; i--) {
+      const m = this.missiles[i];
+      m.t += dt;
+      if (m.t < m.dur) continue;
+      this.missiles.splice(i, 1);
+      this.explode(game, m, M.radius, M.power, 1.5);
+      game.particles.ring(m.x, m.y, M.radius * 0.3, '255,190,120');
+      game.camera.shake(0.9, m.x, m.y);
+    }
+  }
+
+  // Mira roja en el suelo que se cierra y el misil cayendo en picada sobre ella.
+  drawMissiles(ctx, time) {
+    const R = ABILITY.bomber.radius;
+    for (const m of this.missiles) {
+      const k = Math.min(1, m.t / m.dur);
+      const blink = 0.55 + 0.45 * Math.abs(Math.sin(time * (6 + k * 18)));
+      ctx.save();
+      ctx.globalAlpha = 0.12 + 0.12 * k;
+      ctx.fillStyle = '#b5302a';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, R, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 0.5 * blink;
+      ctx.strokeStyle = '#ff5a40';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([18, 12]);
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, R, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // mira que se cierra hacia el punto de impacto
+      const rr = 30 + (1 - k) * 120;
+      ctx.globalAlpha = 0.9 * blink;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, rr, 0, TAU);
+      ctx.moveTo(m.x - rr - 14, m.y);
+      ctx.lineTo(m.x - rr + 10, m.y);
+      ctx.moveTo(m.x + rr - 10, m.y);
+      ctx.lineTo(m.x + rr + 14, m.y);
+      ctx.moveTo(m.x, m.y - rr - 14);
+      ctx.lineTo(m.x, m.y - rr + 10);
+      ctx.moveTo(m.x, m.y + rr - 10);
+      ctx.lineTo(m.x, m.y + rr + 14);
+      ctx.stroke();
+      // sombra que crece mientras baja
+      ctx.globalAlpha = 0.15 + 0.35 * k;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y, 6 + 16 * k, 4 + 9 * k, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      const h = (1 - k) * (1 - k) * 900;
+      ctx.save();
+      ctx.translate(m.x, m.y - h);
+      ctx.scale(2.2, 2.2);
+      drawRocket(ctx, 0, 0, Math.PI / 2, true);
+      ctx.restore();
+    }
   }
 
   // Los reventones de ácido se encolan: así una cadena de gordos no se pisa a sí misma.
@@ -273,7 +365,7 @@ export class Structures {
         }
         game.sfx.gore();
         this.explode(game, { x: cx, y: cy, owner: r.owner }, ROCKET.fatRadius, ROCKET.fatPower, 1.5);
-        game.camera.shake(0.9);
+        game.camera.shake(0.9, cx, cy);
       } else {
         // super blindado: lo revienta de un solo tiro
         if (!z.dead) {
@@ -343,7 +435,7 @@ export class Structures {
     if (this.fires.length > 8) this.fires.shift();
     game.particles.shatter(x, y);
     game.sfx.molotov();
-    game.camera.shake(0.12);
+    game.camera.shake(0.12, x, y);
   }
 
   updateFires(dt, game) {
@@ -413,7 +505,7 @@ export class Structures {
     game.decals.acid(x, y, R * 0.75);
     for (let i = 0; i < 4; i++) game.decals.acid(x + rand(-R, R) * 0.6, y + rand(-R, R) * 0.6, rand(14, 26));
     game.sfx.acid();
-    game.camera.shake(0.2 * clamp(1 - nearestPlayer(game, x, y) / 500, 0, 1));
+    game.camera.shake(0.2, x, y);
     for (const p of game.targets || [game.player]) if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
     if (game.coop && game.coop.isHost) game.coop.acidAt(x, y, R);
   }
@@ -455,7 +547,7 @@ export class Structures {
         z.lastDy = (dy / n) * (2 + 3 * f);
       }
     }
-    game.camera.shake(0.45 + 0.5 * clamp(1 - nearestPlayer(game, x, y) / 600, 0, 1));
+    game.camera.shake(0.95, x, y);
     // cohete: bola de fuego corta y luego humo; granada: explosión clásica
     if (fling) game.particles.rocketImpact(x, y, R);
     else game.particles.explosion(x, y, R);
@@ -489,6 +581,7 @@ export class Structures {
       this.acidBurst(game, b.x, b.y);
     }
     this.updateFires(dt, game);
+    this.updateMissiles(dt, game);
     this.updateStuck(dt, game);
     for (let i = this.blasts.length - 1; i >= 0; i--) {
       this.blasts[i].t -= dt;
@@ -531,20 +624,9 @@ export class Structures {
     const a = b.ang + rand(-0.04, 0.04);
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    game.bullets.spawn({
-      x: cx + ca * 20,
-      y: cy + sa * 20,
-      dx: ca,
-      dy: sa,
-      speed: 1100,
-      life: TURRET_RANGE + 40,
-      dmg: 34,
-      pierce: 1,
-      knock: 40,
-      shot: null,
-      hits: null,
-      owner: b.owner,
-    });
+    game.bullets.spawn(turretBullet(cx + ca * 20, cy + sa * 20, a, b.owner));
+    // en línea: el servidor avisa del disparo y cada cliente lanza su propia bala de adorno
+    if (game.onTurretShot) game.onTurretShot(cx + ca * 20, cy + sa * 20, a);
     game.particles.muzzleSmoke(cx + ca * 22, cy + sa * 22, a);
     game.sfx.turret();
   }
@@ -588,6 +670,39 @@ export class Structures {
         ctx.restore();
       } else drawBlock(ctx, b);
     }
+  }
+
+  // La torreta pesada libre más cercana al alcance de p (o null).
+  nearHeavy(p) {
+    let best = null;
+    let bd = HEAVY.reach + p.r;
+    for (const b of this.blocks) {
+      if (b.kind !== 'heavy' || b.manned) continue;
+      const d = Math.hypot(b.x + b.w / 2 - p.x, b.y + b.h / 2 - p.y);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  // Montar o dejar la torreta pesada (en solitario, en el anfitrión y en el servidor).
+  mountHeavy(p, b) {
+    p.manned = b;
+    b.manned = p;
+    p.reloadT = 0;
+    p.target = null;
+  }
+
+  leaveHeavy(p) {
+    if (p.manned && p.manned.manned === p) p.manned.manned = null;
+    p.manned = null;
+  }
+
+  // El cañón de las torretas pesadas montadas va encima de quien las maneja.
+  drawMannedHeavy(ctx) {
+    for (const b of this.blocks) if (b.kind === 'heavy' && b.manned) drawHeavyGun(ctx, b);
   }
 
   drawGhost(ctx, game, kind, time) {
@@ -663,7 +778,131 @@ export class Structures {
   }
 }
 
+// Torreta pesada (inspirada en la torreta de Gears of War 4): trípode y cañón doble blindado.
+function drawHeavy(ctx, b) {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 4, cy + 6, 24, 20, 0, 0, TAU);
+  ctx.fill();
+  // patas del trípode
+  ctx.lineCap = 'round';
+  for (const [lw, col] of [
+    [7, OUT],
+    [4, '#4a5056'],
+  ]) {
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    for (let k = 0; k < 3; k++) {
+      const a = (k * TAU) / 3 - Math.PI / 2;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * 21, cy + Math.sin(a) * 21);
+    }
+    ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = '#2a2e32';
+  for (let k = 0; k < 3; k++) {
+    const a = (k * TAU) / 3 - Math.PI / 2;
+    ctx.fillRect(cx + Math.cos(a) * 21 - 3.5, cy + Math.sin(a) * 21 - 3.5, 7, 7);
+  }
+  // anillo de giro
+  ctx.fillStyle = b.hitT > 0 ? '#8a9096' : '#3a3f44';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 12, 0, TAU);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = OUT;
+  ctx.stroke();
+  drawHeavyGun(ctx, b);
+}
+
+function drawHeavyGun(ctx, b) {
+  ctx.save();
+  ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
+  ctx.rotate(b.ang || 0);
+  ctx.strokeStyle = OUT;
+  // dos cañones con camisa de aletas y freno de boca; retrocede el que acaba de disparar
+  for (const s of [-1, 1]) {
+    const k = b.side === s ? (b.recoil || 0) * 4 : 0;
+    const y = s * 7;
+    ctx.lineWidth = 1.2;
+    ctx.fillStyle = '#25282b';
+    ctx.fillRect(6 - k, y - 2.6, 32, 5.2);
+    ctx.strokeRect(6 - k, y - 2.6, 32, 5.2);
+    ctx.fillStyle = '#4c5258';
+    for (let i = 0; i < 4; i++) ctx.fillRect(14 + i * 4.5 - k, y - 3.6, 2.2, 7.2);
+    ctx.fillStyle = '#3b4045';
+    ctx.fillRect(36 - k, y - 3.8, 7, 7.6);
+    ctx.strokeRect(36 - k, y - 3.8, 7, 7.6);
+    ctx.fillStyle = '#0e0f10';
+    ctx.fillRect(41.5 - k, y - 1.2, 1.5, 2.4);
+    if (b.flash > 0 && b.side === s) {
+      ctx.fillStyle = 'rgba(255,214,140,0.95)';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        const d = i % 2 ? 3 : 9 + Math.random() * 6;
+        ctx.lineTo(46 + Math.cos(a) * d * 1.4, y + Math.sin(a) * d * 0.7);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // cajas blindadas de cada cañón, con franja amarilla y remaches
+  ctx.lineWidth = 1.6;
+  for (const s of [-1, 1]) {
+    const y = s < 0 ? -14 : 2;
+    roundRect(ctx, -13, y, 24, 12, 3);
+    ctx.fillStyle = b.hitT > 0 ? '#b8bec4' : '#7b838a';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#c9a54a';
+    ctx.fillRect(-10, s < 0 ? y + 1.5 : y + 8.5, 17, 2);
+    ctx.fillStyle = '#3a3f44';
+    ctx.fillRect(-10, y + 5, 2, 2);
+    ctx.fillRect(5, y + 5, 2, 2);
+  }
+  // escudo frontal en ángulo
+  ctx.beginPath();
+  ctx.moveTo(8, -19);
+  ctx.lineTo(13, -16);
+  ctx.lineTo(13, -10);
+  ctx.lineTo(10, -10);
+  ctx.lineTo(10, 10);
+  ctx.lineTo(13, 10);
+  ctx.lineTo(13, 16);
+  ctx.lineTo(8, 19);
+  ctx.closePath();
+  ctx.fillStyle = '#9aa2a8';
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#c9a54a';
+  ctx.fillRect(11, -15, 1.6, 4);
+  ctx.fillRect(11, 11, 1.6, 4);
+  // núcleo y asas de atrás (donde se agarra quien la maneja)
+  ctx.fillStyle = '#2e3236';
+  ctx.beginPath();
+  ctx.arc(-2, 0, 5.5, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = b.manned ? '#7fe07a' : '#b5463a';
+  ctx.fillRect(-3, -1, 2, 2);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#2a2e32';
+  ctx.beginPath();
+  ctx.moveTo(-13, -9);
+  ctx.lineTo(-19, -11);
+  ctx.moveTo(-13, 9);
+  ctx.lineTo(-19, 11);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawBlock(ctx, b) {
+  if (b.kind === 'heavy') return drawHeavy(ctx, b);
   const { x, y, w, h } = b;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(x + 5, y + 6, w, h);
@@ -753,6 +992,64 @@ function drawBlock(ctx, b) {
     } else {
       ctx.fillRect(x + w - 6, y + 6, 3, 10);
       ctx.fillRect(x + w - 6, y + h - 16, 3, 10);
+    }
+  } else if (b.kind === 'hesco') {
+    // Celdas cuadradas de malla con geotextil beige, vistas desde arriba con la arena dentro.
+    const horiz = w >= h;
+    const S = horiz ? h : w;
+    const n = Math.max(1, Math.round((horiz ? w : h) / S));
+    const L = (horiz ? w : h) / n;
+    for (let i = 0; i < n; i++) {
+      const cx = horiz ? x + i * L : x;
+      const cy = horiz ? y : y + i * L;
+      const cw = horiz ? L : w;
+      const ch = horiz ? h : L;
+      ctx.fillStyle = '#c9b98c';
+      ctx.fillRect(cx, cy, cw, ch);
+      ctx.fillStyle = '#a8966a';
+      ctx.fillRect(cx + 4, cy + 4, cw - 8, ch - 8);
+      ctx.fillStyle = 'rgba(70,58,36,0.3)';
+      ctx.fillRect(cx + 4, cy + 4, cw - 8, 3);
+      ctx.fillRect(cx + 4, cy + 4, 3, ch - 8);
+      ctx.fillStyle = 'rgba(60,50,30,0.35)';
+      for (let k = 0; k < 5; k++)
+        ctx.fillRect(cx + 8 + ((k * 13 + i * 7) % (cw - 16)), cy + 8 + ((k * 11 + i * 5) % (ch - 16)), 2, 2);
+    }
+    ctx.strokeStyle = 'rgba(95,98,98,0.85)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let gx = x + 4; gx < x + w; gx += 6) {
+      ctx.moveTo(gx, y);
+      ctx.lineTo(gx, y + 4);
+      ctx.moveTo(gx, y + h - 4);
+      ctx.lineTo(gx, y + h);
+    }
+    for (let gy = y + 4; gy < y + h; gy += 6) {
+      ctx.moveTo(x, gy);
+      ctx.lineTo(x + 4, gy);
+      ctx.moveTo(x + w - 4, gy);
+      ctx.lineTo(x + w, gy);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#6e7070';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 1; i < n; i++) {
+      if (horiz) {
+        ctx.moveTo(x + i * L, y);
+        ctx.lineTo(x + i * L, y + h);
+      } else {
+        ctx.moveTo(x, y + i * L);
+        ctx.lineTo(x + w, y + i * L);
+      }
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#4d5050';
+    for (let i = 0; i <= n; i++) {
+      const px = horiz ? x + i * L : x;
+      const py = horiz ? y : y + i * L;
+      ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+      ctx.fillRect(px - 1.5 + (horiz ? 0 : w), py - 1.5 + (horiz ? h : 0), 3, 3);
     }
   } else if (b.kind === 'turret') {
     const cx = x + w / 2;

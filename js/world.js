@@ -48,8 +48,9 @@ export class World {
     return o;
   }
 
-  addCircle(x, y, r, low = false) {
-    const o = { k: 1, x, y, r, low };
+  // prop: objeto pequeño (farola, barril, bote…) que ocupa su sitio al generar el mapa pero no choca
+  addCircle(x, y, r, low = false, prop = false) {
+    const o = { k: 1, x, y, r, low, prop };
     this.obstacles.push(o);
     return o;
   }
@@ -98,7 +99,7 @@ export class World {
 
   addBarrel(x, y, burning) {
     if (!this.free(x - 13, y - 13, 26, 26, 4)) return false;
-    this.addCircle(x, y, 12);
+    this.addCircle(x, y, 12, false, true);
     this.op(3, x - 16, y - 16, 34, 34, (g) => {
       g.fillStyle = 'rgba(0,0,0,0.35)';
       g.beginPath();
@@ -325,7 +326,7 @@ export class World {
 
   debris(x, y, s) {
     if (!this.free(x - s, y - s, s * 2, s * 2, 4)) return;
-    this.addCircle(x, y, s * 0.8);
+    this.addCircle(x, y, s * 0.8, false, true);
     const seed = this.nextSeed();
     this.op(3, x - s - 4, y - s - 4, s * 2 + 14, s * 2 + 14, (g) => {
       const rng = mulberry32(seed);
@@ -733,7 +734,7 @@ export class World {
         g.fill();
       }
     });
-    this.addCircle(x, y + 30, 12, true);
+    this.addCircle(x, y + 30, 12, true, true);
     this.addLight(x, y + 30, 240, 1, 0.3);
     this.fires.push({ x, y: y + 30, s: 0.9 });
   }
@@ -1023,7 +1024,7 @@ export class World {
       for (let u = a + 70; u < b - 50; u += rrange(rng, 220, 300)) {
         const [lx, ly] = P(u, v);
         if (!this.free(lx - 6, ly - 6, 12, 12, 4)) continue;
-        this.addCircle(lx, ly, 6);
+        this.addCircle(lx, ly, 6, false, true);
         const lit = rng() < 0.35;
         const [hx, hy] = P(u, side * (ROAD_HALF - 18));
         this.overhead.push({ k: 'lamp', x: lx, y: ly, hx, hy, lit });
@@ -1032,7 +1033,7 @@ export class World {
       if (rng() < 0.5) {
         const [tx, ty] = P(rrange(rng, a + 40, b - 40), side * (ROAD_HALF + 22));
         if (this.free(tx - 9, ty - 9, 18, 18, 4)) {
-          this.addCircle(tx, ty, 9);
+          this.addCircle(tx, ty, 9, false, true);
           const red = rng() < 0.4;
           this.op(3, tx - 12, ty - 12, 26, 26, (g) => {
             g.fillStyle = 'rgba(0,0,0,0.35)';
@@ -1079,7 +1080,7 @@ export class World {
     });
     const corner = [cx - ROAD_HALF - 14, cy - ROAD_HALF - 14];
     if (this.free(corner[0] - 6, corner[1] - 6, 12, 12, 2)) {
-      this.addCircle(corner[0], corner[1], 6);
+      this.addCircle(corner[0], corner[1], 6, false, true);
       this.overhead.push({ k: 'signal', x: corner[0], y: corner[1], hx: corner[0] + 40, hy: corner[1] + 24 });
     }
   }
@@ -1106,6 +1107,7 @@ export class World {
     this.obstacles.forEach((o, idx) => {
       o.id = idx;
       o.stamp = 0;
+      if (o.prop) return;
       const [x, y, w, h] = o.k === 0 ? [o.x, o.y, o.w, o.h] : [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2];
       const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
       const y0 = clamp(Math.floor(y / OBS_CELL), 0, n - 1);
@@ -1413,6 +1415,25 @@ export class World {
         }
       }
     }
+    if (bi < 0 && here === 65535) {
+      // en una celda sin ruta (pegado a un muro o en un rincón): ir a la celda con ruta más cercana
+      for (let r = 2; r <= 3 && bi < 0; r++) {
+        for (let dj = -r; dj <= r; dj++) {
+          for (let di = -r; di <= r; di++) {
+            if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+            const i = ci + di;
+            const j = cj + dj;
+            if (i < 0 || j < 0 || i >= n || j >= n) continue;
+            const v = dist[j * n + i];
+            if (v < best) {
+              best = v;
+              bi = i;
+              bj = j;
+            }
+          }
+        }
+      }
+    }
     if (bi < 0) return null;
     const tx = bi * NAV_CELL + NAV_CELL / 2 - x;
     const ty = bj * NAV_CELL + NAV_CELL / 2 - y;
@@ -1422,11 +1443,11 @@ export class World {
     return out;
   }
 
-  reachable(x, y) {
+  reachable(x, y, field = this.main) {
     const n = this.navN;
     const ci = clamp(Math.floor(x / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(y / NAV_CELL), 0, n - 1);
-    return this.dist[cj * n + ci] < 65535;
+    return field.ok && field.dist[cj * n + ci] < 65535;
   }
 
   /* ---------- render ---------- */

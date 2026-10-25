@@ -101,7 +101,7 @@ export class Robot {
     if (side !== this.stepSide) {
       this.stepSide = side;
       game.sfx.stomp(0.35);
-      game.camera.shake(0.08);
+      game.camera.shake(0.08, this.x, this.y);
       const fx = this.x + Math.cos(this.legAngle + (side & 1 ? 1.2 : -1.2)) * ROBOT.radius * 0.45;
       const fy = this.y + Math.sin(this.legAngle + (side & 1 ? 1.2 : -1.2)) * ROBOT.radius * 0.45;
       game.particles.dust(fx, fy, 10);

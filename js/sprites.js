@@ -1252,6 +1252,24 @@ export function drawSurvivor(g, p, time) {
   g.save();
   g.translate(p.x, p.y);
   softShadow(g, r * 1.5, 0.45);
+  // Booster: estelas azules detrás y halo de inmunidad
+  if (p.boostT > 0) {
+    g.globalCompositeOperation = 'lighter';
+    const ba = p.legAngle + Math.PI;
+    for (let i = 1; i <= 3; i++) {
+      g.globalAlpha = 0.28 / i;
+      circ(g, Math.cos(ba) * r * 0.9 * i, Math.sin(ba) * r * 0.9 * i, r * (1 - i * 0.12), '#5ab4ff', null);
+    }
+    const pulse = 0.75 + 0.25 * Math.sin(time * 18);
+    g.globalAlpha = 0.5 * pulse;
+    g.strokeStyle = '#9fdcff';
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.arc(0, 0, r * 1.45, 0, TAU);
+    g.stroke();
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+  }
   // piernas orientadas al movimiento
   g.save();
   g.rotate(p.legAngle);
@@ -1290,8 +1308,17 @@ export function drawSurvivor(g, p, time) {
     g.translate(-k * 3, k * 4);
     g.rotate(k * 0.55);
   }
-  GUNS[p.weapon.id](g, r, p);
-  if (longGun) {
+  const rage = p.rageT > 0;
+  // Berserker: tres ametralladoras a la vez durante la megarráfaga
+  if (rage) {
+    for (const y of [-9, 0, 9]) {
+      g.save();
+      g.translate(0, y);
+      GUNS.lmg(g, r, p);
+      g.restore();
+    }
+  } else if (!p.manned) GUNS[p.weapon.id](g, r, p);
+  if (longGun || rage) {
     limb(g, 0, r * 0.62, r * 0.7, r * 0.12, r * 0.28, L.jacket);
     limb(g, 0, -r * 0.62, r * 1.25, -r * 0.05, r * 0.28, L.jacket);
     circ(g, r * 0.72, r * 0.12, r * 0.17, L.skin, OUT, 1);
@@ -1302,17 +1329,19 @@ export function drawSurvivor(g, p, time) {
     circ(g, r * 0.8, 0, r * 0.2, L.skin, OUT, 1);
   }
   if (p.flashT > 0) {
-    const tip = p.gunTip;
-    g.fillStyle = 'rgba(255,214,140,0.95)';
-    g.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * TAU;
-      const d = i % 2 ? 3 : 9 + Math.random() * 5;
-      g.lineTo(tip + Math.cos(a) * d * 1.3, Math.sin(a) * d * 0.7);
+    const tip = rage ? r * 0.15 + 38 : p.gunTip;
+    for (const y of rage ? [-9, 0, 9] : [0]) {
+      g.fillStyle = 'rgba(255,214,140,0.95)';
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        const d = i % 2 ? 3 : 9 + Math.random() * 5;
+        g.lineTo(tip + Math.cos(a) * d * 1.3, y + Math.sin(a) * d * 0.7);
+      }
+      g.closePath();
+      g.fill();
+      circ(g, tip, y, 3.5, '#fff6dc', null);
     }
-    g.closePath();
-    g.fill();
-    circ(g, tip, 0, 3.5, '#fff6dc', null);
   }
   g.restore();
   // cabeza con pañuelo

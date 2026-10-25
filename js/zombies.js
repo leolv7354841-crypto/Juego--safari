@@ -1,4 +1,4 @@
-import { ZOMBIES, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV } from './config.js';
+import { ZOMBIES, ZOMBIE_SPEED, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV, WAVES } from './config.js';
 import { clamp, rand, angleTo, TAU } from './util.js';
 import { zombieSprites, flameSprite } from './sprites.js';
 
@@ -43,7 +43,6 @@ export class Grid {
 }
 
 let nextId = 1;
-const near2 = [];
 
 // Táctica de cada zombi en la horda: unos van directo, otros buscan tu costado y otros
 // tu espalda (siempre por rutas reales). Además, algunos son rezagados: más lentos y torpes.
@@ -83,6 +82,55 @@ function overtake(a, b, nx, ny, dt) {
 const tmpDir = { x: 0, y: 0 };
 const near = [];
 const near3 = [];
+
+// Radio a partir del cual un zombi no cabe en el barrido por celdas (ver Horde.separate).
+const BIG_R = 24;
+
+// Separación de un par de zombis: el más rápido rodea al lento y se empujan si se enciman.
+function pairUp(z, o, dt) {
+  const dx = o.x - z.x;
+  const dy = o.y - z.y;
+  const rr = z.r + o.r;
+  const look = rr + 34;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= look * look) return;
+  const d = Math.sqrt(d2) || 0.01;
+  const nx = dx / d;
+  const ny = dy / d;
+  // esquivar (se usa en el siguiente fotograma): cada uno se aparta del otro y, si lo tiene
+  // delante, lo rodea por su lado
+  const A = rr + 22;
+  if (d2 < A * A && d2 > 0.0001) {
+    const push = 1 - d / A;
+    z.avx -= nx * push;
+    z.avy -= ny * push;
+    o.avx += nx * push;
+    o.avy += ny * push;
+    if (nx * (z.hx || 0) + ny * (z.hy || 0) > 0.75) {
+      const side = z.id & 1 ? 1 : -1;
+      z.avx -= z.hy * side * push * 0.8;
+      z.avy += z.hx * side * push * 0.8;
+    }
+    if (-nx * (o.hx || 0) - ny * (o.hy || 0) > 0.75) {
+      const side = o.id & 1 ? 1 : -1;
+      o.avx -= o.hy * side * push * 0.8;
+      o.avy += o.hx * side * push * 0.8;
+    }
+  }
+  // el más rápido rodea al más lento que tiene delante (todos pueden pasar a un gigante)
+  overtake(z, o, nx, ny, dt);
+  overtake(o, z, -nx, -ny, dt);
+  if (d2 >= rr * rr) return;
+  // el fuego se contagia a los que se rozan
+  if (z.burn > 0.6 && !(o.burn > 0) && Math.random() < dt * 2) o.burn = MOLOTOV.burn * 0.6;
+  else if (o.burn > 0.6 && !(z.burn > 0) && Math.random() < dt * 2) z.burn = MOLOTOV.burn * 0.6;
+  const ov = (rr - d) * 0.8;
+  const tm = z.mass + o.mass;
+  z.x -= nx * ov * (o.mass / tm);
+  z.y -= ny * ov * (o.mass / tm);
+  o.x += nx * ov * (z.mass / tm);
+  o.y += ny * ov * (z.mass / tm);
+}
 
 // ¿Hay vista directa entre dos puntos? (los muros y edificios tapan; coches y barricadas no)
 function clearLine(world, x0, y0, x1, y1) {
@@ -146,7 +194,7 @@ export class Horde {
       mass: def.mass,
       hp: def.hp * hpMult,
       maxHp: def.hp * hpMult,
-      speed: rand(def.speed[0], def.speed[1]) * speedMult,
+      speed: rand(ZOMBIE_SPEED[0], ZOMBIE_SPEED[1]) * def.speed * speedMult,
       angle: rand(0, TAU),
       anim: rand(0, def.frames),
       // variante de dibujo según el id (así el cooperativo no necesita mandarla)
@@ -230,6 +278,9 @@ export class Horde {
     const time = game.time;
     const list = this.list;
     this.frame++;
+    // lo que ve cada jugador: fuera de todas las vistas los zombis corren más (WAVES.offscreen)
+    const dir = game.director;
+    const views = dir && game.state !== 'menu' ? dir.views(game) : null;
     let danger = 0;
     let nearCount = 0;
 
@@ -266,7 +317,7 @@ export class Horde {
       }
       const dx = p.x - z.x;
       const dy = p.y - z.y;
-      const d = Math.hypot(dx, dy) || 1;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
       if (d < 650) {
         danger += 1 - d / 650;
         if (d < 300) nearCount++;
@@ -357,38 +408,18 @@ export class Horde {
       const calm = z.touchT > 0 ? 0.2 : 1;
       z.touchT -= dt;
       // evitar amontonarse: se apartan de los vecinos y rodean al que tienen delante.
-      // Se recalcula en fotogramas alternos (mitad de la horda cada vez) para rendir con cientos.
+      // avx/avy los suma la separación del fotograma anterior (pairUp), sin consultas aparte.
+      z.hx = mx;
+      z.hy = my;
       if (d > 50) {
-        if (((z.id + this.frame) & 1) === 0) {
-          this.grid.query(z.x - z.r - 26, z.y - z.r - 26, z.x + z.r + 26, z.y + z.r + 26, near2);
-          let ax = 0;
-          let ay = 0;
-          for (let k = 0; k < near2.length; k++) {
-            const o = near2[k];
-            if (o === z || o.dead) continue;
-            const ox = z.x - o.x;
-            const oy = z.y - o.y;
-            const R = z.r + o.r + 22;
-            const od = Math.hypot(ox, oy);
-            if (od >= R || od < 0.01) continue;
-            const push = 1 - od / R;
-            ax += (ox / od) * push;
-            ay += (oy / od) * push;
-            if (-(ox * mx + oy * my) / od > 0.75) {
-              const side = z.id & 1 ? 1 : -1;
-              ax += -my * side * push * 0.8;
-              ay += mx * side * push * 0.8;
-            }
-          }
-          z.avx = ax;
-          z.avy = ay;
-        }
         mx += z.avx * 0.7 * calm;
         my += z.avy * 0.7 * calm;
-        const l = Math.hypot(mx, my) || 1;
+        const l = Math.sqrt(mx * mx + my * my) || 1;
         mx /= l;
         my /= l;
       }
+      z.avx = 0;
+      z.avy = 0;
       // movimiento torpe: el rumbo deriva un poco, a ratos tropiezan y dan un tirón
       z.wanderV = (z.wanderV + rand(-1, 1) * dt * 4) * Math.exp(-dt * 1.2);
       z.wander = (z.wander + z.wanderV * dt) * Math.exp(-dt * 0.5);
@@ -430,6 +461,7 @@ export class Horde {
         mx = nx;
       }
       if (inRange) sp *= 0.15;
+      else if (views && z.type !== 'golden' && !dir.seen(views, z.x, z.y, z.r)) sp *= WAVES.offscreen;
       // alambre de púas: frena y hiere
       const trap = game.structures.wires.length ? game.structures.trapAt(z, dt, game) : null;
       if (trap) {
@@ -479,36 +511,8 @@ export class Horde {
     const grid = this.grid;
     grid.clear();
     for (const z of list) grid.insert(z);
+    this.separate(dt);
     for (const z of list) {
-      const q = z.r + 70;
-      grid.query(z.x - q, z.y - q, z.x + q, z.y + q, near);
-      for (let k = 0; k < near.length; k++) {
-        const o = near[k];
-        if (o.id <= z.id) continue;
-        const dx = o.x - z.x;
-        const dy = o.y - z.y;
-        const rr = z.r + o.r;
-        const look = rr + 34;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= look * look) continue;
-        const d0 = Math.sqrt(d2) || 0.01;
-        // el más rápido rodea al más lento que tiene delante (todos pueden pasar a un gigante)
-        overtake(z, o, dx / d0, dy / d0, dt);
-        overtake(o, z, -dx / d0, -dy / d0, dt);
-        if (d2 >= rr * rr) continue;
-        // el fuego se contagia a los que se rozan
-        if (z.burn > 0.6 && !(o.burn > 0) && Math.random() < dt * 2) o.burn = MOLOTOV.burn * 0.6;
-        else if (o.burn > 0.6 && !(z.burn > 0) && Math.random() < dt * 2) z.burn = MOLOTOV.burn * 0.6;
-        const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
-        const ov = (rr - d) * 0.8;
-        const nx = dx / d;
-        const ny = dy / d;
-        const tm = z.mass + o.mass;
-        z.x -= nx * ov * (o.mass / tm);
-        z.y -= ny * ov * (o.mass / tm);
-        o.x += nx * ov * (z.mass / tm);
-        o.y += ny * ov * (z.mass / tm);
-      }
       for (const pl of targets || (peer ? [p0, peer] : [p0])) {
         if (!pl.alive) continue;
         const dx = pl.x - z.x;
@@ -571,6 +575,50 @@ export class Horde {
     } else if (p0.alive) world.collide(p0, p0.r, true);
     grid.clear();
     for (const z of list) grid.insert(z);
+  }
+
+  // Separa cada par de zombis una sola vez: dentro de cada celda y con sus vecinas de
+  // adelante (este, sureste, sur, suroeste). Cubre todo par a menos de CELL px, que basta
+  // para radios hasta BIG_R; los más grandes (gigante) consultan su propio vecindario.
+  separate(dt) {
+    const grid = this.grid;
+    const n = grid.n;
+    const cells = grid.cells;
+    let big = false;
+    for (const idx of grid.used) {
+      const c = cells[idx];
+      const i = idx % n;
+      const last = idx >= n * (n - 1);
+      for (let a = 0; a < c.length; a++) {
+        const z = c[a];
+        if (z.r > BIG_R) {
+          big = true;
+          continue;
+        }
+        for (let b = a + 1; b < c.length; b++) if (c[b].r <= BIG_R) pairUp(z, c[b], dt);
+        if (i + 1 < n) this.pairCell(z, cells[idx + 1], dt);
+        if (!last) {
+          this.pairCell(z, cells[idx + n], dt);
+          if (i + 1 < n) this.pairCell(z, cells[idx + n + 1], dt);
+          if (i > 0) this.pairCell(z, cells[idx + n - 1], dt);
+        }
+      }
+    }
+    if (!big) return;
+    for (const z of this.list) {
+      if (z.r <= BIG_R) continue;
+      const q = z.r + BIG_R + 34;
+      grid.query(z.x - q, z.y - q, z.x + q, z.y + q, near);
+      for (let k = 0; k < near.length; k++) {
+        const o = near[k];
+        if (o === z || (o.r > BIG_R && o.id <= z.id)) continue;
+        pairUp(z, o, dt);
+      }
+    }
+  }
+
+  pairCell(z, c, dt) {
+    for (let k = 0; k < c.length; k++) if (c[k].r <= BIG_R) pairUp(z, c[k], dt);
   }
 
   /* ---------- toro ---------- */
@@ -636,7 +684,7 @@ export class Horde {
         game.onZombieHit(z, p);
         p.kx += z.cdx * BULL.throw;
         p.ky += z.cdy * BULL.throw;
-        game.camera.shake(0.75);
+        game.camera.shake(0.75, p.x, p.y);
         game.particles.dust(p.x, p.y, 14);
         game.sfx.bullHit();
         z.bs = 'recover';
@@ -701,7 +749,7 @@ export class Horde {
       const long = z.bs === 'charge';
       game.structures.damageBlock(game, block, long ? BULL.long : BULL.short);
       game.particles.dust(z.x + z.cdx * z.r, z.y + z.cdy * z.r, long ? 26 : 12);
-      game.camera.shake(long ? 0.35 : 0.12);
+      game.camera.shake(long ? 0.35 : 0.12, z.x, z.y);
       game.sfx.bullSlam(long);
       z.ramBlock = block;
       z.bs = block.hp > 0 ? 'ram' : 'recover';
@@ -773,7 +821,10 @@ export class Horde {
         ctx.fill();
         ctx.globalAlpha = 1;
       }
-      if (z.type !== 'golden') ctx.globalAlpha = z.spawnT > 0 ? 1 - z.spawnT : 1;
+      if (z.type !== 'golden') {
+        const al = z.spawnT > 0 ? 1 - z.spawnT : 1;
+        if (ctx.globalAlpha !== al) ctx.globalAlpha = al;
+      }
       ctx.setTransform(k * c, k * sn, -k * sn, k * c, tx + lx * s, ty + ly * s);
       ctx.drawImage(img, -half, -half, half * 2, half * 2);
       if (swell) {

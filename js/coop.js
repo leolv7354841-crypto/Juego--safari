@@ -8,8 +8,9 @@
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
 import { Net } from './net.js';
 import { Player } from './player.js';
-import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN } from './config.js';
+import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from './config.js';
 import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
+import { Abilities } from './abilities.js';
 import { Bullets } from './bullets.js';
 import { rand, angleTo, TAU } from './util.js';
 
@@ -49,6 +50,8 @@ export const SFX_SYNC = [
   'rocketArm',
   'gore',
   'wave',
+  'missile',
+  'boost',
 ];
 export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
 
@@ -201,6 +204,7 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld();
     g.resetRun();
+    g.player.cls = g.classPick;
     this.mode = 'host';
     this.clock = new Clock();
     this.snapSeq = 0;
@@ -241,6 +245,7 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld(m.seed);
     g.resetRun();
+    g.player.cls = g.classPick;
     this.mode = 'guest';
     this.clock = new Clock();
     this.lastSeq = 0;
@@ -310,6 +315,13 @@ export class Coop {
   // Los efectos visuales lejos del compañero no se mandan (no los vería y gastan conexión).
   nearPeer(tag, n, args) {
     const q = this.peer;
+    // temblor: sólo los que tienen lugar (los del anfitrión, como sus golpes, son sólo suyos)
+    if (tag === 'c')
+      return (
+        typeof args[1] === 'number' &&
+        typeof args[2] === 'number' &&
+        (!q || (Math.abs(args[1] - q.x) < VIEW && Math.abs(args[2] - q.y) < VIEW))
+      );
     if (!q || (tag !== 'p' && tag !== 'd')) return true;
     const o = n === 'corpse' ? args[0] : null;
     const x = o ? o.x : args[0];
@@ -400,12 +412,19 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     const near = (x, y, m = VIEW) => Math.abs(x - peer.x) < m && Math.abs(y - peer.y) < m;
+    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
+    const zw = Math.max(NET.zombieView[0], (peer.vw || 0) + 150);
+    const zh = Math.max(NET.zombieView[1], (peer.vh || 0) + 150);
+    const nearZ = (o) =>
+      o.type === 'golden' || o.type === 'giant'
+        ? near(o.x, o.y)
+        : Math.abs(o.x - peer.x) < zw && Math.abs(o.y - peer.y) < zh;
     const ox = Math.round(peer.x);
     const oy = Math.round(peer.y);
     const z = [];
     const zx = [];
     for (const o of g.horde.list) {
-      if (o.dead || !near(o.x, o.y)) continue;
+      if (o.dead || !nearZ(o)) continue;
       const flags =
         (o.flash > 0 ? 1 : 0) |
         (o.burn > 0 ? 2 : 0) |
@@ -467,6 +486,7 @@ export class Coop {
         q.kind === 'fat' ? 1 : 0,
       ]),
       bl: st.blasts.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t)]),
+      ms: st.missiles.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)]),
     };
     const rb = g.robot;
     s.rb = rb.owned
@@ -508,6 +528,7 @@ export class Coop {
       p.hurtT > 0 ? 1 : 0,
       r100(p.recoil),
       Math.round(p.speedNow),
+      (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
     ];
   }
 
@@ -557,6 +578,10 @@ export class Coop {
         peer.alive = !!m.al;
         peer.hp = Number(m.hp) || 0;
         peer.stats.maxHp = Number(m.mh) || 100;
+        if (Number.isFinite(m.vw) && Number.isFinite(m.vh)) {
+          peer.vw = Math.min(1600, Math.max(100, m.vw));
+          peer.vh = Math.min(1600, Math.max(100, m.vh));
+        }
         peer.needAmmo = !!m.na;
         if (WEAPONS[m.w] && (!peer.weapons[0] || peer.weapons[0].id !== m.w)) {
           peer.weapons = [peer.makeWeapon(m.w)];
@@ -565,6 +590,8 @@ export class Coop {
         peer.weapon.mag = m.mag | 0;
         peer.reloadT = Number(m.rl) || 0;
         peer.reloadProg = Number(m.rp) || 0;
+        peer.rageT = m.ab & 1 ? 1 : 0;
+        peer.boostT = m.ab & 2 ? 1 : 0;
         break;
       }
       case 'shot':
@@ -590,6 +617,15 @@ export class Coop {
         );
         const q = g.structures.grenades[g.structures.grenades.length - 1];
         if (q) q.owner = 'peer';
+        break;
+      }
+      case 'ab': {
+        // misil del Bomber invitado: la espera la lleva su celular; aquí sólo se frena el abuso
+        const now = performance.now();
+        if (now - (this.peerAbAt || -1e9) < (ABILITY.minCooldown - 2) * 1000) break;
+        this.peerAbAt = now;
+        this.syncPeer(m);
+        if (Number.isFinite(m.tx) && Number.isFinite(m.ty)) g.structures.launchMissile(g, peer, m.tx, m.ty, 'peer');
         break;
       }
       case 'dead':
@@ -721,7 +757,8 @@ export class Coop {
     try {
       if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
       else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
-      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0));
+      else if (tag === 'c' && n === 'shake')
+        g.camera.shake(Math.min(1, Number(args[0]) || 0), Number(args[1]), Number(args[2]));
       else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
       else if (tag === 'd' && DECAL_SYNC.includes(n)) {
         if (n === 'corpse') {
@@ -777,6 +814,10 @@ export class Coop {
         mag: w.mag,
         rl: r100(Math.max(0, p.reloadT)) / 100,
         rp: r100(p.reloadProg || 0) / 100,
+        ab: (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
+        // media pantalla en px del mundo: el anfitrión no hace aparecer zombis dentro de ella
+        vw: Math.round(g.camera.viewW / 2),
+        vh: Math.round(g.camera.viewH / 2),
       },
       true,
     );
@@ -835,6 +876,18 @@ export class Coop {
     this.send({
       t: 'throw',
       kind,
+      tx: Math.round(tx),
+      ty: Math.round(ty),
+      x: Math.round(p.x),
+      y: Math.round(p.y),
+      a: Math.round(p.angle * 1000) / 1000,
+    });
+  }
+
+  guestMissile(tx, ty) {
+    const p = this.game.player;
+    this.send({
+      t: 'ab',
       tx: Math.round(tx),
       ty: Math.round(ty),
       x: Math.round(p.x),
@@ -936,6 +989,10 @@ export class Coop {
         glow: so[i + 5] / 100,
         kind: so[i + 6] ? 'fat' : 'heavy',
       });
+    const ms = s.ms || [];
+    st.missiles = [];
+    for (let i = 0; i + 3 < ms.length; i += 4)
+      st.missiles.push({ x: ms[i], y: ms[i + 1], t: ms[i + 2] / 100, dur: ms[i + 3] / 100 });
     const bl = s.bl || [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
@@ -1004,6 +1061,9 @@ export class Coop {
     if (a[13]) h.hurtT = 0.2;
     h.recoil = a[14] / 100;
     h.speedNow = a[15];
+    // habilidad en curso (para dibujarla): 1 megarráfaga, 2 impulso
+    h.rageT = a[16] & 1 ? 1 : 0;
+    h.boostT = a[16] & 2 ? 1 : 0;
   }
 
   applyZombies(z, t, org, zx) {
@@ -1085,6 +1145,7 @@ export class Coop {
     if (g.input.consume('pause')) return g.pause();
     if (p.alive) {
       p.update(dt, g);
+      if (g.input.consume('ability')) g.useAbility();
       if (g.input.consume('build')) g.tryBuild();
       if (g.input.consume('cycleBuild')) g.cycleBuild();
       if (g.input.consume('grenade')) g.tryGrenade();
@@ -1146,7 +1207,10 @@ export class Coop {
       if (b.rocket) g.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
     }
     g.bullets.update(dt, g);
+    // espera de la habilidad y megarráfaga (sus balas reales las crea el anfitrión)
+    Abilities.update(dt, g, p);
     for (const f of g.structures.fires) f.t += dt;
+    for (const m of g.structures.missiles) m.t = Math.min(m.dur, m.t + dt);
     for (const q of g.structures.blasts) q.t -= dt;
     g.particles.update(dt);
     g.decals.update(dt);

@@ -97,8 +97,8 @@ test('permisos del propietario y paso por las fases', async () => {
   await waitFor(() => owner.state.phase === 'playing', 3000, 'jugando');
   await waitFor(() => (oIn.snap?.length || 0) > 3, 3000, 'fotos');
   const s = oIn.snap[oIn.snap.length - 1];
-  assert.ok(Array.isArray(s.me) && s.me.length === 10);
-  assert.equal(s.pl.length, 15, 'el otro jugador aparece en la foto');
+  assert.ok(Array.isArray(s.me) && s.me.length === 11);
+  assert.equal(s.pl.length, 16, 'el otro jugador aparece en la foto');
   // el invitado no puede devolver la sala al lobby
   guest.send('lobby');
   await waitFor(() => gIn.error?.length > 1, 2000, 'error lobby');
@@ -325,23 +325,23 @@ test('entre oleadas llegan las mejoras y la tienda funciona por la red', async (
   // fin de oleada simulado: un nivel por elegir y dinero para gastar
   sim.director.state = 'waiting';
   sim.addXp(slot, slot.xpNeed);
-  slot.money = 500;
+  slot.money = 2000;
   const last = () => got.snap[got.snap.length - 1];
   await waitFor(() => last()?.up, 3000, 'mejoras en la foto');
   const up = last().up;
-  assert.deepEqual([last().st[7], last().ec[0]], [500, 2]);
+  assert.deepEqual([last().st[7], last().ec[0]], [2000, 2]);
   owner.send('pick', { i: 0, n: up[0] });
   await waitFor(() => slot.pending === 0 && !last().up, 3000, 'mejora aplicada');
   assert.equal(slot.taken[up[1]], 1);
   // un arma que las mejoras nunca dan (la mejora elegida al azar puede ser el subfusil)
   owner.send('buy', { k: 'gun', id: 'ar', n: 0 });
   await waitFor(() => last().wp.some((w: any) => w[0] === 'ar'), 3000, 'fusil comprado');
-  assert.equal(last().st[7], 500 - WEAPONS.ar.price);
+  assert.equal(last().st[7], 2000 - WEAPONS.ar.price);
   // basura: se ignora sin tirar nada
   owner.send('buy', { k: 'gun', id: { x: 1 } });
   owner.send('pick', { i: 'a' });
   owner.send('buy', { k: 'gun', id: 'constructor', n: 0 });
   await sleep(200);
-  assert.equal(slot.money, 500 - WEAPONS.ar.price);
+  assert.equal(slot.money, 2000 - WEAPONS.ar.price);
   await leaveAll([owner]);
 });

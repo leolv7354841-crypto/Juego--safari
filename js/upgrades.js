@@ -1,4 +1,5 @@
-import { WEAPONS } from './config.js';
+import { ABILITY } from './config.js';
+import { cooldownOf } from './abilities.js';
 
 // Cada mejora modifica las estadísticas reales del jugador.
 export const UPGRADES = [
@@ -98,22 +99,15 @@ export const UPGRADES = [
     when: (p) => p.hp < p.stats.maxHp * 0.7,
     apply: (p) => (p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.4)),
   },
-  ...['smg', 'shotgun', 'rifle'].map((id, i) => ({
-    id: 'w_' + id,
-    name: WEAPONS[id].name,
-    desc: {
-      smg: 'Ráfagas rápidas para contener a la horda',
-      shotgun: 'Perdigones de corto alcance que derriban grupos',
-      rifle: 'Disparo potente y lejano que atraviesa 2 enemigos',
-    }[id],
-    icon: 'gun',
-    weapon: id,
-    max: 1,
-    minLevel: 2 + i,
-    weight: 2.2,
-    when: (p) => !p.has(id),
-    apply: (p) => p.unlock(id),
-  })),
+  {
+    id: 'abcd',
+    name: 'Instinto táctico',
+    desc: '-15% espera de la habilidad (mín. 20 s)',
+    icon: 'cd',
+    weight: 1.2,
+    when: (p) => !!p.cls && cooldownOf(p) > ABILITY.minCooldown + 0.01,
+    apply: (p) => (p.stats.cdMult *= ABILITY.cdStep),
+  },
 ];
 
 export function rollUpgrades(player, level, taken, count = 3) {
@@ -150,5 +144,6 @@ export const ICONS = {
   pierce: `<svg viewBox="0 0 24 24" ${P}><circle cx="9" cy="12" r="3"/><circle cx="16" cy="12" r="3"/><path d="M2 12h20M19 9l3 3-3 3"/></svg>`,
   reload: `<svg viewBox="0 0 24 24" ${P}><path d="M4 12a8 8 0 0 1 14-5l2 2"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5l-2-2"/><path d="M4 20v-5h5"/></svg>`,
   heal: `<svg viewBox="0 0 24 24" ${P}><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M12 10v6M9 13h6M9 6V4h6v2"/></svg>`,
+  cd: `<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>`,
   gun: `<svg viewBox="0 0 24 24" ${P}><path d="M3 9h15l2 2v2h-8l-1 2H7l-1 5H3z"/><path d="M18 9V7"/></svg>`,
 };

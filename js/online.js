@@ -16,6 +16,7 @@ import {
   BUILD_ORDER,
   ROBOT,
   PLAYER_BASE,
+  CLASS_ORDER,
 } from './config.js';
 import { Player } from './player.js';
 import { Robot } from './robot.js';
@@ -23,12 +24,14 @@ import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD,
 import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
+import { turretBullet } from './build.js';
 import { UPGRADES } from './upgrades.js';
+import { Abilities } from './abilities.js';
 import { rand, TAU, angleTo } from './util.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
-const PEER_N = 15;
+const PEER_N = 16;
 // mismo orden que STAT_KEYS en server/src/sim/ServerSim.ts
 const STAT_KEYS = [
   'maxHp',
@@ -41,6 +44,7 @@ const STAT_KEYS = [
   'ammoMult',
   'pierce',
   'reloadMult',
+  'cdMult',
 ];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
@@ -141,12 +145,12 @@ export class Online {
 
   async create(name) {
     const c = await this.client();
-    this.attach(await c.create('dz', { name, look: lookCode(this.game.look) }));
+    this.attach(await c.create('dz', { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
 
   async join(code, name) {
     const c = await this.client();
-    this.attach(await c.joinById(code, { name, look: lookCode(this.game.look) }));
+    this.attach(await c.joinById(code, { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
 
   // Tras recargar la página: vuelve a la misma sala con el token (dentro de la ventana de 20 s).
@@ -335,6 +339,8 @@ export class Online {
     g.director.coop = true;
     g.director.state = 'break';
     const p = g.player;
+    // la clase la confirma el servidor en cada foto (ab)
+    p.cls = g.classPick;
     this.pred = new Predictor(p, g.world);
     this.phys = { x: p.x, y: p.y };
     this.fresh = true;
@@ -380,7 +386,9 @@ export class Online {
     this.pingT -= dt;
     if (this.pingT <= 0) {
       this.pingT = 1;
-      this.send('p', { c: Math.round(performance.now()) });
+      // con el ping va la media pantalla (px del mundo): el servidor no hace aparecer zombis a la vista
+      const cam = this.game.camera;
+      this.send('p', { c: Math.round(performance.now()), v: [Math.round(cam.viewW / 2), Math.round(cam.viewH / 2)] });
       // la ventana para volver tras recargar cuenta desde la última vez que hubo conexión
       if (!this.reconnecting) this.remember();
     }
@@ -442,6 +450,7 @@ export class Online {
         if (inp.consume('grenade')) g.tryGrenade();
         if (inp.consume('molotov')) g.tryGrenade('molotov');
         if (inp.consume('robot')) g.toggleRobot();
+        if (inp.consume('ability')) g.useAbility();
         // a mitad de oleada la mejora se abre cuando él quiere (U o el botón)
         if (inp.consume('upgrade') && this.upReady) return g.openLevelUp();
       }
@@ -450,6 +459,8 @@ export class Online {
     g.time += dt;
     // la mira y el disparo se ven al instante (las balas propias son de adorno: el daño es del servidor)
     if (live && p.alive) p.act(dt, g, inp.move());
+    // espera de la habilidad y megarráfaga propia (de adorno: las balas reales son del servidor)
+    Abilities.update(dt, g, p);
     this.pred.decay(dt);
     p.x = this.phys.x + this.pred.ox;
     p.y = this.phys.y + this.pred.oy;
@@ -467,9 +478,18 @@ export class Online {
     const st = g.structures;
     st.time = g.time;
     for (const f of st.fires) f.t += dt;
+    for (const m of st.missiles) m.t = Math.min(m.dur, m.t + dt);
     for (const q of st.blasts) q.t -= dt;
     for (const q of st.scorches) q.t += dt;
-    for (const b of st.blocks) b.hitT -= dt;
+    for (const b of st.blocks) {
+      b.hitT -= dt;
+      if (b.flash) b.flash = Math.max(0, b.flash - dt);
+      // torreta pesada de otro: el cañón se acerca al ángulo de la última foto
+      if (b.manned && b.manned !== p && b.ta !== undefined) {
+        b.ang = angleTo(b.ang, b.ta, dt * 12);
+        b.recoil = Math.max(0, (b.recoil || 0) - dt * 10);
+      }
+    }
     for (const w of st.wires) w.hitT -= dt;
     g.particles.update(dt);
     g.decals.update(dt);
@@ -611,6 +631,7 @@ export class Online {
     this.left = s.lft | 0;
     this.applyPeers(s.pl || [], ts);
     this.applyRobots(s.rb || []);
+    this.applyHeavy(s);
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], ts);
     const pk = s.pk || [];
     g.pickups.list = [];
@@ -740,6 +761,15 @@ export class Online {
     g.xpNeed = Math.max(1, ec[2] | 0);
     g.pendingLevels = Math.max(0, ec[3] | 0);
     if (Array.isArray(s.ps)) STAT_KEYS.forEach((k, i) => Number.isFinite(s.ps[i]) && (p.stats[k] = s.ps[i]));
+    // habilidad: la clase y la espera las lleva el servidor (justo después de usarla manda lo predicho)
+    if (Array.isArray(s.ab)) {
+      const cls = CLASS_ORDER[s.ab[0]];
+      if (cls) p.cls = cls;
+      if (performance.now() - (this.abAt || 0) > 500) {
+        p.abCd = Math.max(0, (Number(s.ab[1]) || 0) / 10);
+        p.rageT = Math.max(0, (Number(s.ab[2]) || 0) / 100);
+      }
+    }
     const up =
       Array.isArray(s.up) && s.up.length > 1
         ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) }
@@ -783,6 +813,7 @@ export class Online {
   act(k, extra = {}) {
     if (!this.pred) return;
     this.send('act', { s: this.pred.seq, k, ...extra });
+    if (k === 'ab') this.abAt = performance.now();
   }
 
   // Granadas en el aire, fuego, cohetes clavados, explosiones; barricadas y trampas cuando cambian.
@@ -837,6 +868,10 @@ export class Online {
         glow: so[i + 5] / 100,
         kind: so[i + 6] ? 'fat' : 'heavy',
       });
+    const ms = Array.isArray(s.ms) ? s.ms : [];
+    st.missiles = [];
+    for (let i = 0; i + 3 < ms.length; i += 4)
+      st.missiles.push({ x: ms[i], y: ms[i + 1], t: ms[i + 2] / 100, dur: ms[i + 3] / 100 });
     const bl = Array.isArray(s.bl) ? s.bl : [];
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
@@ -869,7 +904,8 @@ export class Online {
           const b = st.blocks[i];
           if (q[5] < b.hp) b.hitT = 0.12;
           b.hp = q[5];
-          b.ang = q[6] / 100;
+          // el cañón de la torreta pesada propia gira con la predicción, no con la foto
+          if (b.manned !== g.player) b.ang = q[6] / 100;
         });
       }
     }
@@ -879,6 +915,38 @@ export class Online {
         .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
     if (Array.isArray(s.sc))
       st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
+  }
+
+  // Torretas pesadas: la que maneja él (su cuerpo queda detrás del cañón, también al predecir)
+  // y las de los demás (el cañón gira hacia el ángulo de la foto, ver update).
+  applyHeavy(s) {
+    const g = this.game;
+    const p = g.player;
+    const st = Array.isArray(s.st) ? s.st : [];
+    p.heavyAmmo = Math.max(0, st[10] | 0);
+    const heavy = g.structures.blocks.filter((b) => b.kind === 'heavy');
+    const at = (x, y) => heavy.find((b) => b.x === x && b.y === y) || null;
+    const old = p.manned;
+    for (const b of heavy) b.manned = null;
+    for (const q of this.peers.values()) q.manned = null;
+    const hv = Array.isArray(s.hv) ? s.hv : [];
+    for (let i = 0; i + 4 < hv.length; i += 5) {
+      const b = at(hv[i], hv[i + 1]);
+      const q = this.peers.get(hv[i + 3]);
+      if (!b || !q) continue;
+      b.manned = q;
+      q.manned = b;
+      b.ta = hv[i + 2] / 100;
+      if (hv[i + 4]) {
+        b.side = hv[i + 4];
+        b.flash = 0.05;
+        b.recoil = 1;
+      }
+    }
+    const mine = p.alive && Number(st[11]) >= 0 ? at(st[11], st[12]) : null;
+    if (mine && old && old !== mine && old.x === mine.x && old.y === mine.y) mine.ang = old.ang;
+    p.manned = mine;
+    if (mine) mine.manned = p;
   }
 
   // Robots: el propio en game.robot (tienda, barra de vida, dibujo) y los de los demás aparte.
@@ -957,6 +1025,9 @@ export class Online {
       q.idx = idx;
       q.inRobot = !!pl[i + 14];
       q.r = q.inRobot ? ROBOT.radius : PLAYER_BASE.radius;
+      // habilidad en curso (sólo para dibujarla): 1 megarráfaga, 2 impulso
+      q.rageT = pl[i + 15] & 1 ? 1 : 0;
+      q.boostT = pl[i + 15] & 2 ? 1 : 0;
     }
     for (const idx of this.peers.keys()) if (!seen.has(idx)) this.peers.delete(idx);
   }
@@ -1044,8 +1115,10 @@ export class Online {
     if (!Array.isArray(args)) return;
     try {
       if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
+      else if (tag === 't' && n === 'shot') this.turretShot(Number(args[0]), Number(args[1]), Number(args[2]));
       else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
-      else if (tag === 'c' && n === 'shake') g.camera.shake(Math.min(1, Number(args[0]) || 0));
+      else if (tag === 'c' && n === 'shake')
+        g.camera.shake(Math.min(1, Number(args[0]) || 0), Number(args[1]), Number(args[2]));
       else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
       else if (tag === 'd' && DECAL_SYNC.includes(n)) {
         if (n === 'corpse') {
@@ -1061,6 +1134,21 @@ export class Online {
       }
     } catch {
       /* efecto con datos raros: se ignora */
+    }
+  }
+
+  // Disparo de una torreta: bala de adorno local (choca con los zombis y paredes que se ven) y
+  // el cañón gira hacia donde disparó, con su fogonazo.
+  turretShot(x, y, a) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(a)) return;
+    const g = this.game;
+    g.bullets.spawn(turretBullet(x, y, a));
+    const cx = x - Math.cos(a) * 20;
+    const cy = y - Math.sin(a) * 20;
+    for (const b of g.structures.blocks) {
+      if (b.kind !== 'turret' || Math.abs(b.x + b.w / 2 - cx) > 4 || Math.abs(b.y + b.h / 2 - cy) > 4) continue;
+      b.ang = a;
+      b.flash = 0.05;
     }
   }
 

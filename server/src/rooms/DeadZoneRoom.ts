@@ -6,7 +6,7 @@ import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core
 import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanLookCode, cleanCmd, cleanAct, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanClass, cleanCmd, cleanAct, cleanView, Bucket, type Cmd } from '../validate.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -87,6 +87,14 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
         if (mb && (this.phase === 'waiting' || this.phase === 'finished')) mb.ready = !!(m && m.v);
       }),
     );
+    // clase para la próxima partida (se elige en el lobby)
+    this.onMessage('cls', (c, m) =>
+      this.admin(c, () => {
+        const mb = this.member(c);
+        const cls = cleanClass(m && m.v);
+        if (mb && cls && (this.phase === 'waiting' || this.phase === 'finished')) mb.cls = cls;
+      }),
+    );
     this.onMessage('start', (c) => this.admin(c, () => this.start(c)));
     this.onMessage('lobby', (c) => this.admin(c, () => this.backToLobby(c)));
     this.onMessage('loaded', (c) =>
@@ -129,6 +137,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       if (!l || !l.ping.take()) return;
       const t = m && Number.isFinite(m.c) ? m.c : 0;
       c.send('p', { c: t, s: Math.round(performance.now()) });
+      const v = cleanView(m && m.v);
+      if (v && this.sim) this.sim.setView(c.sessionId, v[0], v[1]);
     });
     this.onMessage('*', (c, type) => this.strike(c, `mensaje desconocido: ${String(type).slice(0, 20)}`));
 
@@ -159,13 +169,14 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (!originAllowed(context.headers.get('origin'))) throw new ServerError(403, 'origen');
     const name = cleanName(options && options.name);
     if (!name) throw new ServerError(400, 'nombre');
-    return { name, look: cleanLookCode(options && options.look) };
+    return { name, look: cleanLookCode(options && options.look), cls: cleanClass(options && options.cls) };
   }
 
-  onJoin(client: Client, _options: any, auth: { name: string; look?: string }) {
+  onJoin(client: Client, _options: any, auth: { name: string; look?: string; cls?: string }) {
     const m = new Member({
       name: auth.name,
       look: auth.look || '',
+      cls: auth.cls || '',
       idx: this.nextIdx++,
       ready: false,
       connected: true,
@@ -325,7 +336,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       this.seed,
       ids.map((id) => {
         const m = this.state.members.get(id)!;
-        return { id, idx: m.idx, name: m.name };
+        return { id, idx: m.idx, name: m.name, cls: m.cls };
       }),
     );
   }
@@ -340,7 +351,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   go() {
     const players = [...this.state.members.entries()]
       .filter(([id, m]) => m.inGame && (this.loaded.has(id) || m.connected))
-      .map(([id, m]) => ({ id, idx: m.idx, name: m.name }));
+      .map(([id, m]) => ({ id, idx: m.idx, name: m.name, cls: m.cls }));
     if (!players.length) return this.backToLobby(null);
     for (const [id, m] of this.state.members.entries()) {
       m.inGame = players.some((p) => p.id === id);
