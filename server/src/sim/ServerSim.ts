@@ -14,8 +14,17 @@ import { Player } from '../../../js/player.js';
 import { Structures, ACID } from '../../../js/build.js';
 import { Robot } from '../../../js/robot.js';
 import { bulletHit } from '../../../js/combat.js';
-import { applyMove, packBody, IN_RELOAD, IN_FIRE, IN_RUN, TICK } from '../../../js/netcode.js';
-import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/coop.js';
+import { applyMove, packBody, TICK } from '../../../js/netcode.js';
+import {
+  IN_RELOAD,
+  IN_FIRE,
+  IN_RUN,
+  TYPES,
+  PICKS,
+  PARTICLE_SKIP,
+  SFX_SYNC,
+  DECAL_SYNC,
+} from '../../../js/net/protocol.js';
 import {
   GOLDEN,
   DROPS,

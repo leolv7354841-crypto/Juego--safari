@@ -14,48 +14,14 @@ import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
 import { Abilities } from './abilities.js';
 import { Bullets } from './bullets.js';
 import { rand, angleTo, TAU } from './util.js';
+import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './net/protocol.js';
 
-export const TYPES = ['normal', 'swat', 'sprinter', 'fat', 'heavy', 'golden', 'bull', 'giant'];
-export const PICKS = ['ammo', 'med', 'crate'];
 const SNAP_HZ = 12;
 const IN_HZ = 20;
 const VIEW = 1000;
 // fotos del mundo sin confirmar que se permiten "en camino" hacia el invitado
 const WINDOW = 6;
 const FX_MAX = 500;
-// efectos que el invitado genera por su cuenta (no hace falta mandarlos)
-export const PARTICLE_SKIP = new Set(['constructor', 'add', 'update', 'draw', 'clear', 'rocketTrail', 'burning']);
-export const SFX_SYNC = [
-  'shot',
-  'hit',
-  'kill',
-  'stomp',
-  'explosion',
-  'acid',
-  'ricochet',
-  'blockHit',
-  'blockBreak',
-  'build',
-  'turret',
-  'goldenSpawn',
-  'punch',
-  'bullRoar',
-  'bullCharge',
-  'bullHit',
-  'bullSlam',
-  'throwBottle',
-  'molotov',
-  'crackle',
-  'burnScream',
-  'rocketStick',
-  'rocketArm',
-  'gore',
-  'wave',
-  'missile',
-  'boost',
-];
-export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
-
 const r100 = (v) => Math.round(v * 100);
 
 // Reloj de llegada: convierte la hora del otro celular en la nuestra y calcula cuánto

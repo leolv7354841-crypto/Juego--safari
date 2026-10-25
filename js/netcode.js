@@ -2,12 +2,9 @@
 // pruebas del servidor): predicción con reconciliación del jugador propio e interpolación
 // de los demás a partir de las fotos del servidor.
 import { NET } from './config.js';
+import { IN_RUN } from './net/protocol.js';
 
 export const TICK = 1 / NET.tickHz;
-// bits de la entrada
-export const IN_RUN = 1;
-export const IN_FIRE = 2;
-export const IN_RELOAD = 4;
 
 const silent = new Proxy({}, { get: () => () => {} });
 

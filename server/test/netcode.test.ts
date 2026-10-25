@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import '../src/sim/shim.ts';
 import { World } from '../../js/world.js';
 import { Player } from '../../js/player.js';
-import { Predictor, Interp, applyMove, packBody, unpackBody, IN_RUN, TICK } from '../../js/netcode.js';
+import { Predictor, Interp, applyMove, packBody, unpackBody, TICK } from '../../js/netcode.js';
+import { IN_RUN } from '../../js/net/protocol.js';
 import { NET } from '../../js/config.js';
 
 const world = new World(777);

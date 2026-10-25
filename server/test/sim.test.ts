@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
-import { IN_FIRE } from '../../js/netcode.js';
+import { IN_FIRE } from '../../js/net/protocol.js';
 import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/config.js';
 import { UPGRADES } from '../../js/upgrades.js';
 import { cooldownOf } from '../../js/abilities.js';

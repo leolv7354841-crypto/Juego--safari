@@ -21,8 +21,8 @@ import {
 } from './config.js';
 import { Player } from './player.js';
 import { Robot } from './robot.js';
-import { Predictor, ServerClock, Interp, unpackBody, IN_RUN, IN_FIRE, IN_RELOAD, TICK } from './netcode.js';
-import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './coop.js';
+import { Predictor, ServerClock, Interp, unpackBody, TICK } from './netcode.js';
+import { IN_RUN, IN_FIRE, IN_RELOAD, TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './net/protocol.js';
 import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
 import { Bullets } from './bullets.js';
 import { turretBullet } from './build.js';

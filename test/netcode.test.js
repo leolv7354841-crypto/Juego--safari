@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { NET } from '../js/config.js';
-import { applyMove, IN_RUN, Predictor, packBody, TICK, unpackBody } from '../js/netcode.js';
+import { applyMove, Predictor, packBody, TICK, unpackBody } from '../js/netcode.js';
+import { IN_RUN } from '../js/net/protocol.js';
 import { Player } from '../js/player.js';
 import { World } from '../js/world.js';
 import { silent } from './helpers.js';
