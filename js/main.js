@@ -20,7 +20,7 @@ import {
   drawGrenades,
   drawBars,
 } from './render/build.js';
-import { clamp, rand, fmtTime, makeCanvas, storage, TAU } from './core/util.js';
+import { clamp, rand, makeCanvas, storage, TAU } from './core/util.js';
 import { World } from './sim/world.js';
 import { Player } from './sim/player.js';
 import { Horde } from './sim/zombies.js';
@@ -37,9 +37,11 @@ import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
 import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
+import { setupMenu, start, bindMenu } from './ui/menu.js';
+import { bindOver, gameOver } from './ui/over.js';
 import { openLevelUp, chooseUpgrade } from './ui/levelup.js';
 import { drawLookPreview, bindLook } from './ui/look.js';
-import { showClass, chooseClass, renderClassRows, bindClass } from './ui/class.js';
+import { chooseClass, renderClassRows, bindClass } from './ui/class.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
@@ -155,6 +157,9 @@ class Game {
   renderLobby = () => renderLobby(this);
   renderClassRows = () => renderClassRows(this);
   openLevelUp = () => openLevelUp(this);
+  setupMenu = () => setupMenu(this);
+  start = (freshWorld) => start(this, freshWorld);
+  gameOver = () => gameOver(this);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -215,55 +220,6 @@ class Game {
     this.camera.trauma = 0;
     w.updateFlow(w.spawn.x, w.spawn.y);
     this.cache = {};
-  }
-
-  setupMenu() {
-    this.resetRun();
-    this.player.alive = false;
-    const { x, y } = this.world.spawn;
-    for (let i = 0; i < 22; i++) {
-      for (let t = 0; t < 8; t++) {
-        const a = rand(0, TAU);
-        const d = rand(160, 560);
-        const zx = x + Math.cos(a) * d;
-        const zy = y + Math.sin(a) * d;
-        if (this.world.pointBlocked(zx, zy, 24)) continue;
-        this.horde.spawn(i % 9 === 0 ? 'fat' : 'normal', zx, zy).spawnT = 0;
-        break;
-      }
-    }
-    this.setState('menu');
-    const cur = this.accounts.current;
-    this.$('acct-name').textContent = cur ? cur.name : 'Sin cuenta';
-    this.$('acct-best').textContent =
-      cur && cur.best ? `Tu récord: oleada ${cur.best.wave} · ${cur.best.kills} bajas` : '';
-    const save = storage.get(this.accounts.saveKey(), null) || storage.get(this.accounts.checkKey(), null);
-    this.$('btn-continue').hidden = !save;
-    if (save) {
-      this.$('btn-continue').textContent =
-        save.dstate === 'active' ? `Continuar · ronda ${save.wave}` : `Continuar · ronda ${save.wave + 1}`;
-    }
-    this.$('btn-start').textContent = save ? 'Nueva partida' : 'Jugar';
-    this.$('btn-start').classList.toggle('primary', !save);
-    refreshHall(this);
-    const best = storage.get('dz-best', null);
-    this.$('best').textContent = best
-      ? `Récord: ${fmtTime(best.time)} · ${best.kills} bajas · oleada ${best.wave}`
-      : '';
-  }
-
-  start(freshWorld) {
-    this.sfx.unlock();
-    // una partida nueva sustituye al progreso guardado
-    storage.remove(this.accounts.saveKey());
-    storage.remove(this.accounts.checkKey());
-    if (freshWorld) this.newWorld();
-    this.resetRun();
-    this.player.cls = this.classPick;
-    this.input.reset();
-    this.input.setRun(false);
-    this.setState('play');
-    this.updateHud(true);
   }
 
   setState(s) {
@@ -469,119 +425,18 @@ class Game {
 
   /* ---------- fin de partida ---------- */
 
-  gameOver() {
-    if (this.coop.isHost) this.coop.send({ t: 'over' });
-    this.setState('over');
-    const p = this.player;
-    const total = Ev.totalKills(this);
-    const acc = p.shotsFired ? Math.round((p.shotsHit / p.shotsFired) * 100) : 0;
-    const rows = [
-      ['Tiempo sobrevivido', fmtTime(this.time)],
-      ['Oleada alcanzada', this.director.wave],
-      ['Nivel', this.level],
-      ['sep'],
-      ['Zombis eliminados', total],
-      ['Normales', this.kills.normal],
-      ['Policías SWAT', this.kills.swat],
-      ['Velocistas', this.kills.sprinter],
-      ['Gordos', this.kills.fat],
-      ['Dorados', this.kills.golden || 0],
-      ['Super blindados', this.kills.heavy],
-      ['Toros', this.kills.bull || 0],
-      ['sep'],
-      ['Precisión', `${acc}%`],
-      ['Daño recibido', Math.round(p.damageTaken)],
-      ['Dinero ganado', `$${this.moneyEarned}`],
-    ];
-    const dl = this.$('results');
-    dl.innerHTML = '';
-    for (const [k, v] of rows) {
-      if (k === 'sep') {
-        const s = document.createElement('div');
-        s.className = 'sep';
-        dl.appendChild(s);
-        continue;
-      }
-      const dt = document.createElement('dt');
-      dt.textContent = k;
-      const dd = document.createElement('dd');
-      dd.textContent = v;
-      dl.append(dt, dd);
-    }
-    const best = storage.get('dz-best', null);
-    const record = !best || this.time > best.time;
-    if (record) storage.set('dz-best', { time: this.time, kills: total, wave: this.director.wave });
-    this.$('over-best').textContent = record
-      ? 'Nuevo récord personal'
-      : `Récord: ${fmtTime(best.time)} · ${best.kills} bajas`;
-  }
-
   /* ---------- interfaz ---------- */
 
   bindUi() {
-    const on = (id, fn) => this.$(id).addEventListener('click', fn);
     bindHud(this);
+    bindMenu(this);
+    bindOver(this);
     bindShop(this);
     bindClass(this);
     bindLook(this);
     bindAccount(this);
     bindBoard(this);
     bindLobby(this);
-    on('btn-start', () => {
-      this.tryFullscreen();
-      showClass(this, false);
-    });
-    on('btn-resume', () => this.resume());
-    // en cooperativo reinicia el anfitrión (el invitado espera)
-    const again = () => {
-      if (this.online.active) return this.toast('En línea la partida sigue mientras quede alguien vivo');
-      if (this.coop.isHost) return this.coop.restart();
-      if (this.coop.isGuest) return this.toast('Espera a que el anfitrión reinicie la partida');
-      // venías del cooperativo: al menú, donde sigue tu partida normal
-      if (this.coopRun) {
-        this.newWorld();
-        return this.setupMenu();
-      }
-      showClass(this, true);
-    };
-    on('btn-restart', again);
-    on('btn-again', again);
-    on('btn-continue', () => {
-      this.tryFullscreen();
-      if (!this.loadProgress()) this.start(false);
-    });
-    on('btn-menu', () => {
-      this.coop.leave();
-      this.online.leave();
-      this.newWorld();
-      this.setupMenu();
-    });
-    on('btn-over-menu', () => {
-      this.coop.leave();
-      this.online.leave();
-      this.newWorld();
-      this.setupMenu();
-    });
-    on('btn-sound', () => {
-      this.sfx.setMuted(!this.sfx.muted);
-      this.syncSoundLabel();
-    });
-    this.syncSoundLabel();
-  }
-
-  syncSoundLabel() {
-    this.$('btn-sound').textContent = `Sonido: ${this.sfx.muted ? 'desactivado' : 'activado'}`;
-  }
-
-  tryFullscreen() {
-    if (this.input.mode !== 'touch') return;
-    const el = document.documentElement;
-    try {
-      const r = el.requestFullscreen && el.requestFullscreen({ navigationUI: 'hide' });
-      if (r && r.catch) r.catch(() => {});
-    } catch {
-      /* Safari en iPhone no admite pantalla completa para páginas */
-    }
   }
 
   /* ---------- bucle ---------- */

@@ -179,6 +179,7 @@ export function bindHud(game) {
     if (game.state === 'play') game.useAbility();
   });
   on(game, 'btn-pause', () => game.pause());
+  on(game, 'btn-resume', () => game.resume());
   on(game, 'btn-next-round', () => game.startNextRound());
   on(game, 'btn-upgrade', () => {
     if (game.state === 'play' && game.online.upReady) game.openLevelUp();
