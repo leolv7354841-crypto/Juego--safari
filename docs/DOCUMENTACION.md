@@ -73,15 +73,15 @@ de pago o una máquina virtual (ver sección 9).
 index.html            Interfaz, HUD, controles táctiles y pantallas. Contiene el cargador sellado.
 css/style.css         Estilos y diseño adaptable.
 js/                   Código del cliente (módulos ES, sin compilar).
-js/vendor/colyseus.js SDK de Colyseus para el navegador (se carga sólo en línea).
+
 server/               Servidor en línea (Node + TypeScript + Colyseus 0.18).
 server/src/           Código del servidor.
 server/test/          Pruebas con node:test (salas, simulación, netcode).
 server/tools/load.ts  Prueba de carga (5 salas de 4 bots por defecto).
 deploy/               Servidor en máquina virtual: Dockerfile, docker-compose (con Caddy), scripts y guía.
-tools/stamp.mjs       Sella el build con un hash (ver sección 7).
-assets/               Íconos de la PWA (192, 512, 180 px y SVG).
-manifest.webmanifest  Manifiesto para instalar en pantalla de inicio.
+vite.config.js       Configuración de Vite (build a dist/, puerto 8080).
+public/               Archivos estáticos tal cual: manifiesto e íconos de la PWA (icons/).
+
 vercel.json           Reescrituras y cabeceras del hosting del juego.
 render.yaml           Blueprint de Render para el servidor.
 .claude/launch.json   Configuraciones de arranque (dev en 8080, server en 2567).
@@ -105,7 +105,7 @@ render.yaml           Blueprint de Render para el servidor.
 | `net.js`, `coop.js` | Cooperativo directo: conexión WebRTC y simulación en el anfitrión. |
 | `online.js` | Cliente del modo en línea: sala, entrada, interpolación y diagnóstico (F3). |
 | `netcode.js` | `Predictor` (predicción y reconciliación) e `Interp` (interpolación). Compartido con el servidor. |
-| `version.js` | Hash de versión generado por `tools/stamp.mjs`. |
+| `version.js` | Versión del build (la inyecta Vite) y aviso de versión nueva. |
 
 ### Módulos del servidor
 
@@ -242,7 +242,7 @@ Todo el ajuste está en [`js/config.js`](../js/config.js):
 | `NET` | `view` | `1000` | Radio de lo que se manda a cada jugador. |
 | `ICE` | — | STUN | Servidores para WebRTC del cooperativo directo. |
 
-Para cambiar el servidor: edita `NET.server`, ejecuta `npm run stamp` y publica el juego.
+Para cambiar el servidor: edita `NET.server` y publica el juego.
 Para probar sin publicar: abre el juego con `?servidor=wss://…`.
 
 ---
@@ -274,11 +274,9 @@ No hay secretos. El servidor no usa claves ni base de datos.
 
 ## 7. Versiones y caché
 
-- `npm run stamp` (o `node tools/stamp.mjs`) calcula un hash SHA-1 de `js/*.js` y de
-  `css/style.css`. Escribe `js/version.js` y reemplaza el bloque del cargador en `index.html`.
-- **Ejecutarlo antes de cada commit** que cambie el cliente. Si no se ejecuta, los jugadores
-  pueden seguir viendo código viejo por el caché del CDN.
-- `vercel.json` manda `Cache-Control: public, max-age=0, must-revalidate` para `.js` y `.css`.
+- `npm run build` (Vite) genera `dist/` con archivos con hash en `assets/`; ya no hay sellado manual.
+- `vercel.json` manda `no-cache` para `index.html` y `version.json`, e `immutable` para `/assets/*`.
+- `js/version.js` compara su versión con `version.json` y avisa si hay una nueva.
 
 ---
 
@@ -336,7 +334,7 @@ Opción recomendada, con el blueprint:
    - Health check: `/health`
    - `autoDeploy: true`: cada push despliega.
 4. Verifica `https://dead-zone-server.onrender.com/health`. Debe responder `{ "ok": true, ... }`.
-5. Si la URL es distinta, actualiza `NET.server` en `js/config.js` y ejecuta `npm run stamp`.
+5. Si la URL es distinta, actualiza `NET.server` en `js/config.js`.
 
 ### 9.3 Máquina virtual Linux (recomendada)
 
@@ -361,7 +359,7 @@ Para operarlo en producción:
 1. Crea un proyecto en la consola de Firebase (sin Analytics).
 2. Crea una Realtime Database.
 3. Publica las reglas de la sección "Clasificación mundial" del README.
-4. Copia la URL en `ONLINE.url` de `js/config.js` y ejecuta `npm run stamp`.
+4. Copia la URL en `ONLINE.url` de `js/config.js`.
 
 Si cambias la forma de `scores` o `rooms`, actualiza las reglas en el README
 (ver también [CLAUDE.md](../CLAUDE.md)).
@@ -415,12 +413,12 @@ se garantiza un RTT menor a 50 ms.
 
 | Si cambias... | Haz también... |
 |---|---|
-| Cualquier archivo de `js/` o `css/` | `npm run stamp` antes del commit. |
+| Cualquier archivo de `js/` o `css/` | Nada especial: Vite lo recompila. |
 | Equilibrio (armas, zombis, precios) | Cambia sólo `js/config.js`. |
 | `NET.tickHz` | Cámbialo en `config.js`; el servidor lo toma de ahí. Ambos lados deben coincidir. |
 | Lógica compartida (`player.js` `move`, `combat.js`, `netcode.js`) | Corre `npm run server:test`. |
 | El dominio del juego | Agrega el nuevo origen a `ALLOWED_ORIGINS` (en `deploy/.env` de la máquina, o en Render). |
-| La URL del servidor | Actualiza `NET.server` y ejecuta `npm run stamp`. |
+| La URL del servidor | Actualiza `NET.server`. |
 | Forma de `scores` o `rooms` | Actualiza las reglas de Firebase en el README. |
 | Variables del servidor | Actualiza `server/.env.example` y la sección 6 de este documento. |
 | Versión de Node | Actualiza `NODE_VERSION` en `render.yaml` y `engines` en `server/package.json`. |
@@ -438,4 +436,4 @@ se garantiza un RTT menor a 50 ms.
 - **P2P / WebRTC**: conexión directa entre navegadores, sin pasar por un servidor.
 - **STUN / TURN**: STUN ayuda a descubrir la dirección pública; TURN retransmite el tráfico. Este proyecto usa sólo STUN.
 - **Señalización**: intercambio inicial de direcciones para abrir WebRTC. Aquí va por Firebase.
-- **Sellado (stamp)**: hash del código que se usa para evitar cachés viejos.
+- **Hash de versión**: Vite nombra los archivos con un hash, así que el caché nunca sirve código viejo.

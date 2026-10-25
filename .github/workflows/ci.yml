@@ -1,4 +1,4 @@
-# Comprobación de cada push y pull request: el sellado de versión está al día, Biome y las pruebas
+# Comprobación de cada push y pull request: Biome y las pruebas
 # del núcleo pasan, Playwright (Chromium y WebKit) pasa, el servidor
 # compila (tsc) y pasan sus pruebas. Si algo falla, el commit sale en rojo en GitHub.
 name: Comprobación
@@ -18,17 +18,6 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: server/package-lock.json
-
-      - name: Sellado de versión al día (npm run stamp antes del commit)
-        run: |
-          node tools/stamp.mjs
-          git diff --exit-code -- js/version.js index.html || {
-            echo "::error::Falta ejecutar 'npm run stamp' y hacer commit de js/version.js e index.html"
-            exit 1
-          }
-
-      - name: Build de Vercel
-        run: node tools/build.mjs
 
       - name: Dependencias del servidor
         run: npm ci --prefix server

@@ -97,7 +97,7 @@ Mira que «pasos/s por sala» quede en 60 y «descartados» en 0.
 ### 5. Hacer que el juego use el servidor nuevo (en tu PC)
 
 1. En `js/config.js` cambia `NET.server` a `'wss://servidor.yeyo.games'`.
-2. Ejecuta `npm run stamp`, haz commit y push: Vercel publica el juego.
+2. Haz commit y push: Vercel publica el juego.
 3. Cuando todo funcione, puedes borrar el servicio de Render.
 
 ## Mantenimiento

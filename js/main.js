@@ -26,7 +26,7 @@ import { Music } from './music.js';
 import { Robot } from './robot.js';
 import { Coop } from './coop.js';
 import { Online, validName, explainOnline } from './online.js';
-import { VERSION } from './version.js';
+import { VERSION, hayVersionNueva } from './version.js';
 import { Accounts } from './accounts.js';
 import { Structures, ACID, drawBottle } from './build.js';
 import { bulletHit } from './combat.js';
@@ -2551,31 +2551,15 @@ class Game {
   }
 }
 
-// Si algún CDN entregó archivos de una versión vieja, se recarga pidiendo todo de nuevo (hasta 3 veces).
-function staleReload() {
-  const want = window.DZ_VERSION;
-  if (!want) return false;
-  try {
-    if (VERSION === want) {
-      window.sessionStorage.removeItem('dz-reload');
-      return false;
-    }
-    const n = Number(window.sessionStorage.getItem('dz-reload') || 0);
-    if (n >= 3) return false;
-    window.sessionStorage.setItem('dz-reload', String(n + 1));
-    const u = new window.URL(window.location.href);
-    u.searchParams.set('b', Date.now().toString(36));
-    window.location.replace(u.toString());
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function boot() {
-  if (staleReload()) return;
   try {
-    new Game();
+    const game = new Game();
+    const ver = document.getElementById('ver');
+    if (ver) ver.textContent = 'Versión ' + VERSION;
+    // si se publicó una versión nueva mientras la pestaña seguía abierta, se avisa
+    hayVersionNueva().then((nueva) => {
+      if (nueva) game.toast('Hay una versión nueva: recarga la página');
+    });
   } catch (err) {
     console.error(err);
     document.body.insertAdjacentHTML(

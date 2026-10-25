@@ -4,7 +4,7 @@ import { abrir } from './helpers.js';
 // WebKit avisa "Wrong protocol for WebSocket" con el SDK de Colyseus empaquetado en js/vendor; la conexión
 // funciona igual. Se tolera aquí hasta la Etapa 2 (SDK desde npm); si desaparece, quitar el filtro.
 const CONOCIDO = /favicon|Wrong protocol for WebSocket/;
-const SERVER_URL = 'ws://127.0.0.1:2599'; // el mismo puerto que playwright.config.js
+const SERVER_URL = `ws://127.0.0.1:${process.env.E2E_SERVER_PORT || 2599}`; // el mismo puerto que playwright.config.js
 
 // Con dos páginas abiertas, la que queda en segundo plano no anima (WebKit): se la trae al frente
 // y se envía el clic como evento del DOM, sin pasar por el ratón (que en WebKit se cuelga).

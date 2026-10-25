@@ -157,3 +157,8 @@ declare global {
     DZ_VERSION?: string;
   }
 }
+
+// Lo inyecta Vite al compilar (vite.config.js); no existe en desarrollo ni en el servidor.
+declare global {
+  var __DZ_VERSION__: string | undefined;
+}
