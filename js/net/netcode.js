@@ -141,9 +141,10 @@ function lerpAngle(a, b, t) {
 // Fotos de una entidad (tiempo del servidor + valores) para dibujarla un poco en diferido.
 // ang = índices de los valores que son ángulos.
 export class Interp {
-  constructor(ang = [], max = 24) {
+  constructor(ang = [], max = 24, extrapolate = NET.maxExtrapolate) {
     this.ang = ang;
     this.max = max;
+    this.extrapolate = extrapolate;
     this.t = [];
     this.v = [];
   }
@@ -162,7 +163,7 @@ export class Interp {
   get last() {
     return this.v[this.v.length - 1];
   }
-  // escribe en out los valores en el instante t (extrapola como mucho NET.maxExtrapolate ms)
+  // escribe en out los valores en el instante t (extrapola como mucho `extrapolate` ms, NET.maxExtrapolate por omisión)
   sample(t, out) {
     const T = this.t;
     const V = this.v;
@@ -179,7 +180,7 @@ export class Interp {
         a = n - 2;
         b = n - 1;
         const span = T[b] - T[a] || 1;
-        k = 1 + Math.min(t - T[b], NET.maxExtrapolate) / span;
+        k = 1 + Math.min(t - T[b], this.extrapolate) / span;
       }
     } else {
       // la foto anterior y la siguiente al instante pedido

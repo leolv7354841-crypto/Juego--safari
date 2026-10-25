@@ -7,15 +7,15 @@
 // El invitado mueve a su personaje en su propio celular (sin retraso), dispara balas de
 // adorno al instante y le avisa al anfitrión, que crea las balas que de verdad hacen daño.
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
-import { drawRobot } from '../render/robot.js';
 import { Net } from './net.js';
 import { Player } from '../sim/player.js';
-import { ZOMBIES, WEAPONS, SHOP, GOLDEN, ABILITY, NET } from '../core/config.js';
-import { zombieSprites, drawSurvivor, cleanLook } from '../render/sprites.js';
+import { WEAPONS, SHOP, ABILITY } from '../core/config.js';
+import { cleanLook } from '../render/sprites.js';
 import { Abilities } from '../sim/abilities.js';
-import { Bullets } from '../sim/bullets.js';
-import { rand, angleTo, TAU } from '../core/util.js';
-import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
+import { rand, angleTo } from '../core/util.js';
+import { PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
+import { encodeStatic, encodeWorld } from './snapshot.js';
+import { GUEST_IDX, HOST_IDX } from './remote.js';
 import { CoopHost, CoopGuest, Solo } from './mode.js';
 
 const SNAP_HZ = 12;
@@ -24,6 +24,8 @@ const VIEW = 1000;
 // fotos del mundo sin confirmar que se permiten "en camino" hacia el invitado
 const WINDOW = 6;
 const FX_MAX = 500;
+// el invitado adelanta lo que ve algo más que el cliente en línea (el P2P llega a tirones)
+const EXTRAPOLATE = 250;
 const r100 = (v) => Math.round(v * 100);
 
 // Reloj de llegada: convierte la hora del otro celular en la nuestra y calcula cuánto
@@ -107,7 +109,7 @@ export class Coop {
   constructor(game) {
     this.game = game;
     this.net = new Net();
-    this.mode = null; // 'host' | 'guest'
+    this.role = null; // 'host' | 'guest' (game.mode es el modo de la partida: js/net/mode.js)
     this.peer = null; // host: el compañero simulado · guest: el anfitrión (sólo para dibujarlo)
     this.peerName = '';
     this.peerLook = null;
@@ -118,23 +120,10 @@ export class Coop {
     this.sendT = 0;
     this.inT = 0;
     this.snapN = 0;
-    this.zmap = new Map();
-    this.fireMap = new Map();
-    this.remoteBullets = [];
     this.pendingBuild = null;
     this.lastDs = null;
     this.levelSeen = 1;
     this.clock = new Clock();
-  }
-
-  get active() {
-    return !!this.mode;
-  }
-  get isHost() {
-    return this.mode === 'host';
-  }
-  get isGuest() {
-    return this.mode === 'guest';
   }
 
   send(m, fast = false) {
@@ -174,7 +163,7 @@ export class Coop {
     g.newWorld();
     g.resetRun();
     g.player.cls = g.classPick;
-    this.mode = 'host';
+    this.role = 'host';
     this.clock = new Clock();
     this.snapSeq = 0;
     this.peerAck = 0;
@@ -186,6 +175,11 @@ export class Coop {
     this.peer.remote = true;
     this.peer.tx = this.peer.x;
     this.peer.ty = this.peer.y;
+    this.peer.idx = GUEST_IDX;
+    this.peer.name = this.peerName || 'Compañero';
+    // el compañero lo simulo yo: se dibuja con los demás jugadores pero no se interpola (lo mueve hostTick)
+    g.remote.start();
+    g.remote.peers.set(GUEST_IDX, this.peer);
     this.installRecording();
     this.send({
       t: 'start',
@@ -204,7 +198,7 @@ export class Coop {
 
   // El anfitrión vuelve a empezar con el mismo compañero (después de perder).
   restart() {
-    if (!this.isHost) return;
+    if (this.role !== 'host') return;
     this.uninstall();
     this.startHost();
   }
@@ -215,9 +209,10 @@ export class Coop {
     g.newWorld(m.seed);
     g.resetRun();
     g.player.cls = g.classPick;
-    this.mode = 'guest';
+    this.role = 'guest';
     this.clock = new Clock();
     this.lastSeq = 0;
+    this.lastT = 0;
     g.mode = new CoopGuest(g);
     this.peerName = m.name || 'Anfitrión';
     this.peerLook = cleanLook(m.look);
@@ -228,9 +223,10 @@ export class Coop {
     this.peer = new Player(g.world.spawn.x, g.world.spawn.y);
     this.peer.look = this.peerLook;
     this.peer.puppet = true;
-    this.zmap.clear();
-    this.fireMap.clear();
-    this.remoteBullets = [];
+    this.peer.idx = HOST_IDX;
+    // el anfitrión se dibuja y se mueve igual que los jugadores del modo en línea (js/net/remote.js)
+    g.remote.start(EXTRAPOLATE);
+    g.remote.peers.set(HOST_IDX, this.peer);
     this.lastDs = null;
     this.levelSeen = 1;
     g.camera.x = m.x;
@@ -340,9 +336,9 @@ export class Coop {
   /* ---------- cada fotograma ---------- */
 
   tick(dt) {
-    if (!this.mode) return;
+    if (!this.role) return;
     this.net.check();
-    if (this.isHost) this.hostTick(dt);
+    if (this.role === 'host') this.hostTick(dt);
     else this.guestTick(dt);
   }
 
@@ -380,125 +376,32 @@ export class Coop {
   snapshot() {
     const g = this.game;
     const peer = this.peer;
-    const near = (x, y, m = VIEW) => Math.abs(x - peer.x) < m && Math.abs(y - peer.y) < m;
-    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
-    const zw = Math.max(NET.zombieView[0], (peer.vw || 0) + 150);
-    const zh = Math.max(NET.zombieView[1], (peer.vh || 0) + 150);
-    const nearZ = (o) =>
-      o.type === 'golden' || o.type === 'giant'
-        ? near(o.x, o.y)
-        : Math.abs(o.x - peer.x) < zw && Math.abs(o.y - peer.y) < zh;
-    const ox = Math.round(peer.x);
-    const oy = Math.round(peer.y);
-    const z = [];
-    const zx = [];
-    for (const o of g.horde.list) {
-      if (o.dead || !nearZ(o)) continue;
-      const flags =
-        (o.flash > 0 ? 1 : 0) |
-        (o.burn > 0 ? 2 : 0) |
-        (o.wounded ? 4 : 0) |
-        (o.bs === 'windup' ? 8 : 0) |
-        (o.hitT > 0 ? 16 : 0) |
-        (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
-        (o.lunge > 0.3 ? 64 : 0);
-      // compacto: posición relativa al compañero y ángulo en 64 pasos
-      z.push(
-        o.id,
-        TYPES.indexOf(o.type),
-        Math.round(o.x - ox),
-        Math.round(o.y - oy),
-        Math.round((o.angle / TAU) * 64) & 63,
-        flags,
-      );
-      if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
-    }
-    const st = g.structures;
+    // la parte del mundo es la misma que arma el servidor en línea (js/net/snapshot.js)
     const s = {
       t: 's',
       q: ++this.snapSeq,
       ts: Math.round(performance.now()),
-      o: [ox, oy],
-      zx,
-      w: g.director.wave,
-      ds: g.director.state,
-      tm: Math.round(g.time),
+      ...encodeWorld(
+        g,
+        { x: peer.x, y: peer.y, vw: peer.vw, vh: peer.vh },
+        {
+          players: [{ idx: HOST_IDX, p: g.player }],
+          robots: [{ idx: HOST_IDX, r: g.robot }],
+          // las balas del compañero ya las vio en su celular
+          skipBullet: (b) => b.owner === 'peer',
+        },
+      ),
+      // experiencia del equipo
       lv: g.level,
       xp: Math.round(g.xp),
       xn: g.xpNeed,
-      z,
-      hp: this.packPlayer(g.player),
-      pk: g.pickups.list.flatMap((it) =>
-        near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
-      ),
-      b: g.bullets.list.flatMap((b) =>
-        b.owner !== 'peer' && near(b.x, b.y)
-          ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0]
-          : [],
-      ),
-      gr: st.grenades.flatMap((q) => [
-        Math.round(q.x),
-        Math.round(q.y),
-        Math.round(q.h),
-        r100(q.rot),
-        q.kind === 'molotov' ? 1 : 0,
-        q.t > q.dur ? 1 : 0,
-      ]),
-      fi: st.fires.flatMap((f) => [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)]),
-      so: st.stuck.flatMap((q) => [
-        Math.round(q.x),
-        Math.round(q.y),
-        r100(q.ang || 0),
-        r100(q.t),
-        r100(q.stick),
-        r100(q.glow),
-        q.kind === 'fat' ? 1 : 0,
-      ]),
-      bl: st.blasts.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t)]),
-      ms: st.missiles.flatMap((q) => [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)]),
     };
-    const rb = g.robot;
-    s.rb = rb.owned
-      ? [
-          Math.round(rb.x),
-          Math.round(rb.y),
-          r100(rb.angle),
-          r100(rb.legAngle),
-          r100(rb.walk),
-          Math.round(rb.hp),
-          rb.piloted ? 1 : 0,
-        ]
-      : 0;
     // lo que cambia poco va cada medio segundo
     if (this.snapN++ % 6 === 0) {
-      s.blk = st.blocks.map((b) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]);
-      s.wir = st.wires.map((w) => [w.kind, w.x, w.y, w.w, w.h, Math.round(w.hp)]);
-      s.sc = st.scorches.map((c) => [Math.round(c.x), Math.round(c.y), r100(c.a), Math.round(c.t), c.life]);
+      Object.assign(s, encodeStatic(g.structures));
       s.kl = g.kills;
     }
     return s;
-  }
-
-  packPlayer(p) {
-    return [
-      Math.round(p.x),
-      Math.round(p.y),
-      r100(p.angle),
-      r100(p.legAngle),
-      Math.round(p.walkPhase * 10),
-      p.running ? 1 : 0,
-      p.weapon.id,
-      p.weapon.mag,
-      r100(Math.max(0, p.reloadT)),
-      r100(p.reloadProg || 0),
-      p.flashT > 0 ? 1 : 0,
-      p.alive ? 1 : 0,
-      p.inRobot ? 1 : 0,
-      p.hurtT > 0 ? 1 : 0,
-      r100(p.recoil),
-      Math.round(p.speedNow),
-      (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
-    ];
   }
 
   // La mira y las piernas del compañero giran suave hacia lo último recibido.
@@ -517,15 +420,18 @@ export class Coop {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'start') return this.startGuest(m);
     if (m.t === 'bye') return this.lost();
-    if (this.isHost) this.onGuestMessage(m);
-    else if (this.isGuest) this.onHostMessage(m);
+    if (this.role === 'host') this.onGuestMessage(m);
+    else if (this.role === 'guest') this.onHostMessage(m);
     else if (m.t === 'hello') this.onHello(m);
   }
 
   onHello(m) {
     this.peerName = String(m.name || '').slice(0, 16);
     this.peerLook = cleanLook(m.look);
-    if (this.peer) this.peer.look = this.peerLook;
+    if (this.peer) {
+      this.peer.look = this.peerLook;
+      this.peer.name = this.peerName || 'Compañero';
+    }
   }
 
   onGuestMessage(m) {
@@ -659,7 +565,7 @@ export class Coop {
         this.applySnapshot(m);
         break;
       case 'fx':
-        if (Array.isArray(m.e)) for (const e of m.e) this.replay(e);
+        if (Array.isArray(m.e)) for (const e of m.e) g.remote.replay(e);
         break;
       case 'k': {
         // empujones sumados de varios golpes: se limitan para que no den tirones bruscos
@@ -717,48 +623,11 @@ export class Coop {
     }
   }
 
-  // Repite en el invitado un efecto que ocurrió en el anfitrión.
-  replay(e) {
-    const g = this.game;
-    if (!Array.isArray(e)) return;
-    const [tag, n, args] = e;
-    if (!Array.isArray(args)) return;
-    try {
-      if (tag === 'p' && typeof g.particles[n] === 'function' && !PARTICLE_SKIP.has(n)) g.particles[n](...args);
-      else if (tag === 's' && SFX_SYNC.includes(n)) g.sfx[n](...args);
-      else if (tag === 'c' && n === 'shake')
-        g.camera.shake(Math.min(1, Number(args[0]) || 0), Number(args[1]), Number(args[2]));
-      else if (tag === 'g' && n === 'banner') g.banner(String(args[0] || ''), String(args[1] || ''));
-      else if (tag === 'd' && DECAL_SYNC.includes(n)) {
-        if (n === 'corpse') {
-          const c = args[0] || {};
-          const sets = zombieSprites()[c.type];
-          if (!sets) return;
-          g.decals.corpse(
-            { type: c.type, spr: sets[c.si] || sets[0], x: c.x, y: c.y, r: c.r, angle: c.a, burnt: c.burnt },
-            args[1],
-            args[2],
-          );
-        } else g.decals[n](...args);
-      }
-    } catch {
-      /* efecto con datos raros: se ignora */
-    }
-  }
-
   /* ---------- invitado ---------- */
 
   guestTick(dt) {
     const g = this.game;
     const p = g.player;
-    // el anfitrión (dibujo) se mueve suave entre fotos
-    const h = this.peer;
-    if (h && h.tx !== undefined) {
-      place(h, performance.now(), dt);
-      this.turn(h, dt);
-      h.flashT -= dt;
-      h.hurtT -= dt;
-    }
     this.inT -= dt;
     if (this.inT > 0) return;
     this.inT = 1 / IN_HZ;
@@ -867,224 +736,18 @@ export class Coop {
     if (s.kl) g.kills = s.kl;
     // una foto vieja que llegó tarde no deshace una más nueva
     if (Number(s.q) <= (this.lastSeq || 0)) return;
-    this.rx = (this.rx || 0) + 1;
+    g.remote.net.count();
     this.lastSeq = Number(s.q);
-    const st0 = this.clock.stamp(Number(s.ts));
-    this.applyZombies(s.z || [], st0, s.o || [0, 0], s.zx || []);
-    this.applyPuppet(s.hp, st0);
-    // objetos, balas, granadas, fuego, cohetes clavados, explosiones
-    const pk = s.pk || [];
-    g.pickups.list = [];
-    for (let i = 0; i + 3 < pk.length; i += 4)
-      g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
-    const b = s.b || [];
-    this.remoteBullets = [];
-    for (let i = 0; i + 4 < b.length; i += 5)
-      this.remoteBullets.push({
-        x: b[i],
-        y: b[i + 1],
-        dx: b[i + 2] / 100,
-        dy: b[i + 3] / 100,
-        rocket: !!b[i + 4],
-        trail: 22,
-        age: 0,
-      });
-    const st = g.structures;
-    const gr = s.gr || [];
-    st.grenades = [];
-    for (let i = 0; i + 5 < gr.length; i += 6)
-      st.grenades.push({
-        x: gr[i],
-        y: gr[i + 1],
-        h: gr[i + 2],
-        rot: gr[i + 3] / 100,
-        kind: gr[i + 4] ? 'molotov' : 'grenade',
-        t: gr[i + 5] ? 2 : 0,
-        dur: 1,
-      });
-    const fi = s.fi || [];
-    const fires = [];
-    for (let i = 0; i + 4 < fi.length; i += 5) {
-      let f = this.fireMap.get(fi[i]);
-      if (!f) {
-        f = { id: fi[i], x: fi[i + 1], y: fi[i + 2], r: 82, tick: 0, flames: [] };
-        for (let k = 0; k < 16; k++) {
-          const a = rand(0, TAU);
-          const dd = Math.sqrt(Math.random()) * f.r * 0.85;
-          f.flames.push({
-            x: f.x + Math.cos(a) * dd,
-            y: f.y + Math.sin(a) * dd * 0.85,
-            s: rand(0.7, 1.25),
-            ph: rand(0, 10),
-          });
-        }
-        this.fireMap.set(f.id, f);
-      }
-      f.t = fi[i + 3] / 100;
-      f.life = fi[i + 4] / 100;
-      fires.push(f);
-    }
-    for (const id of this.fireMap.keys()) if (!fires.some((f) => f.id === id)) this.fireMap.delete(id);
-    st.fires = fires;
-    const so = s.so || [];
-    st.stuck = [];
-    for (let i = 0; i + 6 < so.length; i += 7)
-      st.stuck.push({
-        x: so[i],
-        y: so[i + 1],
-        ang: so[i + 2] / 100,
-        t: so[i + 3] / 100,
-        stick: so[i + 4] / 100,
-        glow: so[i + 5] / 100,
-        kind: so[i + 6] ? 'fat' : 'heavy',
-      });
-    const ms = s.ms || [];
-    st.missiles = [];
-    for (let i = 0; i + 3 < ms.length; i += 4)
-      st.missiles.push({ x: ms[i], y: ms[i + 1], t: ms[i + 2] / 100, dur: ms[i + 3] / 100 });
-    const bl = s.bl || [];
-    st.blasts = [];
-    for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
-    if (s.blk) {
-      st.blocks = s.blk
-        .filter((q) => SHOP[q[0]])
-        .map((q) => ({
-          k: 0,
-          kind: q[0],
-          x: q[1],
-          y: q[2],
-          w: q[3],
-          h: q[4],
-          hp: q[5],
-          max: SHOP[q[0]].hp,
-          ang: q[6] / 100,
-          low: true,
-          block: true,
-          hitT: 0,
-          cd: 0,
-        }));
-      st.relayer();
-    }
-    if (s.wir)
-      st.wires = s.wir
-        .filter((q) => SHOP[q[0]])
-        .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
-    if (s.sc) st.scorches = s.sc.map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
-    // robot del anfitrión
-    const rb = g.robot;
-    if (s.rb) {
-      rb.owned = true;
-      rb.x = s.rb[0];
-      rb.y = s.rb[1];
-      rb.angle = s.rb[2] / 100;
-      rb.legAngle = s.rb[3] / 100;
-      rb.walk = s.rb[4] / 100;
-      rb.hp = s.rb[5];
-      rb.piloted = !!s.rb[6];
-    } else rb.owned = false;
-  }
-
-  applyPuppet(a, t) {
-    const h = this.peer;
-    if (!h || !Array.isArray(a)) return;
-    if (h.tx === undefined) {
-      h.x = a[0];
-      h.y = a[1];
-    }
-    h.tx = a[0];
-    h.ty = a[1];
-    track(h, t, a[0], a[1]);
-    h.ta = a[2] / 100;
-    h.tla = a[3] / 100;
-    h.running = !!a[5];
-    if (WEAPONS[a[6]] && (!h.weapons[0] || h.weapons[0].id !== a[6])) {
-      h.weapons = [h.makeWeapon(a[6])];
-      h.wi = 0;
-    }
-    h.weapon.mag = a[7];
-    h.reloadT = a[8] / 100;
-    h.reloadProg = a[9] / 100;
-    if (a[10]) h.flashT = 0.05;
-    h.alive = !!a[11];
-    h.inRobot = !!a[12];
-    if (a[13]) h.hurtT = 0.2;
-    h.recoil = a[14] / 100;
-    h.speedNow = a[15];
-    // habilidad en curso (para dibujarla): 1 megarráfaga, 2 impulso
-    h.rageT = a[16] & 1 ? 1 : 0;
-    h.boostT = a[16] & 2 ? 1 : 0;
-  }
-
-  applyZombies(z, t, org, zx) {
-    const g = this.game;
-    const seen = new Set();
-    const extra = new Map();
-    for (let i = 0; i + 2 < zx.length; i += 3) extra.set(zx[i], [zx[i + 1], zx[i + 2] / 100]);
-    for (let i = 0; i + 5 < z.length; i += 6) {
-      const id = z[i];
-      const x = org[0] + z[i + 2];
-      const y = org[1] + z[i + 3];
-      const ang = (z[i + 4] / 64) * TAU;
-      seen.add(id);
-      let o = this.zmap.get(id);
-      if (!o) {
-        const type = TYPES[z[i + 1]] || 'normal';
-        const def = ZOMBIES[type];
-        const sets = zombieSprites()[type];
-        o = {
-          id,
-          type,
-          def,
-          r: def.radius,
-          mass: def.mass,
-          si: id % sets.length,
-          spr: sets[id % sets.length] || sets[0],
-          x,
-          y,
-          angle: ang,
-          anim: 0,
-          flash: 0,
-          hitT: 0,
-          hitJolt: 0,
-          lunge: 0,
-          spawnT: 0,
-          tilt: 0,
-          air: 0,
-          swell: 0,
-          burn: 0,
-          bs: 'walk',
-          life: 99,
-          dead: false,
-          wob: rand(0, 100),
-          fireFx: 0,
-        };
-        this.zmap.set(id, o);
-      }
-      o.tx = x;
-      o.ty = y;
-      track(o, t, x, y);
-      o.ta = ang;
-      const f = z[i + 5];
-      o.flash = f & 1 ? 0.06 : 0;
-      o.burn = f & 2 ? 1 : 0;
-      o.wounded = !!(f & 4);
-      o.bs = f & 8 ? 'windup' : 'walk';
-      if (f & 16 && o.hitT <= 0) {
-        o.hitT = 0.18;
-        o.hitJolt = rand(0.2, 0.5) * (Math.random() < 0.5 ? -1 : 1);
-      }
-      o.life = f & 32 ? 1 : 99;
-      o.lunge = f & 64 ? 1 : o.lunge;
-      const ex = extra.get(id);
-      o.air = ex ? ex[0] : 0;
-      o.swell = ex ? ex[1] : 0;
-    }
-    for (const [id, o] of this.zmap) {
-      if (seen.has(id)) continue;
-      o.dead = true;
-      this.zmap.delete(id);
-    }
-    g.horde.list = Array.from(this.zmap.values());
+    // jugadores, robots, zombis, objetos, balas y estructuras: lo mismo que ve el cliente en línea
+    // el reloj de llegada puede retroceder un poco: el instante de la foto nunca baja (Interp lo exige)
+    const t = Math.max(this.clock.stamp(Number(s.ts)), (this.lastT || 0) + 1);
+    this.lastT = t;
+    g.remote.applyWorld(s, t, {
+      myIdx: GUEST_IDX,
+      identify: () => ({ name: this.peerName || 'Anfitrión', look: this.peerLook }),
+      // las barricadas del anfitrión no estorban a su compañero (como antes de unificar)
+      collide: false,
+    });
   }
 
   // Reemplaza a game.update() en el celular del invitado.
@@ -1102,36 +765,12 @@ export class Coop {
       if (g.input.consume('robot')) g.toggleRobot();
       if (g.input.consume('nextRound')) g.startNextRound();
     }
-    // zombis: recorren el camino entre las posiciones recibidas (un poco en diferido) y caminan con su animación
-    const now = performance.now();
+    // zombis y compañero: recorren el camino entre las posiciones recibidas (un poco en diferido)
+    const R = g.remote;
+    const rt = performance.now() - this.clock.delay;
+    R.placePeers(rt, dt);
+    R.placeZombies(rt, dt, p);
     const grid = g.horde.grid;
-    grid.clear();
-    let danger = 0;
-    let nc = 0;
-    for (const z of g.horde.list) {
-      const ox = z.x;
-      const oy = z.y;
-      place(z, now, dt);
-      z.angle = angleTo(z.angle, z.ta, dt * 10);
-      z.anim += Math.hypot(z.x - ox, z.y - oy) / (z.r * 0.55);
-      z.hitT -= dt;
-      z.lunge = Math.max(0, z.lunge - dt * 4);
-      z.tilt =
-        (z.wounded ? Math.sin(g.time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(g.time * 23 + z.wob) * 0.28 : 0);
-      if (z.burn > 0) {
-        z.fireFx -= dt;
-        if (z.fireFx <= 0) {
-          z.fireFx = 0.1;
-          g.particles.burning(z.x, z.y, z.r);
-        }
-      }
-      grid.insert(z);
-      const d = Math.hypot(z.x - p.x, z.y - p.y);
-      if (d < 650) {
-        danger += 1 - d / 650;
-        if (d < 300) nc++;
-      }
-    }
     // choque local con los zombis que ves: no los atraviesas (en el anfitrión sólo se aparta el zombi)
     if (p.alive) {
       const q = [];
@@ -1149,29 +788,10 @@ export class Coop {
       }
       g.world.collide(p, p.r, true);
     }
-    for (const b of this.remoteBullets) {
-      b.x += b.dx * (b.rocket ? 640 : 1000) * dt;
-      b.y += b.dy * (b.rocket ? 640 : 1000) * dt;
-      b.age += dt;
-      if (b.rocket) g.particles.rocketTrail(b.x, b.y, b.dx, b.dy);
-    }
-    g.bullets.update(dt, g);
     // espera de la habilidad y megarráfaga (sus balas reales las crea el anfitrión)
     Abilities.update(dt, g, p);
-    for (const f of g.structures.fires) f.t += dt;
-    for (const m of g.structures.missiles) m.t = Math.min(m.dur, m.t + dt);
-    for (const q of g.structures.blasts) q.t -= dt;
-    g.particles.update(dt);
-    g.decals.update(dt);
-    g.emitFires(dt);
-    if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
-      g.sfx.groan(Math.min(3, 0.5 + nc / 10));
-    g.stepT -= dt;
-    if (nc > 0 && g.stepT <= 0) {
-      g.sfx.footstep(Math.min(1, nc / 20));
-      g.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
-    }
-    g.music.setDanger(p.alive ? danger : 0, dt);
+    R.advance(dt);
+    R.ambience(dt, p);
     // muerto: la cámara sigue suave a tu compañero (sin adelantarse hacia donde apunta)
     if (!p.alive && this.peer && this.peer.alive) g.camera.update(dt, this.peer.x, this.peer.y, false);
     else {
@@ -1194,7 +814,7 @@ export class Coop {
     g.input.reset();
     g.camera.shake(0.6);
     g.deathT = 1.6;
-    if (this.isGuest) {
+    if (this.role === 'guest') {
       this.send({ t: 'dead' });
       g.toast('Caíste: revives al terminar la oleada');
     } else if (this.peer && this.peer.alive) g.toast('Caíste: revives al terminar la oleada');
@@ -1214,7 +834,7 @@ export class Coop {
 
   // Anfitrión: al terminar la oleada revive a quien haya caído, junto a su compañero.
   onWaveCleared() {
-    if (!this.isHost || !this.peer) return;
+    if (this.role !== 'host' || !this.peer) return;
     const g = this.game;
     const p = g.player;
     const peer = this.peer;
@@ -1245,47 +865,19 @@ export class Coop {
 
   // Texto corto para la pantalla: tipo de conexión, retraso, fotos por segundo y FPS.
   stats(dt) {
-    this.statT = (this.statT || 0) + dt;
-    this.frames = (this.frames || 0) + 1;
-    if (this.statT < 1) return null;
-    const fps = Math.round(this.frames / this.statT);
-    const per = this.isGuest ? Math.round((this.rx || 0) / this.statT) : null;
-    this.statT = 0;
-    this.frames = 0;
-    this.rx = 0;
+    const r = this.game.remote.net.tick(dt);
+    if (!r) return null;
     const via = 'Directa';
     const lag = Math.round(this.clock.delay);
-    return this.isGuest ? `${via} · ${lag} ms · ${per} act/s · ${fps} FPS` : `${via} · ${lag} ms · ${fps} FPS`;
-  }
-
-  /* ---------- dibujo ---------- */
-
-  drawPeer(ctx) {
-    const q = this.peer;
-    const g = this.game;
-    if (!this.mode || !q || !q.alive) return;
-    if (q.inRobot) drawRobot(ctx, g.robot, q, g.time);
-    else drawSurvivor(ctx, q, g.time);
-    // nombre encima
-    const name = this.isHost ? this.peerName || 'Compañero' : this.peerName || 'Anfitrión';
-    ctx.font = '700 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillText(name, q.x + 1, q.y - q.r - 13);
-    ctx.fillStyle = '#9fd0ff';
-    ctx.fillText(name, q.x, q.y - q.r - 14);
-    ctx.textAlign = 'start';
-  }
-
-  drawRemoteBullets(ctx) {
-    if (!this.isGuest || !this.remoteBullets.length) return;
-    Bullets.prototype.draw.call({ list: this.remoteBullets }, ctx);
+    return this.role === 'guest'
+      ? `${via} · ${lag} ms · ${r.per} act/s · ${r.fps} FPS`
+      : `${via} · ${lag} ms · ${r.fps} FPS`;
   }
 
   /* ---------- desconexión ---------- */
 
   leave() {
-    if (!this.mode && !this.net.role) return;
+    if (!this.role && !this.net.role) return;
     this.send({ t: 'bye' });
     this.end();
   }
@@ -1296,19 +888,20 @@ export class Coop {
     this.net.onClose = null;
     this.net.close();
     // el cooperativo termina pero la partida sigue sin guardarse (viene de un grupo)
-    if (this.mode) g.mode = new Solo(g, true);
-    this.mode = null;
+    if (this.role) {
+      g.mode = new Solo(g, true);
+      g.remote.stop();
+    }
+    this.role = null;
     this.peer = null;
-    this.zmap.clear();
-    this.remoteBullets = [];
     if (g.director) g.director.coop = false;
   }
 
   lost() {
     const g = this.game;
-    const wasGuest = this.isGuest;
+    const wasGuest = this.role === 'guest';
     const name = this.peerName || 'Tu compañero';
-    if (!this.mode) return this.end();
+    if (!this.role) return this.end();
     this.end();
     if (wasGuest) {
       g.newWorld();

@@ -9,6 +9,7 @@ import type { Player } from '../sim/player.js';
 import type { Structures } from '../sim/build.js';
 import type { Robot } from '../sim/robot.js';
 import type { Mode } from '../net/mode.js';
+import type { Remote } from '../net/remote.js';
 
 export type Vec = { x: number; y: number };
 
@@ -123,6 +124,8 @@ export interface GameHost {
   targets?: Player[] | null;
   // Quién manda en esta partida (js/net/mode.js)
   mode: Mode;
+  // Jugadores, zombis y balas que llegan por la red (js/net/remote.js)
+  remote?: Remote;
   hurtFlash: number;
   muzzle: number;
   camera: {

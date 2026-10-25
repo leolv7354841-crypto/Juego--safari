@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { boot, client, sleep, waitFor, serverRoom, cut, inbox } from './helpers.ts';
 import { CONFIG } from '../src/config.ts';
 import { WEAPONS } from '../../js/core/config.js';
+import { PEER_N } from '../../js/net/snapshot.js';
 import { STATS } from '../src/stats.ts';
 import { IDLE } from '../src/rooms/DeadZoneRoom.ts';
 
@@ -98,7 +99,7 @@ test('permisos del propietario y paso por las fases', async () => {
   await waitFor(() => (oIn.snap?.length || 0) > 3, 3000, 'fotos');
   const s = oIn.snap[oIn.snap.length - 1];
   assert.ok(Array.isArray(s.me) && s.me.length === 11);
-  assert.equal(s.pl.length, 16, 'el otro jugador aparece en la foto');
+  assert.equal(s.pl.length, PEER_N, 'el otro jugador aparece en la foto');
   // el invitado no puede devolver la sala al lobby
   guest.send('lobby');
   await waitFor(() => gIn.error?.length > 1, 2000, 'error lobby');

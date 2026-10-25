@@ -15,6 +15,7 @@ import {
 } from './build.js';
 import { drawPickups } from './pickups.js';
 import { drawBullets } from './bullets.js';
+import { drawPeers, drawRemoteBullets } from './remote.js';
 import { drawHorde } from './zombies.js';
 import { setChunkView, drawGround as drawWorldGround, drawOverhead } from './world.js';
 
@@ -62,14 +63,12 @@ export function render(game) {
     if (p.inRobot) drawRobot(ctx, game.robot, p, game.time);
     else drawSurvivor(ctx, p, game.time);
     ctx.globalAlpha = 1;
-    game.coop.drawPeer(ctx);
-    game.online.drawPeers(ctx);
+    drawPeers(ctx, game);
     drawMannedHeavy(ctx, game.structures);
   }
   drawHorde(ctx, game.horde.list, v, base, 'giant');
   drawBullets(ctx, game.bullets.list);
-  game.coop.drawRemoteBullets(ctx);
-  game.online.drawRemoteBullets(ctx);
+  drawRemoteBullets(ctx, game);
   drawGrenades(ctx, game.structures);
   drawOverhead(ctx, game.world, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, game.time);
   game.particles.draw(ctx, v);

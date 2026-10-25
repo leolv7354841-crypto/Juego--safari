@@ -14,19 +14,10 @@ import { Structures } from '../../../js/sim/build.js';
 import { Robot } from '../../../js/sim/robot.js';
 import { applyMove, packBody, TICK } from '../../../js/net/netcode.js';
 import { ServerMode } from '../../../js/net/mode.js';
-import {
-  IN_RELOAD,
-  IN_FIRE,
-  IN_RUN,
-  TYPES,
-  PICKS,
-  PARTICLE_SKIP,
-  SFX_SYNC,
-  DECAL_SYNC,
-} from '../../../js/net/protocol.js';
+import { encodeWorld } from '../../../js/net/snapshot.js';
+import { IN_RELOAD, IN_FIRE, IN_RUN, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/net/protocol.js';
 import {
   GOLDEN,
-  WEAPON_ORDER,
   NET,
   WEAPONS,
   SELL_RATE,
@@ -35,7 +26,6 @@ import {
   BUILD_ORDER,
   THROWABLES,
   ROBOT,
-  ABILITY,
   CLASS_ORDER,
   HEAVY,
   xpForLevel,
@@ -784,80 +774,17 @@ export class ServerSim {
     const me = s.p;
     const V = NET.view;
     const near = (x: number, y: number) => Math.abs(x - me.x) < V && Math.abs(y - me.y) < V;
-    // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
-    const ZW = Math.max(NET.zombieView[0], (me.vw || 0) + 150);
-    const ZH = Math.max(NET.zombieView[1], (me.vh || 0) + 150);
-    const nearZ = (o: any) =>
-      o.type === 'golden' || o.type === 'giant'
-        ? near(o.x, o.y)
-        : Math.abs(o.x - me.x) < ZW && Math.abs(o.y - me.y) < ZH;
-    const ox = Math.round(me.x);
-    const oy = Math.round(me.y);
-    const z: number[] = [];
-    const zx: number[] = [];
-    // vida de los zombis heridos, en %, para su barra (sólo los que la muestran)
-    const zh: number[] = [];
-    for (const o of this.horde.list) {
-      if (o.dead || !nearZ(o)) continue;
-      const flags =
-        (o.flash > 0 ? 1 : 0) |
-        (o.burn > 0 ? 2 : 0) |
-        (o.wounded ? 4 : 0) |
-        (o.bs === 'windup' ? 8 : 0) |
-        (o.hitT > 0 ? 16 : 0) |
-        (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
-        (o.lunge > 0.3 ? 64 : 0);
-      z.push(
-        o.id,
-        TYPES.indexOf(o.type),
-        Math.round(o.x - ox),
-        Math.round(o.y - oy),
-        Math.round((o.angle / TAU) * 64) & 63,
-        flags,
-      );
-      if (o.hp < o.maxHp && o.type !== 'normal' && o.type !== 'sprinter')
-        zh.push(o.id, Math.max(0, Math.ceil((o.hp / o.maxHp) * 100)));
-      if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
-    }
-    const pl: number[] = [];
-    for (const q of this.slots.values()) {
-      if (q === s) continue;
-      const p = q.p;
-      pl.push(
-        q.idx,
-        Math.round(p.x),
-        Math.round(p.y),
-        r100(p.angle),
-        r100(p.legAngle),
-        p.running ? 1 : 0,
-        WEAPON_ORDER.indexOf(p.weapon.id),
-        p.flashT > 0 ? 1 : 0,
-        p.alive ? 1 : 0,
-        p.hurtT > 0 ? 1 : 0,
-        r100(p.recoil),
-        Math.round(p.speedNow),
-        Math.ceil(p.hp),
-        q.away ? 1 : 0,
-        p.inRobot ? 1 : 0,
-        (p.rageT > 0 ? 1 : 0) | (p.boostT > 0 ? 2 : 0),
-      );
-    }
-    // robots de todos (el propio también): estacionados o con su piloto dentro
-    const rb: number[] = [];
-    for (const q of this.slots.values()) {
-      const r = q.robot;
-      if (r.owned && near(r.x, r.y))
-        rb.push(
-          q.idx,
-          Math.round(r.x),
-          Math.round(r.y),
-          r100(r.angle),
-          r100(r.legAngle),
-          r100(r.walk % TAU),
-          Math.max(0, Math.round(r.hp)),
-          r.piloted ? 1 : 0,
-        );
-    }
+    // la parte del mundo es la misma que arma el anfitrión del cooperativo (js/net/snapshot.js)
+    const world = encodeWorld(
+      this,
+      { x: me.x, y: me.y, vw: me.vw, vh: me.vh },
+      {
+        players: [...this.slots.values()].filter((q) => q !== s).map((q) => ({ idx: q.idx, p: q.p, away: q.away })),
+        robots: [...this.slots.values()].map((q) => ({ idx: q.idx, r: q.robot })),
+        // lo que disparó él ya lo vio en su pantalla; las torretas se repiten como efecto
+        skipBullet: (b: any) => b.owner === id || !!b.turret,
+      },
+    );
     const st = this.structures;
     const fx: unknown[] = [];
     for (const f of this.fx) {
@@ -890,71 +817,19 @@ export class ServerSim {
         me.manned ? me.manned.y : -1,
       ],
       wp: me.weapons.map((w: any) => [w.id, w.mag, w.reserve === Infinity ? -1 : w.reserve]),
-      o: [ox, oy],
-      z,
-      zx,
-      zh,
-      pl,
-      pk: this.pickups.list.flatMap((it: any) =>
-        near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
-      ),
-      b: this.bullets.list.flatMap((b: any) =>
-        b.owner !== id && !b.turret && near(b.x, b.y)
-          ? [Math.round(b.x), Math.round(b.y), r100(b.dx), r100(b.dy), b.rocket ? 1 : 0]
-          : [],
-      ),
-      w: d.wave,
-      ds: d.state,
-      tm: Math.round(this.time),
+      ...world,
       kl: this.totalKills(),
       lft: d.queue.length + this.horde.list.length,
       ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
       iv: SHOP_ORDER.map((k: string) => s.inv[k]),
-      rb,
       // torretas pesadas que manejan los demás: dónde, ángulo del cañón, quién y cañón que disparó
       hv: st.blocks.flatMap((b: any) => {
         const q = b.kind === 'heavy' && b.manned && b.manned !== me && near(b.x, b.y) ? this.slotOf(b.manned) : null;
         return q ? [b.x, b.y, r100(b.ang), q.idx, b.flash > 0 ? b.side : 0] : [];
       }),
-      // granadas en el aire, fuego, cohetes clavados y explosiones (sólo lo cercano)
-      gr: st.grenades.flatMap((q: any) =>
-        near(q.x, q.y)
-          ? [
-              Math.round(q.x),
-              Math.round(q.y),
-              Math.round(q.h),
-              r100(q.rot),
-              q.kind === 'molotov' ? 1 : 0,
-              q.t > q.dur ? 1 : 0,
-            ]
-          : [],
-      ),
-      fi: st.fires.flatMap((f: any) =>
-        near(f.x, f.y) ? [f.id, Math.round(f.x), Math.round(f.y), r100(f.t), r100(f.life)] : [],
-      ),
-      so: st.stuck.flatMap((q: any) =>
-        near(q.x, q.y)
-          ? [
-              Math.round(q.x),
-              Math.round(q.y),
-              r100(q.ang || 0),
-              r100(q.t),
-              r100(q.stick),
-              r100(q.glow),
-              q.kind === 'fat' ? 1 : 0,
-            ]
-          : [],
-      ),
-      // misiles del Bomber (la mira en el suelo es grande: se mandan con margen)
-      ms: st.missiles.flatMap((q: any) =>
-        Math.abs(q.x - me.x) < V + ABILITY.bomber.radius && Math.abs(q.y - me.y) < V + ABILITY.bomber.radius
-          ? [Math.round(q.x), Math.round(q.y), r100(q.t), r100(q.dur)]
-          : [],
-      ),
       // habilidad propia: clase, espera (décimas) y megarráfaga en curso
       ab: [CLASS_ORDER.indexOf(me.cls), Math.ceil((me.abCd || 0) * 10), r100(me.rageT || 0)],
-      bl: st.blasts.flatMap((q: any) => (near(q.x, q.y) ? [Math.round(q.x), Math.round(q.y), r100(q.t)] : [])),
     };
     this.structSnap(s, snap);
     if (s.lost) {

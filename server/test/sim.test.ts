@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.js';
+import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.js';
 import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/core/config.js';
 import { UPGRADES } from '../../js/sim/upgrades.js';
 import { cooldownOf } from '../../js/sim/abilities.js';
@@ -463,4 +464,19 @@ test('torreta pesada: se compra con sus balas, se monta y dispara en línea', ()
   a.p.alive = false;
   sim.onPlayerDeath();
   assert.equal(t.manned, null, 'libre al caer');
+});
+
+test('la foto del servidor lleva la parte del mundo común con el cooperativo, y el jugador de otro entra con el mismo tamaño', () => {
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
+  for (let i = 0; i < 30; i++) sim.step();
+  const snap = sim.snapshot('a', 0)!;
+  for (const k of WORLD_KEYS) assert.ok(k in snap, `falta ${k}`);
+  assert.equal(snap.pl.length, PEER_N, 'un solo compañero');
+  assert.equal(snap.pl[0], 2, 'el compañero es Beto (idx 2)');
+  assert.ok(snap.z.length % ZOMBIE_N === 0);
+  // lo propio de cada jugador sigue ahí (el cooperativo no lo manda)
+  for (const k of ['me', 'st', 'wp', 'ec', 'ps', 'iv', 'ab']) assert.ok(k in snap, `falta ${k}`);
 });

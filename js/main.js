@@ -8,6 +8,7 @@ import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
 import { Online } from './net/online.js';
 import { Solo } from './net/mode.js';
+import { Remote } from './net/remote.js';
 import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
 import { Structures } from './sim/build.js';
@@ -62,6 +63,8 @@ class Game {
     this.structures = new Structures();
     this.robot = new Robot();
     this.mode = new Solo(this);
+    // lo que llega por la red (jugadores, zombis, balas de adorno) en el cooperativo y en línea
+    this.remote = new Remote(this);
     this.coop = new Coop(this);
     this.online = new Online(this);
     this.base = { z: 1, tx: 0, ty: 0 };
