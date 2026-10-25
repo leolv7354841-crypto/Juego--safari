@@ -1,7 +1,7 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
 import { drawRobot } from './render/robot.js';
 import { xpForLevel, SHOP, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
-import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
+import { Abilities, isClass, abilityTarget } from './sim/abilities.js';
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
@@ -37,6 +37,7 @@ import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
 import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
+import { showClass, chooseClass, renderClassRows, bindClass } from './ui/class.js';
 import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
@@ -142,6 +143,8 @@ class Game {
   totalKills = () => Ev.totalKills(this);
   recordScore = () => Ev.recordScore(this);
   addXp = (n) => Ev.addXp(this, n);
+  setAcid = (t) => Ev.setAcid(this, t);
+  updateAcid = (dt) => this.updateAcid(dt);
 
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
@@ -149,6 +152,7 @@ class Game {
   showOnline = (keepStatus) => showOnline(this, keepStatus);
   onlineStatus = (text, bad) => onlineStatus(this, text, bad);
   renderLobby = () => renderLobby(this);
+  renderClassRows = () => renderClassRows(this);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -184,7 +188,7 @@ class Game {
     // partida del cooperativo: nunca toca el guardado de tu partida normal
     this.coopRun = false;
     this.robot.reset();
-    Ev.setAcid(this, 0);
+    this.setAcid(0);
     this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
@@ -295,63 +299,6 @@ class Game {
   /* ---------- eventos de combate ---------- */
 
   /* ---------- habilidad de clase ---------- */
-
-  // Pantalla de elegir clase antes de una partida en solitario.
-  showClass(freshWorld) {
-    this.classFresh = freshWorld;
-    this.setState('class');
-    const wrap = this.$('class-cards');
-    wrap.classList.remove('ready');
-    wrap.innerHTML = '';
-    CLASS_ORDER.forEach((id, i) => {
-      const c = CLASSES[id];
-      const b = document.createElement('button');
-      b.className = 'card cls' + (id === this.classPick ? ' sel' : '');
-      b.innerHTML = `<span class="ic">${c.icon}</span><span class="nm"></span><span class="ds"></span><span class="tg">Cada ${Math.round(cooldownOf(this.player))} s <span class="key">· tecla ${i + 1}</span></span>`;
-      b.querySelector('.nm').textContent = c.name;
-      b.querySelector('.ds').textContent = c.desc;
-      b.addEventListener('click', () => this.chooseClass(id));
-      wrap.appendChild(b);
-    });
-    this.classReadyAt = performance.now() + 250;
-    setTimeout(() => wrap.classList.add('ready'), 250);
-  }
-
-  chooseClass(id) {
-    if (this.state !== 'class' || performance.now() < this.classReadyAt || !isClass(id)) return;
-    this.setClassPick(id);
-    this.start(this.classFresh);
-    this.toast(
-      `${CLASSES[id].name}: ${this.input.mode === 'touch' ? 'toca el botón de habilidad' : 'pulsa X'} para usarla`,
-    );
-  }
-
-  setClassPick(id) {
-    if (!isClass(id)) return;
-    this.classPick = id;
-    storage.set('dz-class', id);
-    this.renderClassRows();
-    // en la sala en línea el servidor la guarda para la próxima partida
-    if (this.online.room && !this.online.playing) this.online.send('cls', { v: id });
-  }
-
-  // Selector compacto de clase en las salas del cooperativo y en línea.
-  renderClassRows() {
-    for (const row of this.root.querySelectorAll('.class-row')) {
-      row.innerHTML = '';
-      for (const id of CLASS_ORDER) {
-        const c = CLASSES[id];
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cls-btn' + (id === this.classPick ? ' sel' : '');
-        b.title = c.desc;
-        b.innerHTML = `${c.icon}<span></span>`;
-        b.querySelector('span').textContent = c.name;
-        b.addEventListener('click', () => this.setClassPick(id));
-        row.appendChild(b);
-      }
-    }
-  }
 
   // X o el botón: misil donde apuntas, megarráfaga o impulso.
   useAbility() {
@@ -692,14 +639,14 @@ class Game {
     const on = (id, fn) => this.$(id).addEventListener('click', fn);
     bindHud(this);
     bindShop(this);
+    bindClass(this);
     bindAccount(this);
     bindBoard(this);
     bindLobby(this);
     on('btn-start', () => {
       this.tryFullscreen();
-      this.showClass(false);
+      showClass(this, false);
     });
-    on('btn-class-back', () => this.setupMenu());
     on('btn-resume', () => this.resume());
     // en cooperativo reinicia el anfitrión (el invitado espera)
     const again = () => {
@@ -711,7 +658,7 @@ class Game {
         this.newWorld();
         return this.setupMenu();
       }
-      this.showClass(true);
+      showClass(this, true);
     };
     on('btn-restart', again);
     on('btn-again', again);
@@ -852,7 +799,7 @@ class Game {
         this.drawLookPreview(dt);
       } else if (this.state === 'class') {
         const s = this.input.consume('slot');
-        if (s) this.chooseClass(CLASS_ORDER[s - 1]);
+        if (s) chooseClass(this, CLASS_ORDER[s - 1]);
         this.updateMenu(dt);
       } else if (this.state === 'levelup') {
         const s = this.input.consume('slot');
