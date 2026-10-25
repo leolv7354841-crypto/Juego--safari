@@ -4,7 +4,6 @@
 // el movimiento del jugador). Este archivo hace de "juego" para ellos: les da los
 // jugadores como objetivos, aplica las entradas de cada uno y graba los efectos visuales y
 // sonidos que ocurren para mandárselos sólo a quien los puede ver.
-import './shim.ts';
 import { World } from '../../../js/sim/world.js';
 import { Horde } from '../../../js/sim/zombies.js';
 import { Bullets } from '../../../js/sim/bullets.js';

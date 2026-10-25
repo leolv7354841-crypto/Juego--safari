@@ -1,5 +1,4 @@
-// Ayudas comunes de las pruebas del núcleo (reutilizan el lienzo mudo del servidor).
-import '../server/src/sim/shim.ts';
+// Ayudas comunes de las pruebas del núcleo.
 
 export const silent = new Proxy({}, { get: () => () => {} });
 

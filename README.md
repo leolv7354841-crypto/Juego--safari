@@ -404,36 +404,40 @@ Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siemp
 ## Estructura
 
 ```
-index.html          Interfaz: HUD, controles táctiles y pantallas
-css/style.css       Estilos y diseño adaptable
-js/main.js          Bucle principal, cámara, render, HUD y menús
-js/core/config.js        Equilibrio: armas, zombis, experiencia
-js/sim/world.js         Ciudad procedural, colisiones, campo de flujo y suelo por trozos
-js/sim/player.js        Movimiento, estamina, armas, recarga y retroceso
-js/sim/zombies.js       Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
-js/sim/bullets.js       Balas con colisión segmento-círculo y perforación
-js/sim/director.js      Oleadas y aparición de zombis
-js/sim/upgrades.js      Mejoras al subir de nivel
-js/sim/build.js         Barricadas, alambre de púas y granadas
-js/render/lighting.js      Oscuridad, linterna, farolas y fuegos
-js/render/particles.js     Partículas y restos en el suelo
-js/sim/pickups.js       Munición, botiquines y cajas de armas
-js/ui/input.js         Teclado, ratón y controles táctiles
-js/ui/audio.js         Sonido sintetizado con Web Audio
-js/ui/music.js         Música dinámica (calma, amenaza, horda)
-js/ui/accounts.js      Cuentas, guardado por cuenta y clasificación
-js/sim/robot.js         Robot de combate pilotable
-js/net/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
-js/net/online.js        Modo en línea: sala, predicción, interpolación y diagnóstico
-js/net/netcode.js       Predicción/reconciliación e interpolación (compartido con el servidor)
-js/sim/combat.js        Reglas de impacto de bala (compartidas con el servidor)
-
-js/net/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
-js/core/version.js       Versión del código (la inyecta Vite al compilar)
-server/             Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
-deploy/             Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
-render.yaml         Despliegue del servidor en Render
-js/render/sprites.js       Todo el arte, generado por código
+index.html            Interfaz: HUD, controles táctiles y pantallas
+css/style.css         Estilos y diseño adaptable
+js/main.js            Bucle principal, cámara, HUD y menús
+js/core/config.js     Equilibrio: armas, zombis, experiencia
+js/core/util.js       Utilidades (azar, geometría, almacenamiento)
+js/core/version.js    Versión del código (la inyecta Vite al compilar)
+js/sim/               Lógica del juego; también la ejecuta el servidor (sin document)
+  world.js            Ciudad procedural (solo datos), colisiones y campo de flujo
+  player.js           Movimiento, estamina, armas, recarga y retroceso
+  zombies.js          Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
+  bullets.js          Balas con colisión segmento-círculo y perforación
+  director.js         Oleadas y aparición de zombis
+  upgrades.js         Mejoras al subir de nivel
+  abilities.js        Clases y habilidades
+  build.js            Barricadas, alambre de púas, torreta pesada y granadas
+  pickups.js          Munición, botiquines y cajas de armas
+  robot.js            Robot de combate pilotable
+  combat.js           Reglas de impacto de bala (compartidas con el servidor)
+js/render/            Todo el dibujo (una pieza por módulo de sim/ que se ve)
+  sprites.js          Todo el arte, generado por código
+  world.js            Suelo por trozos, árboles, fuegos y postes
+  zombies.js · bullets.js · pickups.js · build.js · robot.js
+  lighting.js         Oscuridad, linterna, farolas y fuegos
+  particles.js        Partículas y restos en el suelo
+js/net/
+  protocol.js         Tablas y bits del protocolo (cliente y servidor)
+  netcode.js          Predicción/reconciliación e interpolación (compartido con el servidor)
+  net.js              Conexión entre 2 celulares (código de sala + WebRTC)
+  coop.js             Modo cooperativo: anfitrión, invitado y sincronización
+  online.js           Modo en línea: sala, predicción, interpolación y diagnóstico
+js/ui/                Teclado y táctil (input.js), sonido (audio.js), música (music.js), cuentas (accounts.js)
+server/               Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
+deploy/               Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
+render.yaml           Despliegue del servidor en Render
 ```
 
 Todo el arte y el sonido se generan por código: el proyecto no usa recursos de terceros.

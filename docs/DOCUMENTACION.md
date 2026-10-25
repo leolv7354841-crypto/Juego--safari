@@ -118,7 +118,6 @@ render.yaml           Blueprint de Render para el servidor.
 | `src/rooms/state.ts` | Esquema de estado de Colyseus (miembros, listos, dueño, fase, oleada). |
 | `src/validate.ts` | Validación de tipo, rango y tamaño, y límites de frecuencia por jugador. |
 | `src/sim/ServerSim.ts` | Simulación headless con los módulos reales del juego para N jugadores. |
-| `src/sim/shim.ts` | Simula `document.createElement('canvas')` para que los módulos de `js/` carguen en Node. |
 | `src/stats.ts` | Métricas que se exponen en `/health` y en el diagnóstico (F3). |
 | `tools/load.ts` | Carga: 5 salas de 4 clientes simulados (`--rooms`, `--url`, `--origin`). |
 
