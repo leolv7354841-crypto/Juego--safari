@@ -1,7 +1,7 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
 import { drawRobot } from './render/robot.js';
-import { xpForLevel, SHOP, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
-import { Abilities, isClass, abilityTarget } from './sim/abilities.js';
+import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
+import { Abilities, isClass } from './sim/abilities.js';
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
@@ -37,6 +37,7 @@ import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
 import * as Rules from './sim/rules.js';
 import * as Ev from './events.js';
+import * as Act from './actions.js';
 import { setupMenu, start, bindMenu } from './ui/menu.js';
 import { bindOver, gameOver } from './ui/over.js';
 import { openLevelUp, chooseUpgrade } from './ui/levelup.js';
@@ -160,6 +161,13 @@ class Game {
   setupMenu = () => setupMenu(this);
   start = (freshWorld) => start(this, freshWorld);
   gameOver = () => gameOver(this);
+  mouseWorld = () => Act.mouseWorld(this);
+  useAbility = () => Act.useAbility(this);
+  tryBuild = () => Act.tryBuild(this);
+  cycleBuild = () => Act.cycleBuild(this);
+  toggleRobot = () => Act.toggleRobot(this);
+  tryGrenade = (kind) => Act.tryGrenade(this, kind);
+  startNextRound = () => Act.startNextRound(this);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -258,71 +266,9 @@ class Game {
 
   /* ---------- habilidad de clase ---------- */
 
-  // X o el botón: misil donde apuntas, megarráfaga o impulso.
-  useAbility() {
-    const p = this.player;
-    if (!p.cls || !p.alive) return;
-    if (p.abCd > 0) return this.toast(`Habilidad lista en ${Math.ceil(p.abCd)} s`);
-    const t = abilityTarget(this, p);
-    // en línea la usa el servidor; aquí se ve al instante (el misil llega con la siguiente foto)
-    if (this.online.active) this.online.act('ab', { tx: Math.round(t.x), ty: Math.round(t.y) });
-    else if (this.coop.isGuest && p.cls === 'bomber') this.coop.guestMissile(t.x, t.y);
-    Abilities.use(this, p, t.x, t.y, null);
-    this.updateHud(false);
-  }
-
   /* ---------- robot ---------- */
 
-  // Subirse o bajarse del robot (E o el botón ROBOT). Junto a una torreta pesada, la monta.
-  toggleRobot() {
-    const p = this.player;
-    // en línea la monta y la deja el servidor (que repite estas comprobaciones)
-    if (this.online.active && (p.manned || (!p.inRobot && this.structures.nearHeavy(p))))
-      return this.online.act('robot');
-    if (p.manned) return this.leaveHeavy();
-    if (!p.inRobot && !this.coop.isGuest) {
-      const h = this.structures.nearHeavy(p);
-      if (h) return this.mountHeavy(h);
-    }
-    if (this.coop.isGuest) return this.toast('En cooperativo el robot es del anfitrión');
-    const rb = this.robot;
-    if (!rb.owned) {
-      if (this.structures.blocks.some((b) => b.kind === 'heavy'))
-        return this.toast('Acércate a la torreta pesada para montarla');
-      return this.toast('Compra el robot de combate en la tienda');
-    }
-    // en línea se sube o se baja en el servidor (que repite estas mismas comprobaciones)
-    if (this.online.active) {
-      if (!rb.piloted && rb.broken) return this.toast('Robot destruido: repáralo en la tienda');
-      if (!rb.piloted && !rb.near(p)) return this.toast('Acércate al robot para subirte');
-      return this.online.act('robot');
-    }
-    if (rb.piloted) {
-      rb.leave(p, this.world);
-      this.sfx.build();
-      return;
-    }
-    if (rb.broken) return this.toast('Robot destruido: repáralo en la tienda');
-    if (!rb.near(p)) return this.toast('Acércate al robot para subirte');
-    rb.board(p);
-    this.sfx.punch();
-    this.camera.shake(0.2);
-  }
-
   /* ---------- torreta pesada ---------- */
-
-  mountHeavy(b) {
-    const p = this.player;
-    this.structures.mountHeavy(p, b);
-    this.sfx.build();
-    this.camera.shake(0.12);
-    if (p.heavyAmmo <= 0) this.toast('Torreta sin balas: cómpralas en la tienda');
-  }
-
-  leaveHeavy() {
-    this.structures.leaveHeavy(this.player);
-    this.sfx.build();
-  }
 
   drawAcid(ctx, W, H) {
     if (!(this.acidT > 0)) return;
@@ -333,11 +279,6 @@ class Game {
     g.addColorStop(1, `rgba(60,130,20,${0.6 * k * pulse})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-  }
-
-  mouseWorld() {
-    const m = this.input.mouse;
-    return { x: (m.x * this.dpr - this.base.tx) / this.base.z, y: (m.y * this.dpr - this.base.ty) / this.base.z };
   }
 
   /* ---------- mejoras ---------- */
@@ -351,77 +292,6 @@ class Game {
   /* ---------- personaje ---------- */
 
   /* ---------- cuentas y clasificación ---------- */
-
-  startNextRound() {
-    if (this.online.active) return this.online.send('next');
-    if (this.coop.isGuest) return this.coop.send({ t: 'next' });
-    if (this.state !== 'play' || (!this.player.alive && !this.coop.active)) return;
-    this.sfx.unlock();
-    if (this.director.nextRound(this)) this.updateHud(false);
-  }
-
-  tryBuild() {
-    if (this.coop.isGuest) return this.coop.guestBuild();
-    if (this.inv[this.buildSel] <= 0) {
-      const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
-      if (!next) {
-        this.toast('Compra barricadas en la tienda');
-        return;
-      }
-      this.buildSel = next;
-    }
-    // en línea lo coloca el servidor (y descuenta la pieza); aquí sólo se avisa si no cabe
-    if (this.online.active) {
-      if (this.structures.placement(this, this.buildSel).ok) this.online.act('build', { kind: this.buildSel });
-      else this.toast('No cabe ahí');
-      return;
-    }
-    if (this.structures.place(this, this.buildSel)) {
-      this.inv[this.buildSel]--;
-      this.sfx.build();
-      if (this.inv[this.buildSel] <= 0) {
-        const next = BUILD_ORDER.find((k) => this.inv[k] > 0);
-        if (next) this.buildSel = next;
-      }
-    } else {
-      this.toast('No cabe ahí');
-    }
-  }
-
-  cycleBuild() {
-    const owned = BUILD_ORDER.filter((k) => this.inv[k] > 0);
-    if (!owned.length) return;
-    const i = owned.indexOf(this.buildSel);
-    this.buildSel = owned[(i + 1) % owned.length];
-    this.toast(SHOP[this.buildSel].name);
-  }
-
-  tryGrenade(kind = 'grenade') {
-    if (this.coop.isGuest) return this.coop.guestThrow(kind);
-    if (this.inv[kind] <= 0) {
-      this.toast(kind === 'molotov' ? 'Sin molotovs: cómpralos en la tienda' : 'Sin granadas: cómpralas en la tienda');
-      return;
-    }
-    const p = this.player;
-    let tx;
-    let ty;
-    if (this.input.mode === 'mouse') {
-      const m = this.mouseWorld();
-      tx = m.x;
-      ty = m.y;
-    } else if (p.target && !p.target.dead) {
-      tx = p.target.x;
-      ty = p.target.y;
-    } else {
-      tx = p.x + Math.cos(p.angle) * 220;
-      ty = p.y + Math.sin(p.angle) * 220;
-    }
-    this.inv[kind]--;
-    // en línea la lanza el servidor; la cuenta se corrige con su siguiente foto
-    if (this.online.active) return this.online.act('throw', { kind, tx: Math.round(tx), ty: Math.round(ty) });
-    if (kind === 'molotov') this.structures.throwMolotov(this, tx, ty);
-    else this.structures.throwGrenade(this, tx, ty);
-  }
 
   /* ---------- fin de partida ---------- */
 
@@ -574,15 +444,15 @@ class Game {
     }
     if (p.alive) {
       p.update(dt, this);
-      if (this.input.consume('ability')) this.useAbility();
+      if (this.input.consume('ability')) Act.useAbility(this);
       Abilities.update(dt, this, p);
-      if (this.input.consume('build')) this.tryBuild();
-      if (this.input.consume('cycleBuild')) this.cycleBuild();
-      if (this.input.consume('grenade')) this.tryGrenade();
-      if (this.input.consume('molotov')) this.tryGrenade('molotov');
-      if (this.input.consume('robot')) this.toggleRobot();
+      if (this.input.consume('build')) Act.tryBuild(this);
+      if (this.input.consume('cycleBuild')) Act.cycleBuild(this);
+      if (this.input.consume('grenade')) Act.tryGrenade(this);
+      if (this.input.consume('molotov')) Act.tryGrenade(this, 'molotov');
+      if (this.input.consume('robot')) Act.toggleRobot(this);
       this.robot.update(dt, p, this);
-      if (this.input.consume('nextRound')) this.startNextRound();
+      if (this.input.consume('nextRound')) Act.startNextRound(this);
     }
     this.structures.update(dt, this);
     this.flowT -= dt;
