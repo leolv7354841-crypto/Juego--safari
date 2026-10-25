@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { WAVES } from '../js/config.js';
 import { Director } from '../js/director.js';
 import { fakeGame } from './helpers.js';
 
@@ -17,10 +18,11 @@ test('la oleada 1 solo trae normales, SWAT y velocistas', () => {
   assert.equal(d.waveSize, d.queue.length);
   const c = count(d.queue);
   assert.deepEqual(Object.keys(c).sort(), ['normal', 'sprinter', 'swat']);
-  // 5 * (32 + 18 + 1) = 255 normales en total; el 20% son SWAT
-  assert.equal(c.normal + c.swat, 255);
-  assert.equal(c.swat, 51);
-  assert.equal(c.sprinter, 15);
+  // la fórmula de la oleada 1, escalada por WAVES.count (el balance vive en config.js)
+  const normalTotal = Math.round(WAVES.count * 5 * (32 + 18 + 1));
+  assert.equal(c.normal + c.swat, normalTotal);
+  assert.equal(c.swat, Math.round(normalTotal * 0.2));
+  assert.equal(c.sprinter, Math.round(WAVES.count * 5 * 3));
 });
 
 test('el tamaño de la cola es determinista y crece con la oleada', () => {
