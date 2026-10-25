@@ -1,9 +1,9 @@
 // Robot de combate: se compra en la tienda, te subes con E (o el botón ROBOT) y caminas
 // entre la horda apartando zombis. Lleva tu arma en el brazo derecho y puedes cambiarla.
 // Tiene 10 000 de vida que no se recupera sola: se repara en la tienda entre oleadas.
-import { ROBOT, WORLD_SIZE } from './config.js';
+import { ROBOT, WORLD_SIZE, GUN_REACH } from './config.js';
 import { clamp, angleTo, TAU, roundRect } from './util.js';
-import { OUT, drawGunScaled, GUN_REACH } from './sprites.js';
+import { OUT, drawGunScaled } from './sprites.js';
 
 export class Robot {
   constructor() {

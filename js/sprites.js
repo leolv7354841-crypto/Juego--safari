@@ -1083,19 +1083,6 @@ const GUNS = {
   },
 };
 
-// Largo de cada arma dibujada desde su culata (para la boca del cañón en el brazo del robot).
-export const GUN_REACH = {
-  pistol: 12,
-  smg: 22,
-  shotgun: 30,
-  rifle: 36,
-  ar: 30,
-  autoshotgun: 30,
-  sniper: 46,
-  lmg: 37,
-  bazooka: 51,
-};
-
 // El arma del jugador, más grande, empezando en el origen (brazo del robot).
 export function drawGunScaled(g, p, scale) {
   g.save();

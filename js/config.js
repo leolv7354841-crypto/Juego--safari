@@ -639,3 +639,73 @@ export const THROWABLES = ['grenade', 'molotov'];
 export const SHOP_ORDER = [...BUILD_ORDER, ...THROWABLES];
 // Vender un arma devuelve esta fracción de su precio.
 export const SELL_RATE = 0.5;
+
+// Largo de cada arma dibujada desde su culata (para la boca del cañón en el brazo del robot).
+export const GUN_REACH = {
+  pistol: 12,
+  smg: 22,
+  shotgun: 30,
+  rifle: 36,
+  ar: 30,
+  autoshotgun: 30,
+  sniper: 46,
+  lmg: 37,
+  bazooka: 51,
+};
+
+// Etapas de recarga sincronizadas con el progreso de la animación (0..1).
+export const RELOAD_STEPS = {
+  pistol: [
+    [0.12, 'magOut'],
+    [0.6, 'magIn'],
+    [0.88, 'slide'],
+  ],
+  smg: [
+    [0.15, 'magOut'],
+    [0.58, 'magIn'],
+    [0.86, 'bolt'],
+  ],
+  ar: [
+    [0.14, 'magOut'],
+    [0.56, 'magIn'],
+    [0.85, 'bolt'],
+  ],
+  rifle: [
+    [0.12, 'boltOpen'],
+    [0.3, 'magOut'],
+    [0.62, 'magIn'],
+    [0.9, 'boltClose'],
+  ],
+  sniper: [
+    [0.1, 'boltOpen'],
+    [0.3, 'shell'],
+    [0.5, 'shell'],
+    [0.7, 'shell'],
+    [0.9, 'boltClose'],
+  ],
+  shotgun: [
+    [0.15, 'shell'],
+    [0.32, 'shell'],
+    [0.49, 'shell'],
+    [0.66, 'shell'],
+    [0.88, 'pump'],
+  ],
+  autoshotgun: [
+    [0.12, 'magOut'],
+    [0.55, 'drumIn'],
+    [0.86, 'bolt'],
+  ],
+  lmg: [
+    [0.08, 'coverOpen'],
+    [0.3, 'magOut'],
+    [0.55, 'belt'],
+    [0.75, 'coverClose'],
+    [0.9, 'bolt'],
+  ],
+  bazooka: [
+    [0.12, 'coverOpen'],
+    [0.45, 'rocketIn'],
+    [0.7, 'rocketSeat'],
+    [0.92, 'boltClose'],
+  ],
+};

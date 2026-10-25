@@ -9,10 +9,10 @@ import {
   ZOMBIE_SPEED,
   WAVES,
   HEAVY,
+  GUN_REACH,
+  RELOAD_STEPS,
 } from './config.js';
-import { GUN_REACH } from './sprites.js';
 import { clamp, rand, angleTo } from './util.js';
-import { RELOAD_STEPS } from './audio.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
