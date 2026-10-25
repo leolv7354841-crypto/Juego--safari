@@ -29,7 +29,19 @@ import { Coop } from './net/coop.js';
 import { Online, validName, explainOnline } from './net/online.js';
 import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
-import { Structures, ACID, drawBottle } from './sim/build.js';
+import { Structures, ACID } from './sim/build.js';
+import {
+  drawBottle,
+  drawMissiles,
+  drawStuck,
+  drawFires,
+  drawGround,
+  drawBlocks,
+  drawMannedHeavy,
+  drawGhost,
+  drawGrenades,
+  drawBars,
+} from './render/build.js';
 import { bulletHit } from './sim/combat.js';
 import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './core/util.js';
 import { World } from './sim/world.js';
@@ -1654,16 +1666,21 @@ class Game {
     }
     if (k === 'grenade') {
       g.setTransform(4.5, 0, 0, 4.5, 0, 0);
-      this.structures.drawGrenades.call({ grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] }, g);
+      drawGrenades(g, { grenades: [{ x: 10, y: 11, h: 0, rot: -0.6, t: 0, dur: 1 }] });
       return;
     }
     if (k === 'heavy') {
       // el cañón sobresale del trípode: se centra todo el conjunto
       g.setTransform(1.15, 0, 0, 1.15, 33 - 1.15 * 20, 48 - 1.15 * 20);
-      this.structures.drawBlocks.call(
-        { blocks: [{ kind: k, x: 0, y: 0, w: 40, h: 40, hp: 1, max: 1, hitT: 0, ang: 0 }] },
+      drawBlocks(
         g,
-        { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 },
+        { blocks: [{ kind: k, x: 0, y: 0, w: 40, h: 40, hp: 1, max: 1, hitT: 0, ang: 0 }] },
+        {
+          x0: -1e4,
+          y0: -1e4,
+          x1: 1e4,
+          y1: 1e4,
+        },
       );
       return;
     }
@@ -1673,18 +1690,27 @@ class Game {
     const s = Math.min(44 / w, 44 / h, 1);
     g.setTransform(1.6 * s, 0, 0, 1.6 * s, 1.6 * (30 - (w * s) / 2), 1.6 * (30 - (h * s) / 2));
     if (def.ground)
-      this.structures.drawGround.call(
-        { scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
+      drawGround(
         g,
-        { x0: -1e4, y0: -1e4, x1: 1e4, y1: 1e4 },
+        { scorches: [], wires: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
+        {
+          x0: -1e4,
+          y0: -1e4,
+          x1: 1e4,
+          y1: 1e4,
+        },
       );
     else
-      this.structures.drawBlocks.call({ blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] }, g, {
-        x0: -1e4,
-        y0: -1e4,
-        x1: 1e4,
-        y1: 1e4,
-      });
+      drawBlocks(
+        g,
+        { blocks: [{ kind: k, x: 0, y: 0, w, h, hp: 1, max: 1, hitT: 0 }] },
+        {
+          x0: -1e4,
+          y0: -1e4,
+          x1: 1e4,
+          y1: 1e4,
+        },
+      );
   }
 
   buy(k) {
@@ -2367,17 +2393,17 @@ class Game {
     ctx.fillRect(0, 0, W, H);
     ctx.setTransform(z, 0, 0, z, tx, ty);
     this.world.drawGround(ctx, v.x0, v.y0, v.x1, v.y1);
-    this.structures.drawGround(ctx, v);
+    drawGround(ctx, this.structures, v);
     this.decals.drawPools(ctx, v);
     this.decals.draw(ctx, v);
-    this.structures.drawBlocks(ctx, v);
+    drawBlocks(ctx, this.structures, v);
     drawPickups(ctx, this.pickups.list, v, this.time);
     if (this.state === 'play' && p.alive && this.inv[this.buildSel] > 0)
-      this.structures.drawGhost(ctx, this, this.buildSel, this.time);
+      drawGhost(ctx, this.structures, this, this.buildSel, this.time);
     drawHorde(ctx, this.horde.list, v, base, 'small');
-    this.structures.drawFires(ctx, v, this.time);
-    this.structures.drawStuck(ctx, this.time);
-    this.structures.drawMissiles(ctx, this.time);
+    drawFires(ctx, this.structures, v, this.time);
+    drawStuck(ctx, this.structures, this.time);
+    drawMissiles(ctx, this.structures, this.time);
     if (playing && this.robot.owned && !this.robot.piloted) this.robot.draw(ctx, p, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
@@ -2386,13 +2412,13 @@ class Game {
       ctx.globalAlpha = 1;
       this.coop.drawPeer(ctx);
       this.online.drawPeers(ctx);
-      this.structures.drawMannedHeavy(ctx);
+      drawMannedHeavy(ctx, this.structures);
     }
     drawHorde(ctx, this.horde.list, v, base, 'giant');
     drawBullets(ctx, this.bullets.list);
     this.coop.drawRemoteBullets(ctx);
     this.online.drawRemoteBullets(ctx);
-    this.structures.drawGrenades(ctx);
+    drawGrenades(ctx, this.structures);
     this.world.drawOverhead(ctx, v.x0, v.y0, v.x1, v.y1, playing ? p : { x: -1e4, y: -1e4 }, this.time);
     this.particles.draw(ctx, v);
 
@@ -2422,7 +2448,7 @@ class Game {
 
   drawWorldUi(ctx) {
     const v = this.view;
-    this.structures.drawBars(ctx, v);
+    drawBars(ctx, this.structures, v);
     for (const zb of this.horde.list) {
       if (zb.type === 'normal' || zb.type === 'sprinter' || zb.hp >= zb.maxHp) continue;
       if (zb.x < v.x0 || zb.x > v.x1 || zb.y < v.y0 || zb.y > v.y1) continue;
