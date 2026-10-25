@@ -381,3 +381,58 @@ test('bomber: el misil cae donde apunta y arrasa en su radio; berserker: tres ca
   assert.equal(b.p.weapon.mag, mag, 'no gasta su cargador');
   assert.ok(b.p.rageShots >= 299 && b.p.rageShots <= 300, `balas: ${b.p.rageShots}`);
 });
+
+test('torreta pesada: se compra con sus balas, se monta y dispara en línea', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }, { id: 'b', idx: 2, name: 'Beto' }]);
+  const a = sim.slots.get('a')!;
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  a.money = 20000;
+  sim.director.state = 'waiting';
+  assert.ok(sim.shop('a', 'item', 'heavy', 0));
+  assert.ok(sim.shop('a', 'heavy', 'ammo', 1));
+  assert.equal(sim.shop('a', 'heavy', 'ammo', 7), false, 'cantidad no permitida');
+  assert.equal(a.p.heavyAmmo, 100);
+  assert.equal(a.money, 20000 - 15000 - 200);
+  sim.director.state = 'active';
+  for (let k = 0; k < 8 && !sim.structures.blocks.length; k++) {
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+    sim.act('a', { s: seq.n + 1, k: 'build', kind: 'heavy', tx: 0, ty: 0 });
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+  }
+  const t = sim.structures.blocks[0];
+  assert.equal(t?.kind, 'heavy');
+  // montar (E): el jugador queda detrás del cañón
+  sim.act('a', { s: seq.n + 1, k: 'robot', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1, t.ang);
+  assert.equal(a.p.manned, t, 'montada');
+  const snap = sim.snapshot('a', 0)!;
+  assert.deepEqual(snap.st.slice(10, 13), [100, t.x, t.y], 'balas y torreta propia en la foto');
+  assert.deepEqual(sim.snapshot('b', 0)!.hv.slice(0, 4), [t.x, t.y, Math.round(t.ang * 100), 1], 'los demás ven quién la maneja');
+  // disparar: gasta sus balas y las balas son de quien la maneja
+  const before = sim.bullets.list.length;
+  sim.push('a', [{ s: ++seq.n, mx: 0, my: 0, f: IN_FIRE, a: t.ang, w: -1 }]);
+  sim.step();
+  assert.equal(a.p.heavyAmmo, 99);
+  const shot = sim.bullets.list[before];
+  assert.equal(shot.owner, 'a');
+  assert.equal(shot.pierce, 4);
+  // no camina mientras la maneja
+  const x = a.p.x;
+  for (let i = 0; i < 20; i++) {
+    sim.push('a', [{ s: ++seq.n, mx: 1, my: 0, f: 0, a: t.ang, w: -1 }]);
+    sim.step();
+  }
+  assert.ok(Math.abs(a.p.x - x) < 1, 'quieto en la torreta');
+  // bajarse y volver a subir; al caer, la suelta
+  sim.act('a', { s: seq.n + 1, k: 'robot', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1, t.ang);
+  assert.equal(a.p.manned, null, 'se bajó');
+  assert.equal(t.manned, null);
+  sim.act('a', { s: seq.n + 1, k: 'robot', kind: '', tx: 0, ty: 0 });
+  idle(sim, 'a', seq, 1, t.ang);
+  assert.equal(a.p.manned, t);
+  a.p.alive = false;
+  sim.onPlayerDeath();
+  assert.equal(t.manned, null, 'libre al caer');
+});

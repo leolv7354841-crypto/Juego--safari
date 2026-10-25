@@ -341,7 +341,7 @@ export class Player {
     if (this.heavyAmmo <= 0) {
       game.sfx.empty();
       this.fireCd = 0.5;
-      game.toast('Torreta sin balas: cómpralas en la tienda');
+      if (!game.remoteSim) game.toast('Torreta sin balas: cómpralas en la tienda');
       return;
     }
     this.heavyAmmo--;

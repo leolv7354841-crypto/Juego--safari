@@ -631,6 +631,19 @@ export class Structures {
     return best;
   }
 
+  // Montar o dejar la torreta pesada (en solitario, en el anfitrión y en el servidor).
+  mountHeavy(p, b) {
+    p.manned = b;
+    b.manned = p;
+    p.reloadT = 0;
+    p.target = null;
+  }
+
+  leaveHeavy(p) {
+    if (p.manned && p.manned.manned === p) p.manned.manned = null;
+    p.manned = null;
+  }
+
   // El cañón de las torretas pesadas montadas va encima de quien las maneja.
   drawMannedHeavy(ctx) {
     for (const b of this.blocks) if (b.kind === 'heavy' && b.manned) drawHeavyGun(ctx, b);
