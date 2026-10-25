@@ -7,6 +7,7 @@
 // El invitado mueve a su personaje en su propio celular (sin retraso), dispara balas de
 // adorno al instante y le avisa al anfitrión, que crea las balas que de verdad hacen daño.
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
+import { drawRobot } from '../render/robot.js';
 import { Net } from './net.js';
 import { Player } from '../sim/player.js';
 import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from '../core/config.js';
@@ -1282,7 +1283,7 @@ export class Coop {
     const q = this.peer;
     const g = this.game;
     if (!this.mode || !q || !q.alive) return;
-    if (q.inRobot) g.robot.draw(ctx, q, g.time);
+    if (q.inRobot) drawRobot(ctx, g.robot, q, g.time);
     else drawSurvivor(ctx, q, g.time);
     // nombre encima
     const name = this.isHost ? this.peerName || 'Compañero' : this.peerName || 'Anfitrión';

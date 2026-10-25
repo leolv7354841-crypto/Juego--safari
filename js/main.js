@@ -1,4 +1,5 @@
 // DEAD ZONE — punto de entrada. Une todos los módulos y gestiona el bucle.
+import { drawRobot } from './render/robot.js';
 import {
   xpForLevel,
   BOUNTY,
@@ -1567,7 +1568,7 @@ class Game {
       demo.angle = 0;
       demo.legAngle = 0;
       g.setTransform(0.95, 0, 0, 0.95, 0, 0);
-      demo.draw(g, this.player, 0);
+      drawRobot(g, demo, this.player, 0);
     }
     this.$('shop-items')
       .querySelectorAll('canvas[data-gun]')
@@ -2403,10 +2404,10 @@ class Game {
     drawFires(ctx, this.structures, v, this.time);
     drawStuck(ctx, this.structures, this.time);
     drawMissiles(ctx, this.structures, this.time);
-    if (playing && this.robot.owned && !this.robot.piloted) this.robot.draw(ctx, p, this.time);
+    if (playing && this.robot.owned && !this.robot.piloted) drawRobot(ctx, this.robot, p, this.time);
     if (playing) {
       if (!p.alive) ctx.globalAlpha = 0.55;
-      if (p.inRobot) this.robot.draw(ctx, p, this.time);
+      if (p.inRobot) drawRobot(ctx, this.robot, p, this.time);
       else drawSurvivor(ctx, p, this.time);
       ctx.globalAlpha = 1;
       this.coop.drawPeer(ctx);

@@ -6,6 +6,7 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/net/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
+import { drawRobot } from '../render/robot.js';
 import {
   NET,
   WEAPONS,
@@ -1206,12 +1207,12 @@ export class Online {
     ctx.font = '700 11px sans-serif';
     ctx.textAlign = 'center';
     // robots estacionados de los demás (los pilotados se dibujan con su piloto)
-    for (const r of this.robots.values()) if (!r.piloted) r.draw(ctx, null, g.time);
+    for (const r of this.robots.values()) if (!r.piloted) drawRobot(ctx, r, null, g.time);
     for (const q of this.peers.values()) {
       if (!q.alive) continue;
       if (q.away) ctx.globalAlpha = 0.45;
       const r = q.inRobot && this.robots.get(q.idx);
-      if (r) r.draw(ctx, q, g.time);
+      if (r) drawRobot(ctx, r, q, g.time);
       else drawSurvivor(ctx, q, g.time);
       const name = q.away ? `${q.name} (reconectando)` : q.name;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
