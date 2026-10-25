@@ -17,7 +17,7 @@ import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/ab
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.js';
 import { Coop } from './net/coop.js';
-import { Online, validName, explainOnline } from './net/online.js';
+import { Online } from './net/online.js';
 import { VERSION, hayVersionNueva } from './core/version.js';
 import { Accounts } from './ui/accounts.js';
 import { Structures, ACID } from './sim/build.js';
@@ -48,6 +48,7 @@ import { Director } from './sim/director.js';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { saveProgress, loadProgress } from './save.js';
+import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './ui/lobby.js';
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
 import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
@@ -129,12 +130,15 @@ class Game {
     window.__deadzone = this;
     // invitación (?sala=CÓDIGO) o vuelta tras recargar en plena partida en línea
     this.inviteCode = (new URLSearchParams(location.search).get('sala') || '').toUpperCase().slice(0, 6);
-    if (this.accounts.current) this.openInvite();
+    if (this.accounts.current) openInvite(this);
   }
 
   // Accesos que usan los demás módulos y las pruebas e2e: cada uno delega en su módulo.
   saveProgress = () => saveProgress(this);
   loadProgress = (kind) => loadProgress(this, kind);
+  showOnline = (keepStatus) => showOnline(this, keepStatus);
+  onlineStatus = (text, bad) => onlineStatus(this, text, bad);
+  renderLobby = () => renderLobby(this);
   openShop = () => openShop(this);
   closeShop = () => closeShop(this);
   renderShop = () => renderShop(this);
@@ -729,248 +733,6 @@ class Game {
 
   /* ---------- en línea (servidor, hasta 4 por sala) ---------- */
 
-  showOnline(keepStatus) {
-    this.sfx.unlock();
-    this.setState('online');
-    const name = this.$('ol-name');
-    if (!name.value) name.value = this.accounts.current ? this.accounts.current.name : '';
-    if (this.inviteCode) this.$('ol-code-in').value = this.inviteCode;
-    const url = this.online.serverUrl();
-    if (!keepStatus)
-      this.onlineStatus(url ? '' : 'No hay servidor configurado: ver NET.server en js/core/config.js.', !url);
-    this.renderClassRows();
-    this.renderLobby();
-  }
-
-  onlineStatus(text, bad = false) {
-    const el = this.$('ol-status');
-    el.textContent = text;
-    el.classList.toggle('bad', bad);
-  }
-
-  // Lista de integrantes, botones y resultados según la fase de la sala.
-  renderLobby() {
-    const ol = this.online;
-    const room = ol.room;
-    this.$('ol-choose').hidden = !!room;
-    this.$('ol-lobby').hidden = !room;
-    if (!room || !room.state || !room.state.members) return;
-    const st = room.state;
-    const me = ol.me;
-    this.$('ol-code').textContent = st.code || room.roomId;
-    const list = this.$('ol-members');
-    list.innerHTML = '';
-    const rows = [];
-    st.members.forEach((m, id) => rows.push([id, m]));
-    rows.sort((a, b) => a[1].joinedAt - b[1].joinedAt);
-    for (const [id, m] of rows) {
-      const li = document.createElement('li');
-      li.className = 'ol-member' + (id === room.sessionId ? ' me' : '') + (m.connected ? '' : ' off');
-      const nm = document.createElement('span');
-      nm.className = 'nm';
-      nm.textContent =
-        (id === st.ownerId ? '★ ' : '') +
-        m.name +
-        (id === room.sessionId ? ' (tú)' : '') +
-        (CLASSES[m.cls] ? ` · ${CLASSES[m.cls].name}` : '');
-      const tag = document.createElement('span');
-      tag.className = 'tg';
-      tag.textContent = !m.connected
-        ? 'reconectando…'
-        : st.phase === 'playing'
-          ? m.inGame
-            ? m.alive
-              ? 'jugando'
-              : 'caído'
-            : 'esperando'
-          : id === st.ownerId
-            ? 'propietario'
-            : m.ready
-              ? 'listo'
-              : 'no listo';
-      li.append(nm, tag);
-      list.appendChild(li);
-    }
-    this.$('ol-count').textContent = `${rows.length}/${st.maxPlayers}`;
-    const phase = st.phase;
-    const owner = ol.isOwner;
-    const lobbyLike = phase === 'waiting' || phase === 'finished';
-    this.$('btn-ol-ready').hidden = owner || !lobbyLike;
-    this.$('btn-ol-ready').textContent = me && me.ready ? 'Ya no estoy listo' : 'Estoy listo';
-    this.$('btn-ol-start').hidden = !owner || !lobbyLike;
-    const waitingFor = rows.filter(([id, m]) => id !== st.ownerId && m.connected && !m.ready).length;
-    this.$('btn-ol-start').disabled = waitingFor > 0;
-    this.$('btn-ol-start').textContent = waitingFor
-      ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
-      : 'Iniciar partida';
-    this.$('btn-ol-lobby').hidden = !owner || phase !== 'finished';
-    const ph =
-      {
-        waiting: 'Esperando jugadores',
-        loading: 'Cargando…',
-        playing: 'Partida en curso',
-        finished: 'Partida terminada',
-      }[phase] || '';
-    this.$('ol-phase').textContent = ph;
-    const res = this.$('ol-results');
-    const r = ol.results;
-    res.hidden = !r || phase !== 'finished';
-    if (r && phase === 'finished') {
-      res.innerHTML = '';
-      const h = document.createElement('p');
-      h.className = 'ol-res-head';
-      h.textContent = `Oleada ${r.wave} · ${fmtTime(r.time)} · ${r.kills} bajas en total`;
-      res.appendChild(h);
-      for (const pl of r.players || []) {
-        const row = document.createElement('div');
-        row.className = 'ol-res-row';
-        row.textContent = `${pl.name}: ${pl.kills} bajas · ${pl.deaths} caídas`;
-        res.appendChild(row);
-      }
-    }
-  }
-
-  onlineName() {
-    const n = this.$('ol-name').value.replace(/\s+/g, ' ').trim();
-    if (!validName(n)) {
-      this.onlineStatus('Nombre no válido: de 1 a 16 letras, números, espacios, _ . -', true);
-      return null;
-    }
-    return n;
-  }
-
-  async onlineCreate() {
-    const name = this.onlineName();
-    if (!name || this.onlineBusy) return;
-    this.onlineBusy = true;
-    this.onlineStatus('Conectando con el servidor…');
-    try {
-      await this.online.create(name);
-      this.onlineStatus('Sala creada: comparte el código o la invitación.');
-      this.renderLobby();
-    } catch (err) {
-      this.onlineStatus(explainOnline(err), true);
-    }
-    this.onlineBusy = false;
-  }
-
-  async onlineJoin() {
-    const name = this.onlineName();
-    const code = this.$('ol-code-in').value.trim().toUpperCase();
-    if (!name || this.onlineBusy) return;
-    if (!/^[A-Z0-9]{6}$/.test(code)) return this.onlineStatus('El código tiene 6 letras o números.', true);
-    this.onlineBusy = true;
-    this.onlineStatus('Entrando a la sala…');
-    try {
-      await this.online.join(code, name);
-      this.inviteCode = '';
-      this.onlineStatus('');
-      this.renderLobby();
-    } catch (err) {
-      this.onlineStatus(explainOnline(err), true);
-    }
-    this.onlineBusy = false;
-  }
-
-  copyInvite() {
-    const room = this.online.room;
-    if (!room) return;
-    const u = new URL(location.href);
-    u.search = '';
-    u.hash = '';
-    const keep = new URLSearchParams(location.search).get('servidor');
-    if (keep) u.searchParams.set('servidor', keep);
-    u.searchParams.set('sala', room.roomId);
-    const text = u.toString();
-    const done = () => this.onlineStatus('Invitación copiada: ' + text);
-    if (navigator.clipboard && navigator.clipboard.writeText)
-      navigator.clipboard.writeText(text).then(done, () => this.onlineStatus(text));
-    else this.onlineStatus(text);
-  }
-
-  // Abre la sala de una invitación, o vuelve a la partida tras recargar la página.
-  async openInvite() {
-    if (await this.online.resume()) return this.showOnline(true);
-    if (this.inviteCode) this.showOnline();
-  }
-
-  toggleDiag() {
-    if (!this.online.active) return;
-    const el = this.$('net-diag');
-    el.hidden = !el.hidden;
-  }
-
-  showCoop() {
-    this.sfx.unlock();
-    this.setState('coop');
-    this.renderClassRows();
-    this.$('coop-choose').hidden = false;
-    this.$('coop-wait').hidden = true;
-    this.$('coop-code-in').value = '';
-    this.coopStatus(
-      this.coop.net.available ? '' : 'El cooperativo necesita internet y un navegador con conexión directa (WebRTC).',
-    );
-  }
-
-  coopStatus(text, bad = false) {
-    const el = this.$('coop-status');
-    el.textContent = text;
-    el.classList.toggle('bad', bad);
-  }
-
-  coopError(err) {
-    const m = String((err && err.message) || err);
-    if (m === 'cancelado') return;
-    const msg =
-      {
-        'no-existe': 'No existe una sala con ese código (o ya caducó).',
-        llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
-        permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
-        tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
-        directa:
-          'No se pudo conectar directo entre los celulares. Prueben los dos en la misma red Wi‑Fi o con otra red (algunas redes móviles lo bloquean).',
-      }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
-    this.coopStatus(msg, true);
-    this.$('coop-choose').hidden = false;
-    this.$('coop-wait').hidden = true;
-    this.coop.cancel();
-  }
-
-  async coopCreate() {
-    if (!this.coop.net.available) return;
-    this.$('coop-choose').hidden = true;
-    this.$('coop-wait').hidden = false;
-    this.$('coop-code').textContent = '····';
-    this.coopStatus('Creando sala…');
-    try {
-      await this.coop.create((code) => {
-        this.$('coop-code').textContent = code;
-        this.coopStatus('Esperando a tu compañero…');
-      });
-    } catch (err) {
-      this.coopError(err);
-    }
-  }
-
-  async coopJoin() {
-    const code = this.$('coop-code-in').value.trim().toUpperCase();
-    if (!/^[A-Z]{4}$/.test(code)) return this.coopStatus('El código tiene 4 letras.', true);
-    if (!this.coop.net.available) return;
-    this.coopStatus('Conectando…');
-    try {
-      await this.coop.join(code);
-      this.coopStatus('¡Conectado! Esperando al anfitrión…');
-      // si el anfitrión no arranca en un rato, algo falló
-      const t0 = performance.now();
-      while (!this.coop.active && this.state === 'coop') {
-        if (performance.now() - t0 > 20000) throw new Error('tiempo');
-        await new Promise((r) => setTimeout(r, 250));
-      }
-    } catch (err) {
-      this.coopError(err);
-    }
-  }
-
   /* ---------- personaje ---------- */
 
   showLook() {
@@ -1171,6 +933,7 @@ class Game {
     bindShop(this);
     bindAccount(this);
     bindBoard(this);
+    bindLobby(this);
     on('btn-start', () => {
       this.tryFullscreen();
       this.showClass(false);
@@ -1219,41 +982,6 @@ class Game {
       this.setLook({ ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, pick(q.colors)])), hat: pick(HATS).id }),
     );
     on('btn-look-reset', () => this.setLook(DEFAULT_LOOK));
-    on('btn-coop', () => this.showCoop());
-    on('btn-online', () => this.showOnline());
-    on('btn-ol-create', () => this.onlineCreate());
-    on('btn-ol-back', () => {
-      this.online.leave();
-      this.setupMenu();
-    });
-    on('btn-ol-ready', () => {
-      const me = this.online.me;
-      if (me) this.online.send('ready', { v: !me.ready });
-    });
-    on('btn-ol-start', () => this.online.send('start'));
-    on('btn-ol-lobby', () => this.online.send('lobby'));
-    on('btn-ol-copy', () => this.copyInvite());
-    this.$('ol-join-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.onlineJoin();
-    });
-    // tocar el indicador de conexión abre el panel de diagnóstico (también con F3)
-    this.$('net-stat').addEventListener('click', () => this.toggleDiag());
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'F3' && this.online.active) {
-        e.preventDefault();
-        this.toggleDiag();
-      }
-    });
-    on('btn-coop-create', () => this.coopCreate());
-    on('btn-coop-back', () => {
-      this.coop.cancel();
-      this.setupMenu();
-    });
-    this.$('coop-join-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.coopJoin();
-    });
   }
 
   syncSoundLabel() {
