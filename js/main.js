@@ -20,29 +20,29 @@ import {
   START_WEAPON,
   CAMERA,
   HEAVY,
-} from './config.js';
-import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './abilities.js';
-import { Music } from './music.js';
-import { Robot } from './robot.js';
-import { Coop } from './coop.js';
-import { Online, validName, explainOnline } from './online.js';
-import { VERSION, hayVersionNueva } from './version.js';
-import { Accounts } from './accounts.js';
-import { Structures, ACID, drawBottle } from './build.js';
-import { bulletHit } from './combat.js';
-import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './util.js';
-import { World } from './world.js';
-import { Player } from './player.js';
-import { Horde } from './zombies.js';
-import { Bullets } from './bullets.js';
-import { Particles, Decals } from './particles.js';
-import { Pickups } from './pickups.js';
-import { Director } from './director.js';
-import { Lighting } from './lighting.js';
-import { Input } from './input.js';
-import { Sfx } from './audio.js';
-import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './sprites.js';
-import { rollUpgrades, ICONS } from './upgrades.js';
+} from './core/config.js';
+import { Abilities, CLASSES, isClass, abilityTarget, cooldownOf } from './sim/abilities.js';
+import { Music } from './ui/music.js';
+import { Robot } from './sim/robot.js';
+import { Coop } from './net/coop.js';
+import { Online, validName, explainOnline } from './net/online.js';
+import { VERSION, hayVersionNueva } from './core/version.js';
+import { Accounts } from './ui/accounts.js';
+import { Structures, ACID, drawBottle } from './sim/build.js';
+import { bulletHit } from './sim/combat.js';
+import { clamp, rand, randInt, fmtTime, makeCanvas, storage, TAU } from './core/util.js';
+import { World } from './sim/world.js';
+import { Player } from './sim/player.js';
+import { Horde } from './sim/zombies.js';
+import { Bullets } from './sim/bullets.js';
+import { Particles, Decals } from './render/particles.js';
+import { Pickups } from './sim/pickups.js';
+import { Director } from './sim/director.js';
+import { Lighting } from './render/lighting.js';
+import { Input } from './ui/input.js';
+import { Sfx } from './ui/audio.js';
+import { drawSurvivor, drawGunIcon, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from './render/sprites.js';
+import { rollUpgrades, ICONS } from './sim/upgrades.js';
 
 const CROWN_SVG =
   '<svg viewBox="0 0 48 32" aria-hidden="true"><path d="M4 28 L2 8 L14 17 L24 2 L34 17 L46 8 L44 28 Z" fill="currentColor"/><circle cx="2" cy="8" r="2.5" fill="currentColor"/><circle cx="24" cy="2" r="2.5" fill="currentColor"/><circle cx="46" cy="8" r="2.5" fill="currentColor"/><rect x="4" y="25" width="40" height="5" fill="currentColor" opacity="0.7"/></svg>';
@@ -1010,7 +1010,8 @@ class Game {
     if (!name.value) name.value = this.accounts.current ? this.accounts.current.name : '';
     if (this.inviteCode) this.$('ol-code-in').value = this.inviteCode;
     const url = this.online.serverUrl();
-    if (!keepStatus) this.onlineStatus(url ? '' : 'No hay servidor configurado: ver NET.server en js/config.js.', !url);
+    if (!keepStatus)
+      this.onlineStatus(url ? '' : 'No hay servidor configurado: ver NET.server en js/core/config.js.', !url);
     this.renderClassRows();
     this.renderLobby();
   }

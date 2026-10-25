@@ -31,7 +31,7 @@ con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (
 El **Salón de la fama** del menú principal (podio con los 3 mejores) y la insignia **Top #N** junto a tu nombre muestran los récords de las cuentas de ese dispositivo. Abierto como Artifact
 de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
 Para la **clasificación mundial** (todos los celulares en la misma lista) crea una Realtime Database
-gratuita en Firebase y pega su URL en `ONLINE.url` de `js/config.js` (ver «Clasificación mundial» abajo).
+gratuita en Firebase y pega su URL en `ONLINE.url` de `js/core/config.js` (ver «Clasificación mundial» abajo).
 
 ### Progreso guardado
 
@@ -211,7 +211,7 @@ celular para conectarlos). La partida en sí va directo entre los dos celulares 
 redes móviles bloquean la conexión directa y en ellas el cooperativo no conecta.
 
 4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
-   `js/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
+   `js/core/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
 
 Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
 no a prueba de trampas.
@@ -225,15 +225,15 @@ publicarlo en una máquina virtual y qué comprar: [`deploy/README.md`](deploy/R
 (también donde la conexión directa entre celulares falla).
 
 **Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
-partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/world.js`,
-`js/zombies.js`, `js/player.js`, `js/bullets.js`, `js/director.js`): decide movimiento, choques,
+partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/sim/world.js`,
+`js/sim/zombies.js`, `js/sim/player.js`, `js/sim/bullets.js`, `js/sim/director.js`): decide movimiento, choques,
 disparos, impactos, vida, muertes, oleadas y bajas. El navegador sólo manda lo que quiere hacer
 (dirección, correr, disparar, ángulo de la mira, recargar, arma) con un número de secuencia, y
 recibe 20 fotos por segundo de lo que tiene cerca.
 
 - **Tu personaje** responde al instante: el movimiento se predice en el navegador con las mismas
   reglas (`Player.move`) y, al llegar el estado confirmado, se restaura y se vuelven a aplicar las
-  entradas pendientes (`js/netcode.js`). Las correcciones pequeñas se borran suavemente; las grandes
+  entradas pendientes (`js/net/netcode.js`). Las correcciones pequeñas se borran suavemente; las grandes
   (más de 150 px) se aplican de golpe.
 - **Los demás y los zombis** se dibujan 110 ms en diferido, interpolando entre fotos con el reloj
   del servidor; como mucho se adelantan 100 ms si falta una foto, y una foto vieja nunca los hace
@@ -341,7 +341,7 @@ memoria).
    - Health Check Path: `/health`
    - Variables: `NODE_VERSION=24`, `ALLOWED_ORIGINS=https://tu-juego.vercel.app` (las páginas desde
      las que se juega, separadas por comas) y `SNAP_HZ=10`.
-3. Cuando esté en marcha, copia su dirección y ponla en `NET.server` de `js/config.js` con `wss://`
+3. Cuando esté en marcha, copia su dirección y ponla en `NET.server` de `js/core/config.js` con `wss://`
    (por ejemplo `wss://dead-zone-server.onrender.com`), y publica el juego.
    También se puede probar sin publicar abriendo el juego con `?servidor=wss://…`.
 
@@ -375,7 +375,7 @@ jugadores antes de cerrar.
 
 Están todas, con su explicación, en [`server/.env.example`](server/.env.example) (no hay secretos:
 el servidor no usa claves). La frecuencia de simulación no es una variable: es `NET.tickHz` en
-`js/config.js`, porque el navegador la necesita igual para predecir.
+`js/core/config.js`, porque el navegador la necesita igual para predecir.
 
 ### Seguridad básica
 
@@ -399,7 +399,7 @@ conectarse. Los tokens no se registran.
 
 ## Versiones y caché
 
-Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siempre) y `index.html` va con `no-cache` (ver `vercel.json`), así que ya no hay que sellar nada. `js/version.js` lleva la versión del build; si una pestaña vieja sigue abierta cuando se publica otra, el juego avisa con un mensaje (compara con `version.json`). La versión aparece en el menú.
+Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siempre) y `index.html` va con `no-cache` (ver `vercel.json`), así que ya no hay que sellar nada. `js/core/version.js` lleva la versión del build; si una pestaña vieja sigue abierta cuando se publica otra, el juego avisa con un mensaje (compara con `version.json`). La versión aparece en el menú.
 
 ## Estructura
 
@@ -407,33 +407,33 @@ Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siemp
 index.html          Interfaz: HUD, controles táctiles y pantallas
 css/style.css       Estilos y diseño adaptable
 js/main.js          Bucle principal, cámara, render, HUD y menús
-js/config.js        Equilibrio: armas, zombis, experiencia
-js/world.js         Ciudad procedural, colisiones, campo de flujo y suelo por trozos
-js/player.js        Movimiento, estamina, armas, recarga y retroceso
-js/zombies.js       Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
-js/bullets.js       Balas con colisión segmento-círculo y perforación
-js/director.js      Oleadas y aparición de zombis
-js/upgrades.js      Mejoras al subir de nivel
-js/build.js         Barricadas, alambre de púas y granadas
-js/lighting.js      Oscuridad, linterna, farolas y fuegos
-js/particles.js     Partículas y restos en el suelo
-js/pickups.js       Munición, botiquines y cajas de armas
-js/input.js         Teclado, ratón y controles táctiles
-js/audio.js         Sonido sintetizado con Web Audio
-js/music.js         Música dinámica (calma, amenaza, horda)
-js/accounts.js      Cuentas, guardado por cuenta y clasificación
-js/robot.js         Robot de combate pilotable
-js/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
-js/online.js        Modo en línea: sala, predicción, interpolación y diagnóstico
-js/netcode.js       Predicción/reconciliación e interpolación (compartido con el servidor)
-js/combat.js        Reglas de impacto de bala (compartidas con el servidor)
+js/core/config.js        Equilibrio: armas, zombis, experiencia
+js/sim/world.js         Ciudad procedural, colisiones, campo de flujo y suelo por trozos
+js/sim/player.js        Movimiento, estamina, armas, recarga y retroceso
+js/sim/zombies.js       Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
+js/sim/bullets.js       Balas con colisión segmento-círculo y perforación
+js/sim/director.js      Oleadas y aparición de zombis
+js/sim/upgrades.js      Mejoras al subir de nivel
+js/sim/build.js         Barricadas, alambre de púas y granadas
+js/render/lighting.js      Oscuridad, linterna, farolas y fuegos
+js/render/particles.js     Partículas y restos en el suelo
+js/sim/pickups.js       Munición, botiquines y cajas de armas
+js/ui/input.js         Teclado, ratón y controles táctiles
+js/ui/audio.js         Sonido sintetizado con Web Audio
+js/ui/music.js         Música dinámica (calma, amenaza, horda)
+js/ui/accounts.js      Cuentas, guardado por cuenta y clasificación
+js/sim/robot.js         Robot de combate pilotable
+js/net/net.js           Conexión entre 2 celulares (código de sala + WebRTC)
+js/net/online.js        Modo en línea: sala, predicción, interpolación y diagnóstico
+js/net/netcode.js       Predicción/reconciliación e interpolación (compartido con el servidor)
+js/sim/combat.js        Reglas de impacto de bala (compartidas con el servidor)
 
-js/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
-js/version.js       Versión del código (la inyecta Vite al compilar)
+js/net/coop.js          Modo cooperativo: anfitrión, invitado y sincronización
+js/core/version.js       Versión del código (la inyecta Vite al compilar)
 server/             Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
 deploy/             Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
 render.yaml         Despliegue del servidor en Render
-js/sprites.js       Todo el arte, generado por código
+js/render/sprites.js       Todo el arte, generado por código
 ```
 
 Todo el arte y el sonido se generan por código: el proyecto no usa recursos de terceros.

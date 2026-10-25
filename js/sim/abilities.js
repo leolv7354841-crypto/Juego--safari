@@ -1,7 +1,7 @@
 // Habilidades de clase: cada partida el jugador elige una (Bomber, Berserker o Booster) y la usa
 // cada cierto tiempo. Lo usan el juego del navegador y el servidor en línea.
-import { ABILITY, CLASS_ORDER, WEAPONS } from './config.js';
-import { rand } from './util.js';
+import { ABILITY, CLASS_ORDER, WEAPONS } from '../core/config.js';
+import { rand } from '../core/util.js';
 
 const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 export const CLASSES = {

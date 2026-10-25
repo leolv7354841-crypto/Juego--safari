@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bulletHit } from '../js/combat.js';
+import { bulletHit } from '../js/sim/combat.js';
 import { bullet, fakeGame, zombie } from './helpers.js';
 
 test('bulletHit resta el daño de la bala', () => {

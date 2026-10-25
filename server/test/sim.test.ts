@@ -3,10 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.js';
-import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/config.js';
-import { UPGRADES } from '../../js/upgrades.js';
-import { cooldownOf } from '../../js/abilities.js';
-import { WALK } from '../../js/player.js';
+import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/core/config.js';
+import { UPGRADES } from '../../js/sim/upgrades.js';
+import { cooldownOf } from '../../js/sim/abilities.js';
+import { WALK } from '../../js/sim/player.js';
 import { cleanAct, cleanClass } from '../src/validate.ts';
 
 const aimAt = (sim: ServerSim, id: string) => {

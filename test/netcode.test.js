@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { NET } from '../js/config.js';
-import { applyMove, Predictor, packBody, TICK, unpackBody } from '../js/netcode.js';
+import { NET } from '../js/core/config.js';
+import { applyMove, Predictor, packBody, TICK, unpackBody } from '../js/net/netcode.js';
 import { IN_RUN } from '../js/net/protocol.js';
-import { Player } from '../js/player.js';
-import { World } from '../js/world.js';
+import { Player } from '../js/sim/player.js';
+import { World } from '../js/sim/world.js';
 import { silent } from './helpers.js';
 
 const world = new World(777);

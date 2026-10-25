@@ -5,16 +5,16 @@
 // jugadores como objetivos, aplica las entradas de cada uno y graba los efectos visuales y
 // sonidos que ocurren para mandárselos sólo a quien los puede ver.
 import './shim.ts';
-import { World } from '../../../js/world.js';
-import { Horde } from '../../../js/zombies.js';
-import { Bullets } from '../../../js/bullets.js';
-import { Director } from '../../../js/director.js';
-import { Pickups } from '../../../js/pickups.js';
-import { Player } from '../../../js/player.js';
-import { Structures, ACID } from '../../../js/build.js';
-import { Robot } from '../../../js/robot.js';
-import { bulletHit } from '../../../js/combat.js';
-import { applyMove, packBody, TICK } from '../../../js/netcode.js';
+import { World } from '../../../js/sim/world.js';
+import { Horde } from '../../../js/sim/zombies.js';
+import { Bullets } from '../../../js/sim/bullets.js';
+import { Director } from '../../../js/sim/director.js';
+import { Pickups } from '../../../js/sim/pickups.js';
+import { Player } from '../../../js/sim/player.js';
+import { Structures, ACID } from '../../../js/sim/build.js';
+import { Robot } from '../../../js/sim/robot.js';
+import { bulletHit } from '../../../js/sim/combat.js';
+import { applyMove, packBody, TICK } from '../../../js/net/netcode.js';
 import {
   IN_RELOAD,
   IN_FIRE,
@@ -45,10 +45,10 @@ import {
   CLASS_ORDER,
   HEAVY,
   xpForLevel,
-} from '../../../js/config.js';
-import { rollUpgrades, UPGRADES } from '../../../js/upgrades.js';
-import { Abilities, isClass } from '../../../js/abilities.js';
-import { rand, randInt, TAU } from '../../../js/util.js';
+} from '../../../js/core/config.js';
+import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.js';
+import { Abilities, isClass } from '../../../js/sim/abilities.js';
+import { rand, randInt, TAU } from '../../../js/core/util.js';
 import type { Cmd, Act } from '../validate.ts';
 
 const FX_MAX = 300;

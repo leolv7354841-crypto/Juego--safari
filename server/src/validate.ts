@@ -9,14 +9,14 @@ export function cleanName(raw: unknown): string | null {
   return NAME_RE.test(s) ? s : null;
 }
 
-// Colores del personaje: un dígito por parte (índice en LOOK_PARTS de js/sprites.js).
+// Colores del personaje: un dígito por parte (índice en LOOK_PARTS de js/render/sprites.js).
 // Si no es válido se usa el aspecto original; no es motivo para rechazar la entrada.
 const LOOK_RE = /^[0-9]{1,8}$/;
 export function cleanLookCode(raw: unknown): string {
   return typeof raw === 'string' && LOOK_RE.test(raw) ? raw : '';
 }
 
-// Clase de la partida (ver CLASS_ORDER en js/config.js). Si no es válida: '' (el servidor pone una).
+// Clase de la partida (ver CLASS_ORDER en js/core/config.js). Si no es válida: '' (el servidor pone una).
 const CLASSES = ['bomber', 'berserker', 'booster'];
 export function cleanClass(raw: unknown): string {
   return typeof raw === 'string' && CLASSES.includes(raw) ? raw : '';

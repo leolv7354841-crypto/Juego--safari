@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { WAVES } from '../js/config.js';
-import { Director } from '../js/director.js';
+import { WAVES } from '../js/core/config.js';
+import { Director } from '../js/sim/director.js';
 import { fakeGame } from './helpers.js';
 
 const count = (q) =>

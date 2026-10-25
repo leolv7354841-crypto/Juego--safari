@@ -37,9 +37,9 @@ Piezas del sistema:
 |---|---|---|---|
 | Juego (HTML, CSS, JS) | **Vercel** (proyecto estático, sin build) | [`vercel.json`](../vercel.json) | Reescribe `/deadzone/` a `index.html` y `/deadzone/:path+` a la raíz. Los `.js` y `.css` se sirven con `Cache-Control: no-cache`. |
 | Juego (alternativa) | raw.githack.com | Mencionado en `index.html` y en `ALLOWED_ORIGINS` | CDN que sirve el repo de GitHub. Puede entregar archivos viejos; por eso existe el sellado de versión (sección 7). |
-| Servidor en línea | **Render**, plan gratis, servicio web `dead-zone-server` | [`render.yaml`](../render.yaml) | URL pública: `wss://dead-zone-server.onrender.com`, fijada en `NET.server` de [`js/config.js`](../js/config.js). |
+| Servidor en línea | **Render**, plan gratis, servicio web `dead-zone-server` | [`render.yaml`](../render.yaml) | URL pública: `wss://dead-zone-server.onrender.com`, fijada en `NET.server` de [`js/core/config.js`](../js/core/config.js). |
 | Servidor en línea (recomendado) | **Vultr**, High Performance AMD 2 vCPU / 2 GB, Ciudad de México (18 USD/mes) | [`deploy/`](../deploy/README.md) | Docker + Caddy (HTTPS). Al migrar, `NET.server` pasa a `wss://servidor.yeyo.games`. |
-| Clasificación y señalización | **Firebase Realtime Database** (proyecto `dead-zone-73dcc`) | `ONLINE.url` en [`js/config.js`](../js/config.js) | Reglas en la sección "Clasificación mundial" del README. |
+| Clasificación y señalización | **Firebase Realtime Database** (proyecto `dead-zone-73dcc`) | `ONLINE.url` en [`js/core/config.js`](../js/core/config.js) | Reglas en la sección "Clasificación mundial" del README. |
 | Código fuente | **GitHub** (`leolv7354841-crypto/Juego--safari`) | `origin` del repo local | Vercel y Render se despliegan desde este repositorio. |
 
 Dominios que aceptan conexiones al servidor, según `ALLOWED_ORIGINS` en `render.yaml`:
@@ -229,7 +229,7 @@ Cualquier otro tipo se rechaza con `mensaje desconocido`.
 
 ## 5. Configuración del cliente
 
-Todo el ajuste está en [`js/config.js`](../js/config.js):
+Todo el ajuste está en [`js/core/config.js`](../js/core/config.js):
 
 | Objeto | Campo | Valor actual | Qué controla |
 |---|---|---|---|
@@ -276,7 +276,7 @@ No hay secretos. El servidor no usa claves ni base de datos.
 
 - `npm run build` (Vite) genera `dist/` con archivos con hash en `assets/`; ya no hay sellado manual.
 - `vercel.json` manda `no-cache` para `index.html` y `version.json`, e `immutable` para `/assets/*`.
-- `js/version.js` compara su versión con `version.json` y avisa si hay una nueva.
+- `js/core/version.js` compara su versión con `version.json` y avisa si hay una nueva.
 
 ---
 
@@ -334,7 +334,7 @@ Opción recomendada, con el blueprint:
    - Health check: `/health`
    - `autoDeploy: true`: cada push despliega.
 4. Verifica `https://dead-zone-server.onrender.com/health`. Debe responder `{ "ok": true, ... }`.
-5. Si la URL es distinta, actualiza `NET.server` en `js/config.js`.
+5. Si la URL es distinta, actualiza `NET.server` en `js/core/config.js`.
 
 ### 9.3 Máquina virtual Linux (recomendada)
 
@@ -359,7 +359,7 @@ Para operarlo en producción:
 1. Crea un proyecto en la consola de Firebase (sin Analytics).
 2. Crea una Realtime Database.
 3. Publica las reglas de la sección "Clasificación mundial" del README.
-4. Copia la URL en `ONLINE.url` de `js/config.js`.
+4. Copia la URL en `ONLINE.url` de `js/core/config.js`.
 
 Si cambias la forma de `scores` o `rooms`, actualiza las reglas en el README
 (ver también [CLAUDE.md](../CLAUDE.md)).
@@ -414,7 +414,7 @@ se garantiza un RTT menor a 50 ms.
 | Si cambias... | Haz también... |
 |---|---|
 | Cualquier archivo de `js/` o `css/` | Nada especial: Vite lo recompila. |
-| Equilibrio (armas, zombis, precios) | Cambia sólo `js/config.js`. |
+| Equilibrio (armas, zombis, precios) | Cambia sólo `js/core/config.js`. |
 | `NET.tickHz` | Cámbialo en `config.js`; el servidor lo toma de ahí. Ambos lados deben coincidir. |
 | Lógica compartida (`player.js` `move`, `combat.js`, `netcode.js`) | Corre `npm run server:test`. |
 | El dominio del juego | Agrega el nuevo origen a `ALLOWED_ORIGINS` (en `deploy/.env` de la máquina, o en Render). |

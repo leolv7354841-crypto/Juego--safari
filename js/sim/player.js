@@ -11,8 +11,8 @@ import {
   HEAVY,
   GUN_REACH,
   RELOAD_STEPS,
-} from './config.js';
-import { clamp, rand, angleTo } from './util.js';
+} from '../core/config.js';
+import { clamp, rand, angleTo } from '../core/util.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
@@ -208,7 +208,7 @@ export class Player {
    * @param {number} mx
    * @param {number} my
    * @param {boolean} run
-   * @param {import('./types.js').GameHost | Pick<import('./types.js').GameHost, 'world' | 'sfx'>} game
+   * @param {import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
    */
   move(dt, mx, my, run, game) {
     const st = this.stats;

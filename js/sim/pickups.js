@@ -1,6 +1,6 @@
-import { drawPickup } from './sprites.js';
-import { rand, pick } from './util.js';
-import { CRATE_WEAPONS, WEAPONS } from './config.js';
+import { drawPickup } from '../render/sprites.js';
+import { rand, pick } from '../core/util.js';
+import { CRATE_WEAPONS, WEAPONS } from '../core/config.js';
 
 const LIFE = 22;
 
@@ -17,7 +17,7 @@ export class Pickups {
 
   /**
    * @param {number} dt
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    */
   update(dt, game) {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)

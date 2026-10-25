@@ -6,7 +6,8 @@ import { defineConfig } from 'vite';
 const hashCodigo = () => {
   const h = createHash('sha1');
   const texto = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
-  for (const f of readdirSync('js')
+  for (const f of readdirSync('js', { recursive: true })
+    .map((n) => n.split('\\').join('/'))
     .filter((n) => n.endsWith('.js'))
     .sort())
     h.update(texto(`js/${f}`));

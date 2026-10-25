@@ -1,5 +1,5 @@
 // Ajustes del servidor. Todo se puede cambiar con variables de entorno (ver .env.example).
-import { NET } from '../../js/config.js';
+import { NET } from '../../js/core/config.js';
 
 const num = (name: string, def: number) => {
   const v = Number(process.env[name]);
@@ -17,7 +17,7 @@ export const CONFIG = {
   maxPlayers: Math.min(10, num('MAX_PLAYERS', NET.maxPlayers)),
   // salas a la vez en este proceso: con todas ocupadas, crear una más da 'servidor-lleno'
   maxRooms: num('MAX_ROOMS', 5),
-  // igual que la predicción del cliente: se cambia sólo en NET.tickHz (js/config.js)
+  // igual que la predicción del cliente: se cambia sólo en NET.tickHz (js/core/config.js)
   tickHz: NET.tickHz,
   snapHz: num('SNAP_HZ', NET.snapHz),
   // pasos atrasados que se recuperan como mucho de una vez (evita la espiral tras una pausa)

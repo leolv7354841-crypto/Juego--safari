@@ -1,7 +1,7 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from './config.js';
-import { TAU, rand, clamp, roundRect } from './util.js';
-import { OUT, flameSprite } from './sprites.js';
+import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.js';
+import { TAU, rand, clamp, roundRect } from '../core/util.js';
+import { OUT, flameSprite } from '../render/sprites.js';
 import { drawRocket } from './bullets.js';
 
 const SNAP = 20;
@@ -62,7 +62,7 @@ export class Structures {
 
   // Dónde caería el bloque: delante del jugador, alineado a una rejilla de 20 px.
   /**
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    * @param {string} kind
    */
   placement(game, kind) {
@@ -115,7 +115,7 @@ export class Structures {
 
   // owner: de quién son las bajas de sus minas y torretas (en línea)
   /**
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    * @param {string} kind
    * @param {string | null} [owner]
    */
@@ -176,7 +176,7 @@ export class Structures {
   }
 
   /**
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    * @param {any} o
    * @param {number} dmg
    */
@@ -322,11 +322,11 @@ export class Structures {
 
   // El cohete se queda clavado en la panza (gordo) o en la placa (super blindado) y estalla después.
   /**
-   * @param {import('./types.js').GameHost} game
-   * @param {import('./types.js').Zombie} z
+   * @param {import('../core/types.js').GameHost} game
+   * @param {import('../core/types.js').Zombie} z
    * @param {number} x
    * @param {number} y
-   * @param {import('./types.js').Bullet} b
+   * @param {import('../core/types.js').Bullet} b
    */
   stickRocket(game, z, x, y, b) {
     const fat = z.type === 'fat';
@@ -580,7 +580,7 @@ export class Structures {
 
   /**
    * @param {number} dt
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    */
   update(dt, game) {
     this.time = (this.time || 0) + dt;

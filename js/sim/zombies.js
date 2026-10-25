@@ -1,6 +1,6 @@
-import { ZOMBIES, ZOMBIE_SPEED, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV, WAVES } from './config.js';
-import { clamp, rand, angleTo, TAU } from './util.js';
-import { zombieSprites, flameSprite } from './sprites.js';
+import { ZOMBIES, ZOMBIE_SPEED, WORLD_SIZE, GOLDEN, BULL, WOUND, MOLOTOV, WAVES } from '../core/config.js';
+import { clamp, rand, angleTo, TAU } from '../core/util.js';
+import { zombieSprites, flameSprite } from '../render/sprites.js';
 
 const CELL = 64;
 
@@ -184,7 +184,7 @@ export class Horde {
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
     const def = ZOMBIES[type];
     const sets = this.sprites[type];
-    /** @type {import('./types.js').Zombie} */
+    /** @type {import('../core/types.js').Zombie} */
     const z = {
       id: nextId++,
       type,
@@ -269,7 +269,7 @@ export class Horde {
 
   /**
    * @param {number} dt
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    */
   update(dt, game) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas

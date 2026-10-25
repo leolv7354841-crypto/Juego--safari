@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, client, sleep, waitFor, serverRoom, cut, inbox } from './helpers.ts';
 import { CONFIG } from '../src/config.ts';
-import { WEAPONS } from '../../js/config.js';
+import { WEAPONS } from '../../js/core/config.js';
 import { STATS } from '../src/stats.ts';
 import { IDLE } from '../src/rooms/DeadZoneRoom.ts';
 
@@ -157,7 +157,7 @@ test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', a
   owner.send('loaded');
   await waitFor(() => owner.state.phase === 'playing');
   const l = serverRoom(owner.roomId).limits.get(owner.sessionId);
-  // un mensaje por fotograma durante 3 s, como js/online.js (antes, a partir de 2 s, eran faltas)
+  // un mensaje por fotograma durante 3 s, como js/net/online.js (antes, a partir de 2 s, eran faltas)
   const t0 = performance.now();
   for (let seq = 1, next = t0; performance.now() - t0 < 3000; seq++) {
     owner.send('in', { i: [[seq, 0.5, 0, 0, 0, -1]] });

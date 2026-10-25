@@ -1,6 +1,6 @@
 // Todo el arte se genera por código: texturas del suelo, zombis, árboles,
 // vehículos y el superviviente. Nada de recursos externos.
-import { TAU, makeCanvas, mulberry32, rrange, rpick, roundRect, shade } from './util.js';
+import { TAU, makeCanvas, mulberry32, rrange, rpick, roundRect, shade } from '../core/util.js';
 
 export const OUT = '#141612';
 

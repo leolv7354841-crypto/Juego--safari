@@ -2,9 +2,9 @@
 // - obstáculos (rectángulos y círculos) con rejilla espacial
 // - campo de flujo (BFS) para que los zombis rodeen edificios y coches
 // - suelo pre-renderizado en trozos con caché LRU
-import { WORLD_SIZE, CHUNK, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL } from './config.js';
-import { mulberry32, rrange, rpick, makeCanvas, roundRect, clamp, TAU, shade } from './util.js';
-import { pat, drawCar, makeTree, CAR_COLORS, OUT } from './sprites.js';
+import { WORLD_SIZE, CHUNK, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL } from '../core/config.js';
+import { mulberry32, rrange, rpick, makeCanvas, roundRect, clamp, TAU, shade } from '../core/util.js';
+import { pat, drawCar, makeTree, CAR_COLORS, OUT } from '../render/sprites.js';
 
 const OBS_CELL = 128;
 const ROAD_W = ROAD_HALF * 2;

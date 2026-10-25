@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TICK } from '../js/netcode.js';
-import { Player } from '../js/player.js';
-import { World } from '../js/world.js';
+import { TICK } from '../js/net/netcode.js';
+import { Player } from '../js/sim/player.js';
+import { World } from '../js/sim/world.js';
 import { silent } from './helpers.js';
 
 const world = new World(777);

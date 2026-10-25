@@ -4,7 +4,7 @@
 // presentarlos: el anfitrión deja su "dirección" (oferta) en la sala, el invitado deja la suya
 // (respuesta) y, en cuanto se abre la conexión directa, la sala se borra.
 // Si la red no deja conectar directo (pasa en algunas redes móviles), no se puede jugar.
-import { ONLINE } from './config.js';
+import { ONLINE } from '../core/config.js';
 
 const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }];
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

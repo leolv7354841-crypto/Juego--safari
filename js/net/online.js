@@ -4,7 +4,7 @@
 // El servidor simula todo; aquí sólo se manda lo que quiere hacer el jugador (dirección,
 // correr, disparar, apuntar, recargar, arma) 60 veces por segundo. Para que los controles
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
-// servidor y se corrige al llegar el estado confirmado (js/netcode.js). Los demás jugadores y
+// servidor y se corrige al llegar el estado confirmado (js/net/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
 import {
   NET,
@@ -18,17 +18,17 @@ import {
   ROBOT,
   PLAYER_BASE,
   CLASS_ORDER,
-} from './config.js';
-import { Player } from './player.js';
-import { Robot } from './robot.js';
+} from '../core/config.js';
+import { Player } from '../sim/player.js';
+import { Robot } from '../sim/robot.js';
 import { Predictor, ServerClock, Interp, unpackBody, TICK } from './netcode.js';
-import { IN_RUN, IN_FIRE, IN_RELOAD, TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './net/protocol.js';
-import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from './sprites.js';
-import { Bullets } from './bullets.js';
-import { turretBullet } from './build.js';
-import { UPGRADES } from './upgrades.js';
-import { Abilities } from './abilities.js';
-import { rand, TAU, angleTo } from './util.js';
+import { IN_RUN, IN_FIRE, IN_RELOAD, TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
+import { zombieSprites, drawSurvivor, lookCode, lookFromCode } from '../render/sprites.js';
+import { Bullets } from '../sim/bullets.js';
+import { turretBullet } from '../sim/build.js';
+import { UPGRADES } from '../sim/upgrades.js';
+import { Abilities } from '../sim/abilities.js';
+import { rand, TAU, angleTo } from '../core/util.js';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
@@ -61,7 +61,7 @@ export function explainOnline(err) {
   if (/locked|full/i.test(m)) return `La sala está llena (máximo ${NET.maxPlayers} jugadores).`;
   if (m === 'servidor-lleno')
     return 'El servidor está lleno: todas las salas están ocupadas. Únete a la sala de un amigo o prueba en unos minutos.';
-  if (m === 'sin-servidor') return 'No hay servidor configurado (NET.server en js/config.js o ?servidor=wss://…).';
+  if (m === 'sin-servidor') return 'No hay servidor configurado (NET.server en js/core/config.js o ?servidor=wss://…).';
   return 'No se pudo contactar con el servidor. Revisa tu conexión y vuelve a intentarlo en un momento.';
 }
 

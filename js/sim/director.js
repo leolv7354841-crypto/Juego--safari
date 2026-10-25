@@ -1,6 +1,6 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { MAX_ALIVE, WORLD_SIZE, WAVES } from './config.js';
-import { rand, randInt, TAU } from './util.js';
+import { MAX_ALIVE, WORLD_SIZE, WAVES } from '../core/config.js';
+import { rand, randInt, TAU } from '../core/util.js';
 
 export class Director {
   constructor() {
@@ -82,7 +82,7 @@ export class Director {
 
   /**
    * @param {number} dt
-   * @param {import('./types.js').GameHost} game
+   * @param {import('../core/types.js').GameHost} game
    */
   update(dt, game) {
     if (this.state === 'waiting') return;

@@ -8,13 +8,13 @@
 // adorno al instante y le avisa al anfitrión, que crea las balas que de verdad hacen daño.
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
 import { Net } from './net.js';
-import { Player } from './player.js';
-import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from './config.js';
-import { zombieSprites, drawSurvivor, cleanLook } from './sprites.js';
-import { Abilities } from './abilities.js';
-import { Bullets } from './bullets.js';
-import { rand, angleTo, TAU } from './util.js';
-import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './net/protocol.js';
+import { Player } from '../sim/player.js';
+import { ZOMBIES, WEAPONS, SHOP, BUILD_ORDER, GOLDEN, ABILITY, NET } from '../core/config.js';
+import { zombieSprites, drawSurvivor, cleanLook } from '../render/sprites.js';
+import { Abilities } from '../sim/abilities.js';
+import { Bullets } from '../sim/bullets.js';
+import { rand, angleTo, TAU } from '../core/util.js';
+import { TYPES, PICKS, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
 
 const SNAP_HZ = 12;
 const IN_HZ = 20;
