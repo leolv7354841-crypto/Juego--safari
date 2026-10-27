@@ -178,6 +178,9 @@ export class Director {
           continue;
         z.x = c.x;
         z.y = c.y;
+        // salto, no paso: el choque con muros no cuenta desde donde estaba
+        z.ox = undefined;
+        z.oy = undefined;
         z.stuck = 0;
         z.anchor = -2;
         z.chkX = c.x;

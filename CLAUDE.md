@@ -25,7 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Data and balance.** `js/core/config.js` holds all tuning: weapons, zombie stats, bounties, shop prices, drops, robot, rocket, golden zombie, Firebase `ONLINE` settings. Change numbers there rather than in the logic files.
 
-**World.** `js/sim/world.js` builds a procedural city in chunks (`setChunkScale`, `maxChunks`), provides collisions (`pointBlocked`, `rectFree`), reachability checks, a flow field toward the player (`updateFlow`), and dynamic obstacles (`addDynamic`) that player-built structures register into.
+**World.** `js/sim/world.js` builds a procedural city in chunks (`setChunkScale`, `maxChunks`), provides collisions (`pointBlocked`, `rectFree`), reachability checks, a flow field toward the player (`updateFlow`), and dynamic obstacles (`addDynamic`) that player-built structures register into. `collide(e, r, passBlocks, ox, oy)` takes where the zombie ended the previous frame (`z.ox/z.oy`): if a push (crowd pressure, a bull's charge) moved its center into or across a wall, it goes back to the side it came from, never out the far side; whoever teleports a zombie clears `ox/oy` (the director with stragglers).
 
 **Horde and waves.** `js/sim/zombies.js` (`Horde`) runs all zombies: tactics (direct, flank, back-approach), a spatial grid (`horde.grid.query`) used by bullets, explosions, turrets and fire, and attacks. `js/sim/director.js` drives rounds: a queue of zombie types spawned at the screen edges, a `waiting`/`active` state, and the "next round" button. Golden zombie and spawn logic live in `main.js` (`spawnGolden`).
 

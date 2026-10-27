@@ -549,7 +549,9 @@ export class Horde {
         }
       }
       world.lastBlock = null;
-      const bumped = world.collide(z, z.r);
+      // desde donde terminó el fotograma anterior: ni la horda apretando ni una embestida lo hacen
+      // atravesar muros (ox/oy los borra quien lo recoloca, como el director con los rezagados)
+      const bumped = world.collide(z, z.r, false, z.ox ?? NaN, z.oy ?? NaN);
       if (bumped) z.touchT = 0.5;
       if (z.type === 'bull' && !z.dead) this.bullImpact(z, bumped, world.lastBlock, game);
       // detector de atasco: si en 1,2 s casi no avanzó y no está pegado al jugador
@@ -582,6 +584,8 @@ export class Horde {
       }
       z.x = clamp(z.x, 30, WORLD_SIZE - 30);
       z.y = clamp(z.y, 30, WORLD_SIZE - 30);
+      z.ox = z.x;
+      z.oy = z.y;
     }
     if (targets) {
       for (const pl of targets) if (pl.alive) world.collide(pl, pl.r, true);

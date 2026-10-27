@@ -42,3 +42,38 @@ test('hay obstáculos y hay espacio libre', () => {
   assert.ok(f.includes('1'));
   assert.ok(f.includes('0'));
 });
+
+// Un saco terrero (80×24) junto al punto de aparición, que está libre.
+function sandbag() {
+  const w = new World(777);
+  const o = { k: 0, x: w.spawn.x - 40, y: w.spawn.y - 12, w: 80, h: 24, low: true, block: true };
+  w.addDynamic(o);
+  return { w, o };
+}
+
+test('un empujón que mete al zombi en el muro lo devuelve al lado por el que entró', () => {
+  const { w, o } = sandbag();
+  const r = 13;
+  // apoyado arriba del saco y empujado 30 px hacia abajo: el centro pasa la mitad del muro (12 px)
+  const z = { x: o.x + 30, y: o.y - r + 30 };
+  assert.ok(w.collide(z, r, false, o.x + 30, o.y - r));
+  assert.equal(z.y, o.y - r, 'sigue arriba');
+  assert.equal(w.lastBlock, o);
+  // sin saber de dónde venía sale por el lado más cercano: el de abajo (el error de antes)
+  const ciego = { x: o.x + 30, y: o.y - r + 30 };
+  w.collide(ciego, r);
+  assert.ok(ciego.y > o.y + o.h, 'sin la posición anterior lo atraviesa');
+});
+
+test('un salto que cruza el muro entero (embestida, explosión) tampoco lo atraviesa', () => {
+  const { w, o } = sandbag();
+  const r = 13;
+  const z = { x: o.x + 50, y: o.y + o.h + 60 };
+  w.collide(z, r, false, o.x + 10, o.y - 80);
+  assert.equal(z.y, o.y - r, 'queda del lado de donde venía');
+  assert.ok(z.x > o.x + 10 && z.x < o.x + 50, 'donde tocó el muro');
+  // quien camina pegado al muro sin meterse no se mueve
+  const p = { x: o.x + 30, y: o.y - r };
+  assert.equal(w.collide(p, r, false, o.x + 20, o.y - r), false);
+  assert.equal(p.y, o.y - r);
+});

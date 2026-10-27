@@ -9,6 +9,42 @@ const OBS_CELL = 128;
 const ROAD_W = ROAD_HALF * 2;
 const SPAWN_CLEAR = 215;
 
+// Por qué cara entra en el rectángulo `o` el segmento (x0, y0) → (x1, y1): 0 izquierda, 1 derecha,
+// 2 arriba, 3 abajo; -1 si no entra o si ya empezaba dentro. En entryT queda la fracción del
+// segmento donde toca la cara.
+let entryT = 0;
+function entryFace(x0, y0, x1, y1, o) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  let t0 = 0;
+  let t1 = 1;
+  let face = -1;
+  if (dx === 0) {
+    if (x0 <= o.x || x0 >= o.x + o.w) return -1;
+  } else {
+    const a = (o.x - x0) / dx;
+    const b = (o.x + o.w - x0) / dx;
+    if (Math.min(a, b) > t0) {
+      t0 = Math.min(a, b);
+      face = dx > 0 ? 0 : 1;
+    }
+    t1 = Math.min(t1, Math.max(a, b));
+  }
+  if (dy === 0) {
+    if (y0 <= o.y || y0 >= o.y + o.h) return -1;
+  } else {
+    const a = (o.y - y0) / dy;
+    const b = (o.y + o.h - y0) / dy;
+    if (Math.min(a, b) > t0) {
+      t0 = Math.min(a, b);
+      face = dy > 0 ? 2 : 3;
+    }
+    t1 = Math.min(t1, Math.max(a, b));
+  }
+  entryT = t0;
+  return t0 < t1 ? face : -1;
+}
+
 export class World {
   constructor(seed = (Math.random() * 1e9) | 0) {
     this.size = WORLD_SIZE;
@@ -491,12 +527,16 @@ export class World {
 
   // Empuja un círculo fuera de los obstáculos. Modifica e.x / e.y.
   // passBlocks: el jugador atraviesa sus propias barricadas; los zombis no.
-  collide(e, r, passBlocks = false) {
+  // (ox, oy): dónde estaba al terminar el fotograma anterior. Si un empujón grande (la horda
+  // apretando) le metió el centro en un muro o se lo hizo cruzar, vuelve al lado por el que
+  // entró en vez de salir por el más cercano, que en un muro delgado puede ser el de enfrente.
+  collide(e, r, passBlocks = false, ox = NaN, oy = NaN) {
     const n = this.obsN;
-    const x0 = clamp(Math.floor((e.x - r) / OBS_CELL), 0, n - 1);
-    const y0 = clamp(Math.floor((e.y - r) / OBS_CELL), 0, n - 1);
-    const x1 = clamp(Math.floor((e.x + r) / OBS_CELL), 0, n - 1);
-    const y1 = clamp(Math.floor((e.y + r) / OBS_CELL), 0, n - 1);
+    const swept = ox === ox && oy === oy;
+    const x0 = clamp(Math.floor(((swept ? Math.min(e.x, ox) : e.x) - r) / OBS_CELL), 0, n - 1);
+    const y0 = clamp(Math.floor(((swept ? Math.min(e.y, oy) : e.y) - r) / OBS_CELL), 0, n - 1);
+    const x1 = clamp(Math.floor(((swept ? Math.max(e.x, ox) : e.x) + r) / OBS_CELL), 0, n - 1);
+    const y1 = clamp(Math.floor(((swept ? Math.max(e.y, oy) : e.y) + r) / OBS_CELL), 0, n - 1);
     const stamp = ++this.stamp;
     let hit = false;
     for (let j = y0; j <= y1; j++) {
@@ -508,6 +548,17 @@ export class World {
           o.stamp = stamp;
           if (passBlocks && o.block) continue;
           if (o.k === 0) {
+            const face = swept ? entryFace(ox, oy, e.x, e.y, o) : -1;
+            if (face >= 0) {
+              // vuelve a donde tocó la cara, apoyado por fuera
+              const tx = ox + (e.x - ox) * entryT;
+              const ty = oy + (e.y - oy) * entryT;
+              e.x = face === 0 ? o.x - r : face === 1 ? o.x + o.w + r : tx;
+              e.y = face === 2 ? o.y - r : face === 3 ? o.y + o.h + r : ty;
+              hit = true;
+              if (o.block) this.lastBlock = o;
+              continue;
+            }
             const px = e.x < o.x ? o.x : e.x > o.x + o.w ? o.x + o.w : e.x;
             const py = e.y < o.y ? o.y : e.y > o.y + o.h ? o.y + o.h : e.y;
             const dx = e.x - px;

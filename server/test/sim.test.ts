@@ -512,3 +512,50 @@ test('la racha es de quien mata: multiplica su dinero, la corta un golpe y va en
   assert.equal(a.p.combo.n, 0, 'sin bajas se acaba');
   assert.equal(comboMult(a.p.combo.best), m1);
 });
+
+test('la horda apretando contra un cerco de barricadas no lo atraviesa', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }]);
+  const p = sim.slots.get('a')!.p;
+  p.hurt = () => {};
+  sim.director.state = 'waiting';
+  sim.director.queue.length = 0;
+  sim.horde.list.length = 0;
+  // cerco cerrado de sacos terreros (que no se rompen) con el jugador en medio
+  const S = 140;
+  const T = 24;
+  const cx = Math.round(p.x);
+  const cy = Math.round(p.y);
+  const wall = (x: number, y: number, w: number, h: number) => {
+    const o = { k: 0, x, y, w, h, low: true, block: true, kind: 'sandbag', hp: 1e9, max: 1e9, hitT: 0, cd: 0, ang: 0 };
+    sim.structures.blocks.push(o);
+    sim.world.addDynamic(o);
+  };
+  for (let x = cx - S - T; x < cx + S + T; x += 80) {
+    wall(x, cy - S - T, Math.min(80, cx + S + T - x), T);
+    wall(x, cy + S, Math.min(80, cx + S + T - x), T);
+  }
+  for (let y = cy - S; y < cy + S; y += 80) {
+    wall(cx - S - T, y, T, Math.min(80, cy + S - y));
+    wall(cx + S, y, T, Math.min(80, cy + S - y));
+  }
+  // 300 zombis alrededor (con gordos y toros, que embisten y lanzan a los demás)
+  const types = ['normal', 'normal', 'normal', 'fat', 'normal', 'sprinter', 'normal', 'normal', 'bull', 'normal'];
+  for (let i = 0, n = 0; n < 300 && i < 5000; i++) {
+    const a = (i * 2.399) % (Math.PI * 2);
+    const d = 200 + ((i * 37) % 260);
+    const x = cx + Math.cos(a) * d;
+    const y = cy + Math.sin(a) * d;
+    if (Math.abs(x - cx) < S + T + 20 && Math.abs(y - cy) < S + T + 20) continue;
+    if (sim.world.pointBlocked(x, y, 16)) continue;
+    sim.horde.spawn(types[n % types.length], x, y, 1, 1.3);
+    n++;
+  }
+  const inside = () => sim.horde.list.filter((z: any) => Math.abs(z.x - cx) < S && Math.abs(z.y - cy) < S).length;
+  let most = 0;
+  for (let i = 0; i < 60 * 15; i++) {
+    sim.step();
+    most = Math.max(most, inside());
+  }
+  assert.ok(sim.horde.list.length > 250, 'la horda sigue ahí');
+  assert.equal(most, 0, 'ningún zombi entró al cerco');
+});
