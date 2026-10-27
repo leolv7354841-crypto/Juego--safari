@@ -616,8 +616,14 @@ test('torreta pesada: cada bala estalla en el primer zombi y daña a los de alre
   assert.ok(most <= d.damage + HEAVY.blastPower + 1, 'una microexplosión, no una granada');
   // los demás jugadores ven y oyen la microexplosión
   const fx = sim.snapshot('b', 0)!.fx || [];
-  assert.ok(fx.some((e: any) => e[1] === 'miniBlast'), 'chispazo');
-  assert.ok(fx.some((e: any) => e[1] === 'miniBoom'), 'sonido');
+  assert.ok(
+    fx.some((e: any) => e[1] === 'miniBlast'),
+    'chispazo',
+  );
+  assert.ok(
+    fx.some((e: any) => e[1] === 'miniBoom'),
+    'sonido',
+  );
   // las bajas de la explosión son de quien disparó
   const m0 = a.money;
   for (const z of group as any[]) z.hp = 1;
