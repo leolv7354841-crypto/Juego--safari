@@ -24,6 +24,13 @@ export const CLASSES = {
 
 export const isClass = (c) => CLASS_ORDER.includes(c);
 
+// Ametralladoras de la megarráfaga: las de la tienda con el daño y la perforación de la habilidad.
+const RAGE_GUN = {
+  ...WEAPONS[ABILITY.berserker.weapon],
+  damage: ABILITY.berserker.damage,
+  pierce: ABILITY.berserker.pierce,
+};
+
 // Espera de la habilidad con las mejoras tomadas (nunca menos de ABILITY.minCooldown).
 export function cooldownOf(p) {
   return Math.max(ABILITY.minCooldown, ABILITY.cooldown * (p.stats.cdMult || 1));
@@ -72,7 +79,7 @@ export const Abilities = {
     const step = Math.min(dt, p.rageT);
     p.rageT -= step;
     const B = ABILITY.berserker;
-    const d = WEAPONS[B.weapon];
+    const d = RAGE_GUN;
     // 3 cargadores de la ametralladora repartidos en la duración, sin depender de los fps
     const rate = (d.mag * B.mags) / B.time;
     p.rageAcc += rate * step;

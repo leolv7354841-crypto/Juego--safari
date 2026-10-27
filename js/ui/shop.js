@@ -1,5 +1,6 @@
 // Tienda de entre rondas: armas, munición, defensas, lanzables y robot. Compra, venta y dibujo de los íconos.
 import {
+  BOUNTY,
   BUILD_ORDER,
   SHOP,
   SHOP_ORDER,
@@ -42,15 +43,18 @@ export function renderShop(game) {
     return `<button class="btn buy${extra}${poor ? ' poor' : ''}" ${attrs} ${poor ? 'disabled' : ''}>${label}</button>`;
   };
   // armas: de la más barata a la más potente
-  const guns = WEAPON_ORDER.filter((id) => WEAPONS[id].price).map((id) => {
-    const d = WEAPONS[id];
-    const owned = p.has(id);
-    return `<div class="shop-item${owned ? ' owned' : ''}">
+  // (WEAPON_ORDER no se toca: la red manda el arma por su lugar en esa lista)
+  const guns = WEAPON_ORDER.filter((id) => WEAPONS[id].price)
+    .sort((a, b) => WEAPONS[a].price - WEAPONS[b].price)
+    .map((id) => {
+      const d = WEAPONS[id];
+      const owned = p.has(id);
+      return `<div class="shop-item${owned ? ' owned' : ''}">
       <canvas class="shop-ic" data-gun="${id}" width="96" height="96"></canvas>
-      <div class="shop-txt"><b>${d.name}</b><span>${d.desc}</span><small>Daño ${d.damage}${d.pellets > 1 ? `×${d.pellets}` : ''} · ${d.rate} disp/s · cargador ${d.mag}</small></div>
+      <div class="shop-txt"><b>${d.name}</b><span>${d.desc}</span><small>${d.rocket ? 'Daño en área' : `Daño ${d.damage}${d.pellets > 1 ? `×${d.pellets}` : ''}`} · ${d.rate} disp/s · cargador ${d.mag}</small></div>
       ${owned ? `<button class="btn buy sell" data-sell="${id}">Vender $${Math.round(d.price * SELL_RATE)}</button>` : buyBtn(`data-gun-buy="${id}"`, d.price, `$${d.price}`)}
     </div>`;
-  });
+    });
   // munición sin límite para cada arma que tengas
   const ammo = p.weapons
     .filter((w) => w.reserve !== Infinity)
@@ -288,6 +292,10 @@ export function repairRobot(game) {
 
 // Botones de la tienda y del panel de ronda que la abre.
 export function bindShop(game) {
+  // lo que paga cada zombi, tal como está en BOUNTY
+  game.$('shop-bounty').textContent =
+    `Zombi normal $${BOUNTY.normal} · velocista $${BOUNTY.sprinter} · gordo $${BOUNTY.fat} · ` +
+    `SWAT $${BOUNTY.swat} · toro $${BOUNTY.bull} · super blindado $${BOUNTY.heavy}.`;
   on(game, 'btn-shop-done', () => closeShop(game));
   on(game, 'btn-round-shop', () => {
     if (game.state === 'play' && game.director.state === 'waiting') openShop(game);

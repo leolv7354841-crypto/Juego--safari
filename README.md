@@ -58,7 +58,7 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Valla de metal reforzado | $70 | Muro ancho muy resistente (1400) |
 | Muro de concreto | $150 | La defensa más dura (3200) |
 | Barrera HESCO | $600 | Gaviones de malla con arena, casi indestructibles (10000) |
-| Torreta automática | $350 | Dispara sola al zombi más cercano |
+| Torreta automática | $500 | Dispara sola al zombi más cercano |
 | Alambre de púas | $20 | No bloquea: frena y hiere |
 | Trampa de pinchos | $60 | Frena y hiere mucho más |
 | Mina terrestre | $45 | Explota al pisarla |
@@ -101,19 +101,21 @@ oleada. Si su vida llega a 0 explota, sales despedido y hay que repararlo para v
 
 ### Armas y munición
 
-La pistola tiene balas infinitas. Todas las demás se compran en la tienda (las básicas también salen en
-mejoras de nivel). Puedes **vender** cualquier arma que tengas por la mitad de su precio:
+El subfusil, con el que empiezas, tiene balas infinitas. Las demás se compran en la tienda (la escopeta y
+el rifle también salen en las cajas de armas) y cuestan más mientras más poder tienen: daño por segundo
+contando recargas, a cuántos zombis atraviesan y el área. Puedes **vender** cualquier arma que tengas por
+la mitad de su precio:
 
-| Arma | Precio | Cargador |
-|------|--------|----------|
-| Subfusil | $120 | 32 |
-| Escopeta | $160 | 6 (8 perdigones) |
-| Rifle | $220 | 10 (atraviesa 2) |
-| Fusil de asalto | $400 | 30 |
-| Escopeta automática | $600 | 12 (9 perdigones) |
-| Francotirador | $750 | 5 (atraviesa 6) |
-| Ametralladora | $900 | 100 |
-| Bazuca antitanque | $1400 | 1 cohete (recarga 5 s) |
+| Arma | Precio | Daño | Cargador | Daño por segundo |
+|------|--------|------|----------|------------------|
+| Subfusil | inicial | 14 | 32 | 100 |
+| Escopeta | $500 | 8 × 30 | 6 | 280 de cerca |
+| Fusil de asalto | $800 | 30 | 30 (atraviesa 1) | 180 (365 en fila) |
+| Rifle | $1200 | 110 | 10 (atraviesa 2) | 165 (490 en fila) |
+| Escopeta automática | $2000 | 9 × 22 | 12 | 400 de cerca |
+| Ametralladora | $3000 | 30 | 100 (atraviesa 2) | 260 (780 en fila) |
+| Francotirador | $4500 | 300 | 5 (atraviesa 6) | 190 (1320 en fila) |
+| Bazuca antitanque | $6000 | cohete en área | 1 (recarga 4 s) | revienta grupos y blindados |
 
 En la sección **Munición** de la tienda compras cargadores de cualquier arma que tengas, de 1 en 1 o de
 10 en 10. La reserva de balas no tiene límite.

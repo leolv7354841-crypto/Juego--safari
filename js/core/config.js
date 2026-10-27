@@ -75,9 +75,10 @@ export const WEAPONS = {
     len: 15,
     desc: 'Ráfagas rápidas para contener a la horda.',
   },
-  // Armas de la tienda: todas rinden lo mismo (unos 330 de daño por segundo efectivo, contando
-  // perforación y perdigones que fallan) y cuestan casi lo mismo; cambia el estilo, no el poder.
-  // La munición cuesta lo mismo por cada 1000 de daño que lleva el cargador.
+  // Armas de la tienda: el precio sube con su poder (daño por segundo contando recargas, a cuántos
+  // atraviesa y el área), en una escalera que acompaña el dinero de las oleadas: la escopeta tras la
+  // primera, la bazuca hacia la sexta. La munición sigue costando por cargador lo que cada una pedía
+  // por cada 1000 de daño.
   shotgun: {
     id: 'shotgun',
     name: 'Escopeta',
@@ -97,7 +98,7 @@ export const WEAPONS = {
     shake: 0.3,
     pierce: 0,
     len: 20,
-    price: 1000,
+    price: 500,
     ammoPrice: 12,
     desc: '8 perdigones de golpe: derriba grupos y los empuja lejos.',
   },
@@ -120,7 +121,7 @@ export const WEAPONS = {
     shake: 0.22,
     pierce: 2,
     len: 24,
-    price: 1000,
+    price: 1200,
     ammoPrice: 18,
     desc: 'Disparo potente y lejano que atraviesa 2 enemigos.',
   },
@@ -143,14 +144,14 @@ export const WEAPONS = {
     shake: 0.04,
     pierce: 1,
     len: 20,
-    price: 1000,
+    price: 800,
     ammoPrice: 12,
     desc: 'Automático, preciso y perforante. El todoterreno.',
   },
   autoshotgun: {
     id: 'autoshotgun',
     name: 'Escopeta automática',
-    damage: 16,
+    damage: 22,
     rate: 3.2,
     mag: 12,
     reserve: 36,
@@ -166,14 +167,14 @@ export const WEAPONS = {
     shake: 0.28,
     pierce: 0,
     len: 22,
-    price: 1000,
-    ammoPrice: 14,
-    desc: '9 perdigones en ráfaga continua. Barre hordas de cerca.',
+    price: 2000,
+    ammoPrice: 19,
+    desc: '9 perdigones fuertes en ráfaga continua. Barre hordas de cerca.',
   },
   sniper: {
     id: 'sniper',
     name: 'Francotirador',
-    damage: 200,
+    damage: 300,
     rate: 0.9,
     mag: 5,
     reserve: 20,
@@ -189,14 +190,14 @@ export const WEAPONS = {
     shake: 0.35,
     pierce: 6,
     len: 30,
-    price: 1000,
-    ammoPrice: 20,
-    desc: 'Lento pero brutal: cada bala atraviesa hasta 6 zombis en fila.',
+    price: 4500,
+    ammoPrice: 30,
+    desc: 'Lento pero brutal: 300 de daño por bala y atraviesa hasta 6 zombis en fila.',
   },
   lmg: {
     id: 'lmg',
     name: 'Ametralladora',
-    damage: 22,
+    damage: 30,
     rate: 12,
     mag: 100,
     reserve: 200,
@@ -210,11 +211,11 @@ export const WEAPONS = {
     range: 650,
     knock: 45,
     shake: 0.015,
-    pierce: 1,
+    pierce: 2,
     len: 26,
-    price: 1000,
-    ammoPrice: 30,
-    desc: 'Cargador de 100 balas: fuego sin pausa, recarga lenta.',
+    price: 3000,
+    ammoPrice: 41,
+    desc: 'Cargador de 100 balas que atraviesan 2 zombis: fuego sin pausa, recarga lenta.',
   },
   // Lanza cohetes (ver ROCKET): explota al impactar; tarda 4 s en recargar.
   bazooka: {
@@ -237,7 +238,7 @@ export const WEAPONS = {
     pierce: 0,
     len: 30,
     rocket: true,
-    price: 1000,
+    price: 6000,
     ammoPrice: 30,
     desc: 'Cohete con el doble de explosión que una granada. Revienta gordos y blindados. Recarga en 4 s.',
   },
@@ -281,14 +282,15 @@ export const ROCKET = {
 // Habilidad de clase (se elige al empezar cada partida). cooldown en s; cada mejora la baja
 // cdStep (x0,85) hasta minCooldown.
 // bomber: misil balístico que cae donde apuntas tras fall s (3 veces el radio y 2 veces el
-// daño del cohete); berserker: 3 ametralladoras vacían 3 cargadores en time s;
+// daño del cohete); berserker: 3 ametralladoras vacían 3 cargadores en time s, con su propio
+// daño y perforación (no cambia si se ajusta la ametralladora de la tienda);
 // booster: inmune y speed veces más rápido durante time s.
 export const ABILITY = {
   cooldown: 60,
   minCooldown: 20,
   cdStep: 0.85,
   bomber: { radius: ROCKET.radius * 3, power: ROCKET.power * 2, fall: 1.4, range: 700 },
-  berserker: { time: 3, mags: 3, guns: 3, weapon: 'lmg' },
+  berserker: { time: 3, mags: 3, guns: 3, weapon: 'lmg', damage: 22, pierce: 1 },
   booster: { time: 2, speed: 3 },
 };
 export const CLASS_ORDER = ['bomber', 'berserker', 'booster'];
@@ -579,7 +581,7 @@ export const SHOP = {
   turret: {
     name: 'Torreta automática',
     desc: 'Dispara sola al zombi más cercano. Ponla detrás de tus muros.',
-    price: 1000,
+    price: 500,
     hp: 700,
     w: 40,
     h: 40,
