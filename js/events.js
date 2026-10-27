@@ -47,6 +47,8 @@ export const rocketHit = Rules.rocketHit;
 
 export const rocketBlast = Rules.rocketBlast;
 
+export const heavyBlast = Rules.heavyBlast;
+
 export const onSuperPunch = (game, _z, x, y) => Rules.superPunch(game, x, y);
 
 // Ácido del gordo: quema unos segundos (vida por segundo) y nubla la vista.

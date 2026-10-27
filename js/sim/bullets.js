@@ -95,6 +95,15 @@ export class Bullets {
           endT = bt;
           break;
         }
+        if (b.blast) {
+          // bala explosiva (torreta pesada): pega y estalla ahí mismo, también en los blindados
+          game.hitZombie(best, b, hx, hy);
+          game.heavyBlast(hx, hy, b.owner);
+          dead = true;
+          wall = false;
+          endT = bt;
+          break;
+        }
         if (best.type === 'heavy' && Math.random() < RICOCHET) {
           // rebote: se refleja sobre la placa con algo de desvío y pierde fuerza
           const nl = Math.hypot(hx - best.x, hy - best.y) || 1;
@@ -137,6 +146,7 @@ export class Bullets {
         b.life = Math.min(b.life, 240);
       }
       if (b.rocket && !b.exploded && (wall || b.life <= 0)) game.rocketBlast(b.x - b.dx * 4, b.y - b.dy * 4, b.owner);
+      else if (b.blast && wall) game.heavyBlast(b.x - b.dx * 4, b.y - b.dy * 4, b.owner);
       else if (wall) game.particles.impact(b.x, b.y, b.dx, b.dy);
       if (dead || b.life <= 0) {
         b.dead = true;

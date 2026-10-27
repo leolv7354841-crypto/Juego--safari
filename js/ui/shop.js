@@ -121,7 +121,7 @@ export function heavyAmmoItem(game) {
   };
   return `<div class="shop-item">
     <canvas class="shop-ic" data-ic="heavy" width="96" height="96"></canvas>
-    <div class="shop-txt"><b>Balas · Torreta pesada</b><span>Cinta de ${HEAVY.pack} balas perforantes por $${HEAVY.price}. Las usa cualquier torreta pesada que montes.</span><small>Tienes: ${game.player.heavyAmmo} balas</small></div>
+    <div class="shop-txt"><b>Balas · Torreta pesada</b><span>Cinta de ${HEAVY.pack} balas explosivas por $${HEAVY.price}. Las usa cualquier torreta pesada que montes.</span><small>Tienes: ${game.player.heavyAmmo} balas</small></div>
     <div class="buy-col">${buy(1)}${buy(5)}</div>
   </div>`;
 }

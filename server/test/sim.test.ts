@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.js';
 import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.js';
-import { ABILITY, BOUNTY, COMBO, PLAYER_BASE } from '../../js/core/config.js';
+import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.js';
 import { UPGRADES } from '../../js/sim/upgrades.js';
 import { cooldownOf } from '../../js/sim/abilities.js';
 import { comboBreak, comboMult } from '../../js/sim/combo.js';
@@ -447,7 +447,7 @@ test('torreta pesada: se compra con sus balas, se monta y dispara en línea', ()
   assert.equal(a.p.heavyAmmo, 99);
   const shot = sim.bullets.list[before];
   assert.equal(shot.owner, 'a');
-  assert.equal(shot.pierce, 4);
+  assert.equal(shot.blast, true, 'balas explosivas');
   // no camina mientras la maneja
   const x = a.p.x;
   for (let i = 0; i < 20; i++) {
@@ -558,4 +558,69 @@ test('la horda apretando contra un cerco de barricadas no lo atraviesa', () => {
   }
   assert.ok(sim.horde.list.length > 250, 'la horda sigue ahí');
   assert.equal(most, 0, 'ningún zombi entró al cerco');
+});
+
+test('torreta pesada: cada bala estalla en el primer zombi y daña a los de alrededor', () => {
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
+  const a = sim.slots.get('a')!;
+  sim.director.state = 'waiting';
+  sim.director.queue.length = 0;
+  sim.horde.list.length = 0;
+  // un grupito apretado a 200 px a la derecha del jugador (en un sitio libre)
+  const p = a.p;
+  let cx = p.x + 200;
+  let cy = p.y;
+  for (let k = 0; k < 40 && sim.world.pointBlocked(cx, cy, 40); k++) {
+    cx = p.x + 200 * Math.cos(k * 0.6);
+    cy = p.y + 200 * Math.sin(k * 0.6);
+  }
+  const group = [
+    [0, 0],
+    [24, 0],
+    [0, 24],
+    [-24, 0],
+    [0, -24],
+  ].map(([dx, dy]) => sim.horde.spawn('swat', cx + dx, cy + dy, 1, 1) || sim.horde.list[sim.horde.list.length - 1]);
+  const hp = group.map((z: any) => z.hp);
+  // (la cuadrícula de búsqueda la arma la horda en cada paso)
+  sim.horde.grid.clear();
+  for (const z of sim.horde.list) sim.horde.grid.insert(z);
+  const ang = Math.atan2(cy - p.y, cx - p.x);
+  const d = WEAPONS.heavy;
+  sim.bullets.spawn({
+    x: p.x,
+    y: p.y,
+    dx: Math.cos(ang),
+    dy: Math.sin(ang),
+    speed: d.speed,
+    life: d.range,
+    dmg: d.damage,
+    pierce: d.pierce,
+    knock: d.knock,
+    shot: null,
+    hits: null,
+    rocket: false,
+    blast: true,
+    owner: 'a',
+  });
+  sim.flushFx();
+  for (let i = 0; i < 30 && sim.bullets.list.length; i++) sim.bullets.update(1 / 60, sim.game);
+  assert.equal(sim.bullets.list.length, 0, 'la bala estalló y no siguió');
+  const hurt = group.filter((z: any, i: number) => z.hp < hp[i]).length;
+  assert.ok(hurt >= 4, `la explosión daña a los de alrededor (${hurt} de 5)`);
+  const most = Math.max(...group.map((z: any, i: number) => hp[i] - z.hp));
+  assert.ok(most >= d.damage, 'el del impacto recibe la bala y la explosión');
+  assert.ok(most <= d.damage + HEAVY.blastPower + 1, 'una microexplosión, no una granada');
+  // los demás jugadores ven y oyen la microexplosión
+  const fx = sim.snapshot('b', 0)!.fx || [];
+  assert.ok(fx.some((e: any) => e[1] === 'miniBlast'), 'chispazo');
+  assert.ok(fx.some((e: any) => e[1] === 'miniBoom'), 'sonido');
+  // las bajas de la explosión son de quien disparó
+  const m0 = a.money;
+  for (const z of group as any[]) z.hp = 1;
+  sim.game.heavyBlast(cx, cy, 'a');
+  assert.ok(a.money > m0, 'la explosión paga a quien disparó');
 });

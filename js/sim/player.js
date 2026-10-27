@@ -404,6 +404,7 @@ export class Player {
       shot: { hit: false },
       hits: null,
       rocket: false,
+      blast: !!d.blast,
     });
     this.shotsFired++;
     this.bloom = Math.min(0.12, this.bloom + d.bloom);

@@ -132,6 +132,7 @@ class Game {
   killZombie = (z) => Ev.killZombie(this, z);
   rocketHit = (z, x, y, b) => Ev.rocketHit(this, z, x, y, b);
   rocketBlast = (x, y, owner) => Ev.rocketBlast(this, x, y, owner);
+  heavyBlast = (x, y, owner) => Ev.heavyBlast(this, x, y, owner);
   onSuperPunch = (z, x, y) => Ev.onSuperPunch(this, z, x, y);
   applyAcid = () => Ev.applyAcid(this);
   onGoldenExpired = (z) => Ev.onGoldenExpired(this, z);

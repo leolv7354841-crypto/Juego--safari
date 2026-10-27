@@ -152,6 +152,7 @@ export interface GameHost {
   applyAcid(p: any): void;
   rocketHit(z: Zombie, x: number, y: number, b: Bullet): void;
   rocketBlast(x: number, y: number, owner?: string | null): void;
+  heavyBlast(x: number, y: number, owner?: string | null): void;
   updateHud(...a: any[]): void;
   onSuperPunch(z: Zombie, x: number, y: number): void;
   onGiantStep(z: Zombie): void;

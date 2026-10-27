@@ -91,6 +91,20 @@ export class Particles {
     this.add(SMOKE, x, y, -dx * 20, -dy * 20, 0.5, 3, '120,115,105', 3, 16);
   }
 
+  // Microexplosión de una bala de la torreta pesada: chispazo y un poco de humo, sin humareda.
+  miniBlast(x, y, R) {
+    this.ring(x, y, R * 0.6, '255,190,120');
+    for (let i = 0; i < 7; i++) {
+      const a = rand(0, TAU);
+      const s = rand(120, 320);
+      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.08, 0.18), 1, pick(['#ffd890', '#ffb060']), 6);
+    }
+    for (let i = 0; i < 2; i++) {
+      const a = rand(0, TAU);
+      this.add(SMOKE, x, y, Math.cos(a) * 40, Math.sin(a) * 40, rand(0.4, 0.7), rand(6, 10), '90,84,76', 3, 24);
+    }
+  }
+
   // Impacto sobre un zombi: salpicadura de sangre estilizada en la dirección de la bala.
   hit(x, y, dx, dy, big) {
     const n = big ? 7 : 5;

@@ -243,11 +243,12 @@ export const WEAPONS = {
     desc: 'Cohete con el doble de explosión que una granada. Revienta gordos y blindados. Recarga en 4 s.',
   },
   // Cañón doble de la torreta pesada (SHOP.heavy): no se compra ni se lleva, se usa montado.
-  // Sus balas salen de HEAVY.ammo (se compran en la tienda) y atraviesan 4 zombis.
+  // Sus balas salen de HEAVY.ammo (se compran en la tienda) y son explosivas (blast): estallan en
+  // el primer zombi o pared que tocan con una microexplosión (HEAVY.blastR, HEAVY.blastPower).
   heavy: {
     id: 'heavy',
     name: 'Torreta pesada',
-    damage: 70,
+    damage: 60,
     rate: 9,
     mag: 0,
     reserve: 0,
@@ -261,7 +262,8 @@ export const WEAPONS = {
     range: 1000,
     knock: 90,
     shake: 0.06,
-    pierce: 4,
+    pierce: 0,
+    blast: true,
     len: 30,
   },
 };
@@ -494,8 +496,9 @@ export const DROPS = {
 export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 10000, repairPerHp: 0.1, speed: 0.85, gunScale: 1.7 };
 
 // Torreta pesada montada: munición que se compra (pack balas por price), qué tan rápido gira el
-// cañón (rad/s), cuánto daño quita su escudo al que la maneja y a qué distancia se monta.
-export const HEAVY = { pack: 100, price: 200, turn: 4.5, shield: 0.5, reach: 60 };
+// cañón (rad/s), cuánto daño quita su escudo al que la maneja, a qué distancia se monta y la
+// microexplosión de cada bala (radio en px y daño en el centro; la granada es 140 y 330).
+export const HEAVY = { pack: 100, price: 200, turn: 4.5, shield: 0.5, reach: 60, blastR: 60, blastPower: 55 };
 
 // Clasificación mundial (Firebase Realtime Database, sin librerías: API REST).
 // Pega aquí la URL de tu base de datos, p. ej. 'https://mi-juego-default-rtdb.firebaseio.com'.
@@ -590,7 +593,7 @@ export const SHOP = {
   // Se monta con E (o el botón): la manejas tú con su cañón doble (WEAPONS.heavy) y balas compradas.
   heavy: {
     name: 'Torreta pesada',
-    desc: 'Cañón doble blindado: móntala con E y dispara balas que atraviesan 4 zombis. Necesita munición.',
+    desc: 'Cañón doble blindado: móntala con E y dispara balas explosivas que estallan entre la horda. Necesita munición.',
     price: 15000,
     hp: 4000,
     w: 40,

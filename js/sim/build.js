@@ -413,7 +413,8 @@ export class Structures {
   }
 
   // fling > 0: la onda lanza a volar a los que sobreviven (cohetes de bazuca)
-  explode(game, g, R = BLAST_R, power = 330, fling = 0) {
+  // small: microexplosión (balas de la torreta pesada): mismo daño en área, efectos pequeños
+  explode(game, g, R = BLAST_R, power = 330, fling = 0, small = false) {
     const { x, y } = g;
     game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
@@ -448,6 +449,11 @@ export class Structures {
         z.lastDx = (dx / n) * (2 + 3 * f);
         z.lastDy = (dy / n) * (2 + 3 * f);
       }
+    }
+    if (small) {
+      game.particles.miniBlast(x, y, R);
+      game.sfx.miniBoom();
+      return;
     }
     game.camera.shake(0.95, x, y);
     // cohete: bola de fuego corta y luego humo; granada: explosión clásica

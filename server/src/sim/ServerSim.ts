@@ -255,6 +255,7 @@ export class ServerSim {
       applyAcid: (p: any) => this.applyAcid(p),
       rocketHit: (z: any, x: number, y: number, b: any) => Rules.rocketHit(g, z, x, y, b),
       rocketBlast: (x: number, y: number, owner: string | null = null) => Rules.rocketBlast(g, x, y, owner),
+      heavyBlast: (x: number, y: number, owner: string | null = null) => Rules.heavyBlast(g, x, y, owner),
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => Rules.superPunch(g, x, y),
       onGiantStep: (z: any) => {

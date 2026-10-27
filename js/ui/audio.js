@@ -384,6 +384,13 @@ export class Sfx {
     this.tone({ freq: 90, to: 25, dur: 0.9, gain: 1 });
   }
 
+  // Microexplosión de una bala de la torreta pesada: golpe seco y corto (suena 9 veces por segundo).
+  miniBoom() {
+    if (!this.ok('miniBoom', 0.05)) return;
+    this.burst({ dur: 0.18, freq: 1400, sweep: 120, gain: 0.35 });
+    this.tone({ freq: 120, to: 45, dur: 0.16, gain: 0.35 });
+  }
+
   // Silbido del misil balístico que cae del cielo.
   missile() {
     if (!this.ok('missile', 0.2, true)) return;

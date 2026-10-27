@@ -2,7 +2,7 @@
 // (js/main.js) y el servidor en línea (server/src/sim/ServerSim.ts). Aquí vive lo que es igual
 // en los dos lados (bajas, botín, zombi dorado, ácido, cohetes, golpes); lo que cambia
 // (de quién es el dinero, cómo se avisa, de quién es la experiencia) lo pone quien llama con ganchos.
-import { BOUNTY, DROPS, GOLDEN, MONEY_LOSS, ROCKET, WORLD_SIZE, xpForLevel } from '../core/config.js';
+import { BOUNTY, DROPS, GOLDEN, HEAVY, MONEY_LOSS, ROCKET, WORLD_SIZE, xpForLevel } from '../core/config.js';
 import { rand, randInt } from '../core/util.js';
 import { ACID } from './build.js';
 import { bulletHit } from './combat.js';
@@ -182,6 +182,16 @@ export function acidStep(game, p, h, dt, onTick, onDeath) {
 export function rocketBlast(game, x, y, owner = null) {
   if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
+}
+
+/**
+ * Microexplosión de una bala de la torreta pesada (no la calcula quien solo mira).
+ * @param {GameHost} game
+ * @param {string | null} [owner]
+ */
+export function heavyBlast(game, x, y, owner = null) {
+  if (!game.mode.authority()) return;
+  game.structures.explode(game, { x, y, owner }, HEAVY.blastR, HEAVY.blastPower, 0, true);
 }
 
 /** Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante. */

@@ -48,5 +48,6 @@ export const SFX_SYNC = [
   'wave',
   'missile',
   'boost',
+  'miniBoom',
 ];
 export const DECAL_SYNC = ['corpse', 'splat', 'drip', 'acid'];
