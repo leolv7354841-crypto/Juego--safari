@@ -13,6 +13,7 @@ import {
   RELOAD_STEPS,
 } from '../core/config.js';
 import { clamp, rand, angleTo } from '../core/util.js';
+import { newCombo } from './combo.js';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
@@ -60,6 +61,8 @@ export class Player {
     };
     this.hp = this.stats.maxHp;
     this.stamina = this.stats.maxStamina;
+    // racha de bajas (ver combo.js)
+    this.combo = newCombo();
     this.exhausted = false;
     this.running = false;
     this.sinceRun = 10;

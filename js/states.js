@@ -7,7 +7,7 @@ import { Abilities } from './sim/abilities.js';
 import * as Rules from './sim/rules.js';
 import * as Act from './actions.js';
 import { saveProgress } from './save.js';
-import { updateAcid } from './events.js';
+import { updateAcid, updateCombo } from './events.js';
 import { gameOver } from './ui/over.js';
 import { openShop } from './ui/shop.js';
 import { chooseClass } from './ui/class.js';
@@ -110,6 +110,7 @@ export function updatePlay(game, dt) {
   game.muzzle = Math.max(0, game.muzzle - dt * 14);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt * 1.4);
   updateAcid(game, dt);
+  updateCombo(game, dt);
   game.updateHud(false);
   if (!p.alive) {
     if (mate && mate.alive) return;

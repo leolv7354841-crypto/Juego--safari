@@ -12,6 +12,7 @@ import { Player } from '../sim/player.js';
 import { WEAPONS, SHOP, ABILITY } from '../core/config.js';
 import { cleanLook } from '../render/sprites.js';
 import { Abilities } from '../sim/abilities.js';
+import { applyCombo, packCombo } from '../sim/combo.js';
 import { rand, angleTo } from '../core/util.js';
 import { PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
 import { encodeStatic, encodeWorld } from './snapshot.js';
@@ -395,6 +396,8 @@ export class Coop {
       lv: g.level,
       xp: Math.round(g.xp),
       xn: g.xpNeed,
+      // racha del invitado (la lleva el anfitrión, que es quien ve sus bajas y sus golpes)
+      cb: packCombo(peer.combo),
     };
     // lo que cambia poco va cada medio segundo
     if (this.snapN++ % 6 === 0) {
@@ -738,6 +741,7 @@ export class Coop {
     if (Number(s.q) <= (this.lastSeq || 0)) return;
     g.remote.net.count();
     this.lastSeq = Number(s.q);
+    applyCombo(g.player.combo, s.cb);
     // jugadores, robots, zombis, objetos, balas y estructuras: lo mismo que ve el cliente en línea
     // el reloj de llegada puede retroceder un poco: el instante de la foto nunca baja (Interp lo exige)
     const t = Math.max(this.clock.stamp(Number(s.ts)), (this.lastT || 0) + 1);

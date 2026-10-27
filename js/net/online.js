@@ -12,6 +12,7 @@ import { IN_RUN, IN_FIRE, IN_RELOAD } from './protocol.js';
 import { lookCode } from '../render/sprites.js';
 import { UPGRADES } from '../sim/upgrades.js';
 import { Abilities } from '../sim/abilities.js';
+import { applyCombo } from '../sim/combo.js';
 import { OnlineClient, Solo } from './mode.js';
 
 const SAVE = 'dz-online';
@@ -569,6 +570,7 @@ export class Online {
       }
     }
     g.money = money;
+    applyCombo(p.combo, s.cb);
     const wp = Array.isArray(s.wp) ? s.wp.filter((w) => Array.isArray(w) && WEAPONS[w[0]]) : [];
     if (wp.length) {
       const ids = wp.map((w) => w[0]).join();

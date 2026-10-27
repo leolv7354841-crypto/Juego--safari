@@ -33,6 +33,7 @@ import {
 import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.js';
 import { Abilities, isClass } from '../../../js/sim/abilities.js';
 import * as Rules from '../../../js/sim/rules.js';
+import { comboBreak, comboKill, comboTick, packCombo } from '../../../js/sim/combo.js';
 import { TAU } from '../../../js/core/util.js';
 import type { Cmd, Act } from '../validate.ts';
 
@@ -346,16 +347,18 @@ export class ServerSim {
 
   killZombie(z: any) {
     const by = this.slots.get(z.lastOwner);
+    // la baja alarga la racha de quien la hizo: su multiplicador sube el dinero y la experiencia
+    const mult = by && !z.dead ? comboKill(by.p.combo, z.type) : 1;
     Rules.killZombie(this.game, z, {
       kills: this.kills,
       // la experiencia es del equipo (todos suben de nivel juntos)
       xp: (zb: any) => {
-        for (const s of this.slots.values()) this.addXp(s, zb.def.xp);
+        for (const s of this.slots.values()) this.addXp(s, Math.round(zb.def.xp * mult));
       },
       bounty: (zb: any) => {
         if (!by) return;
         by.kills++;
-        by.money += Rules.bountyOf(zb.type);
+        by.money += Math.round(Rules.bountyOf(zb.type) * mult);
       },
       // recompensa única del zombi dorado para quien lo mató (como en solitario)
       golden: (_zb: any, reward: number) => {
@@ -562,6 +565,7 @@ export class ServerSim {
   onZombieHit(p: any) {
     const s = this.slotOf(p);
     if (!s || p.inRobot || p.boostT > 0) return;
+    comboBreak(p.combo);
     const loss = Rules.hitLoss(s.money);
     if (loss <= 0) return;
     s.money -= loss;
@@ -706,6 +710,7 @@ export class ServerSim {
       // el robot pilotado va donde va su piloto (pisadas, chispas si está dañado)
       s.robot.update(TICK, s.p, g);
       this.updateAcid(s);
+      comboTick(s.p, TICK);
     }
     this.structures.update(TICK, g);
     this.flowT -= TICK;
@@ -830,6 +835,8 @@ export class ServerSim {
       }),
       // habilidad propia: clase, espera (décimas) y megarráfaga en curso
       ab: [CLASS_ORDER.indexOf(me.cls), Math.ceil((me.abCd || 0) * 10), r100(me.rageT || 0)],
+      // racha propia: bajas seguidas y décimas que le quedan
+      cb: packCombo(me.combo),
     };
     this.structSnap(s, snap);
     if (s.lost) {

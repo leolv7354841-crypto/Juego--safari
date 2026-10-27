@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.js';
 import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.js';
-import { ABILITY, BOUNTY, PLAYER_BASE } from '../../js/core/config.js';
+import { ABILITY, BOUNTY, COMBO, PLAYER_BASE } from '../../js/core/config.js';
 import { UPGRADES } from '../../js/sim/upgrades.js';
 import { cooldownOf } from '../../js/sim/abilities.js';
+import { comboBreak, comboMult } from '../../js/sim/combo.js';
 import { WALK } from '../../js/sim/player.js';
 import { cleanAct, cleanClass } from '../src/validate.ts';
 
@@ -81,7 +82,8 @@ test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida'
   }
   const a = sim.slots.get('a')!;
   assert.ok(a.kills > 0, 'mató zombis');
-  // (los golpes que recibió le quitan dinero: se comprueba la recompensa de una baja suelta)
+  // (los golpes que recibió le quitan dinero: se comprueba la recompensa de una baja suelta, sin racha)
+  comboBreak(a.p.combo);
   const m0 = a.money;
   const z = sim.horde.list.find((o: any) => o.type === 'normal' && !o.dead);
   z.lastOwner = 'a';
@@ -479,4 +481,34 @@ test('la foto del servidor lleva la parte del mundo común con el cooperativo, y
   assert.ok(snap.z.length % ZOMBIE_N === 0);
   // lo propio de cada jugador sigue ahí (el cooperativo no lo manda)
   for (const k of ['me', 'st', 'wp', 'ec', 'ps', 'iv', 'ab']) assert.ok(k in snap, `falta ${k}`);
+});
+
+test('la racha es de quien mata: multiplica su dinero, la corta un golpe y va en su foto', () => {
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
+  const a = sim.slots.get('a')!;
+  const b = sim.slots.get('b')!;
+  const kill = () => {
+    const z = sim.horde.spawn('normal', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
+    z.lastOwner = 'a';
+    sim.killZombie(z);
+  };
+  const [n1, m1] = COMBO.tiers[0];
+  for (let i = 0; i < n1 - 1; i++) kill();
+  assert.equal(a.money, BOUNTY.normal * (n1 - 1), 'sin multiplicador antes del primer nivel');
+  const m0 = a.money;
+  kill();
+  assert.equal(a.money, m0 + Math.round(BOUNTY.normal * m1), 'la baja que llega al nivel cobra ×' + m1);
+  assert.equal(b.p.combo.n, 0, 'la racha no es del equipo');
+  assert.deepEqual(sim.snapshot('a', 0)!.cb, [n1, COMBO.window * 10]);
+  sim.onZombieHit(a.p);
+  assert.equal(a.p.combo.n, 0, 'un golpe la corta');
+  assert.equal(a.p.combo.best, n1);
+  // el reloj corre con la simulación
+  kill();
+  for (let i = 0; i < Math.ceil((COMBO.window * 60) / 1) + 2; i++) sim.step();
+  assert.equal(a.p.combo.n, 0, 'sin bajas se acaba');
+  assert.equal(comboMult(a.p.combo.best), m1);
 });

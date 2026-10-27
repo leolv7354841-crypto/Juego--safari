@@ -1,7 +1,8 @@
 // Interfaz de juego: marcador (vida, aguante, arma, inventario), avisos, carteles y dinero flotante.
-import { BUILD_ORDER, SHOP, ROBOT, WEAPONS } from '../core/config.js';
+import { BUILD_ORDER, COMBO, SHOP, ROBOT, WEAPONS } from '../core/config.js';
 import { fmtTime } from '../core/util.js';
 import { CLASSES, cooldownOf } from '../sim/abilities.js';
+import { comboMult, comboTier, multText } from '../sim/combo.js';
 import { ITEM_ICONS, SHORT } from './icons.js';
 import { closest, on } from './dom.js';
 
@@ -32,6 +33,52 @@ export function banner(game, title, sub) {
   el.classList.add('show');
   clearTimeout(game.bannerT);
   game.bannerT = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// Racha: bajas seguidas, multiplicador y barra del tiempo que queda. Al subir de nivel salta y suena;
+// al terminar queda un momento lo que se logró (en rojo si la cortó un golpe).
+function updateCombo(game, c) {
+  const $ = game.$;
+  const el = $('combo');
+  const fresh = !('cbn' in game.cache);
+  const last = game.cache.cbn || 0;
+  const lastT = game.cache.cbt || 0;
+  game.cache.cbn = c.n;
+  game.cache.cbt = c.t;
+  const look = (cls) => {
+    if (game.cache.cbC === cls) return false;
+    game.cache.cbC = cls;
+    el.className = cls;
+    return true;
+  };
+  // partida nueva (o HUD redibujado): nada de la racha anterior
+  if (fresh) {
+    clearTimeout(game.comboEndT);
+    look('combo');
+  }
+  if (c.n >= COMBO.show) {
+    clearTimeout(game.comboEndT);
+    const tier = comboTier(c.n);
+    // al subir de nivel salta (bump se queda puesto hasta el siguiente: la clase guardada no lo lleva)
+    if (look(`combo show t${tier}`) && tier > comboTier(last)) {
+      void el.offsetWidth;
+      el.classList.add('bump');
+      game.sfx.combo(tier);
+    }
+    set(game, 'cbN', $('combo-n'), 'text', String(c.n));
+    set(game, 'cbX', $('combo-x'), 'text', multText(comboMult(c.n)));
+    set(game, 'cbL', $('combo-lbl'), 'text', 'Racha');
+    set(game, 'cbW', $('combo-fill'), 'transform', `scaleX(${Math.min(1, c.t / COMBO.window).toFixed(2)})`);
+    return;
+  }
+  if (c.n > 0 || last < COMBO.show) return;
+  // se acabó: si quedaba tiempo en el reloj, la cortó un golpe
+  const cut = lastT > 0.3;
+  look(`combo show end${cut ? ' cut' : ''}`);
+  set(game, 'cbN', $('combo-n'), 'text', String(last));
+  set(game, 'cbL', $('combo-lbl'), 'text', cut ? 'Racha perdida' : 'Fin de la racha');
+  if (cut && comboTier(last)) game.sfx.comboLost();
+  game.comboEndT = setTimeout(() => look('combo'), 1400);
 }
 
 function set(game, key, el, prop, value) {
@@ -106,6 +153,7 @@ export function updateHud(game, force) {
   set(game, 'lvl', $('lvl'), 'text', String(game.level));
   set(game, 'time', $('time'), 'text', fmtTime(game.time));
   set(game, 'kills', $('kills'), 'text', String(game.totalKills()));
+  updateCombo(game, p.combo);
   set(game, 'wave', $('wave'), 'text', String(Math.max(1, game.director.wave)));
   // montado en la torreta pesada se ven sus balas
   const w = p.manned ? { def: WEAPONS.heavy, mag: p.heavyAmmo, reserve: 0 } : p.weapon;

@@ -459,6 +459,21 @@ export const MOLOTOV = { radius: 82, life: 6.5, burn: 4, dps: 24 };
 // Zombi dorado: recompensa al matarlo y cuánto vive antes de desaparecer.
 export const GOLDEN = { rewardMin: 100, rewardMax: 250, life: 26, warnAt: 7, firstAfter: 12, every: [35, 65] };
 
+// Racha: bajas seguidas sin dejar pasar window s entre una y otra ni recibir un golpe de zombi.
+// tiers: [bajas, multiplicador] del dinero y la experiencia de cada baja · golden: bajas que suma
+// un dorado · show: desde cuántas bajas se ve el contador.
+export const COMBO = {
+  window: 2.5,
+  golden: 10,
+  show: 5,
+  tiers: [
+    [10, 1.5],
+    [25, 2],
+    [50, 3],
+    [100, 4],
+  ],
+};
+
 // Dinero que pierdes con cada golpe de zombi (siempre más de $15).
 export const MONEY_LOSS = { min: 16, max: 40 };
 

@@ -314,6 +314,22 @@ export class Sfx {
       this.tone({ freq: rand(2500, 4200), dur: 0.12, gain: 0.05, type: 'sine', delay: 0.1 + i * 0.05 });
   }
 
+  // La racha sube de nivel: arpegio más agudo en cada nivel.
+  combo(tier) {
+    if (!this.ok('combo', 0.15, true)) return;
+    const k = 2 ** ((tier - 1) / 4);
+    [523, 659, 784].forEach((f, i) =>
+      this.tone({ freq: f * k, dur: 0.18, gain: 0.13, type: 'square', delay: i * 0.05 }),
+    );
+    this.tone({ freq: 1046 * k, dur: 0.3, gain: 0.1, type: 'triangle', delay: 0.15 });
+  }
+
+  // Un golpe cortó la racha.
+  comboLost() {
+    if (!this.ok('comboLost', 0.5, true)) return;
+    this.tone({ freq: 440, to: 140, dur: 0.4, gain: 0.14, type: 'sawtooth' });
+  }
+
   goldenSpawn() {
     if (!this.ok('goldenSpawn', 1, true)) return;
     [1318, 1568, 2093].forEach((f, i) => this.tone({ freq: f, dur: 0.25, gain: 0.1, type: 'sine', delay: i * 0.09 }));

@@ -379,6 +379,46 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .round-key { margin: 5px 0 0; font-size: 11px; color: var(--dim); }
 .touch .round-key { display: none; }
 
+/* ---------- Racha ---------- */
+
+.combo {
+  --c: var(--ink);
+  position: absolute;
+  top: calc(var(--sat) + 62px);
+  right: max(14px, var(--sar));
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--c);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.combo.show { opacity: 1; transform: none; }
+.combo small { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.combo-row { display: flex; align-items: baseline; gap: 6px; line-height: 0.85; }
+.combo b { font-family: var(--display); font-size: 40px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.combo em { font-family: var(--display); font-size: 26px; font-weight: 600; font-style: normal; }
+.combo-track { display: block; width: 96px; height: 4px; background: rgba(0, 0, 0, 0.5); }
+.combo-track u { display: block; height: 100%; background: var(--c); transform-origin: right; transition: transform 0.12s linear; }
+.combo.t0 em { display: none; }
+.combo.t1 { --c: #f0c040; }
+.combo.t2 { --c: #ec8a3a; }
+.combo.t3 { --c: #e05a48; }
+.combo.t4 { --c: #ff4a4a; }
+.combo.t4 b { animation: combo-glow 0.8s ease-in-out infinite; }
+.combo.bump .combo-row { animation: combo-bump 0.45s ease-out; }
+.combo.end { --c: var(--dim); }
+.combo.end.cut { --c: #e05a48; }
+.combo.end .combo-track, .combo.end em { visibility: hidden; }
+@keyframes combo-bump {
+  0% { transform: scale(1.7); }
+  60% { transform: scale(0.92); }
+  100% { transform: none; }
+}
+@keyframes combo-glow { 50% { text-shadow: 0 0 16px rgba(255, 74, 74, 0.9), 0 2px 6px #000; } }
+
 /* ---------- Dinero flotante ---------- */
 
 #money-pops { position: relative; height: 0; }
@@ -858,6 +898,10 @@ kbd {
   .icon-btn { width: 38px; }
   .hud-left { left: max(10px, var(--sal)); gap: 6px; }
   .hud-right { right: max(10px, var(--sar)); }
+  .combo { top: calc(var(--sat) + 56px); right: max(10px, var(--sar)); }
+  .combo b { font-size: 32px; }
+  .combo em { font-size: 21px; }
+  .combo-track { width: 80px; }
 }
 
 @media (max-width: 560px) {

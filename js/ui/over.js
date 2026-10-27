@@ -2,6 +2,7 @@
 import { fmtTime, storage } from '../core/util.js';
 import { on } from './dom.js';
 import { showClass } from './class.js';
+import { comboMult, multText } from '../sim/combo.js';
 
 export function gameOver(game) {
   game.mode.onGameOver();
@@ -9,6 +10,12 @@ export function gameOver(game) {
   const p = game.player;
   const total = game.totalKills();
   const acc = p.shotsFired ? Math.round((p.shotsHit / p.shotsFired) * 100) : 0;
+  // mejor racha de la partida y récord de este dispositivo
+  const combo = p.combo.best;
+  const comboBest = storage.get('dz-combo', 0) || 0;
+  if (combo > comboBest) storage.set('dz-combo', combo);
+  const mult = comboMult(combo);
+  const comboTxt = `${combo}${mult > 1 ? ` (${multText(mult)})` : ''}${combo > comboBest && comboBest ? ' · récord' : ''}`;
   const rows = [
     ['Tiempo sobrevivido', fmtTime(game.time)],
     ['Oleada alcanzada', game.director.wave],
@@ -23,6 +30,7 @@ export function gameOver(game) {
     ['Super blindados', game.kills.heavy],
     ['Toros', game.kills.bull || 0],
     ['sep'],
+    ['Mejor racha', comboTxt],
     ['Precisión', `${acc}%`],
     ['Daño recibido', Math.round(p.damageTaken)],
     ['Dinero ganado', `$${game.moneyEarned}`],

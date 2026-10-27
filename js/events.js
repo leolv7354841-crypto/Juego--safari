@@ -2,6 +2,7 @@
 // (iguales en el servidor) viven en sim/rules.js; aquí se decide qué pasa con el dinero y los avisos.
 import { clamp, storage } from './core/util.js';
 import * as Rules from './sim/rules.js';
+import { comboBreak, comboKill, comboTick } from './sim/combo.js';
 
 export function hitZombie(game, z, b, hx, hy) {
   // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
@@ -12,12 +13,15 @@ export function hitZombie(game, z, b, hx, hy) {
 
 export function killZombie(game, z) {
   // cooperativo: las bajas del compañero le dan el dinero a él
-  const byPeer = z.lastOwner === 'peer' && !!game.mode.hostedPeer();
+  const peer = game.mode.hostedPeer();
+  const byPeer = z.lastOwner === 'peer' && !!peer;
+  // la baja alarga la racha de quien la hizo y su multiplicador sube el dinero y la experiencia
+  const mult = z.dead || game.state === 'menu' ? 1 : comboKill((byPeer ? peer : game.player).combo, z.type);
   Rules.killZombie(game, z, {
     kills: game.kills,
-    xp: (zb) => addXp(game, zb.def.xp),
+    xp: (zb) => addXp(game, Math.round(zb.def.xp * mult)),
     bounty: (zb) => {
-      const n = Rules.bountyOf(zb.type);
+      const n = Math.round(Rules.bountyOf(zb.type) * mult);
       if (byPeer) game.coop.earn(n);
       else {
         game.money += n;
@@ -91,10 +95,15 @@ export function onGoldenExpired(game, z) {
 
 // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
 export function onZombieHit(game, z, target) {
-  // el golpe al compañero se lo cobra su propio celular
-  if (target && target.remote) return game.coop.send({ t: 'hit' });
+  // el golpe al compañero se lo cobra su propio celular (y aquí se le corta la racha)
+  if (target && target.remote) {
+    if (!target.inRobot && !(target.boostT > 0)) comboBreak(target.combo);
+    return game.coop.send({ t: 'hit' });
+  }
   // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
   if (game.state === 'menu' || game.player.inRobot || game.player.boostT > 0) return;
+  // el golpe corta la racha (la del invitado la corta el anfitrión)
+  if (game.mode.authority()) comboBreak(game.player.combo);
   const loss = Rules.hitLoss(game.money);
   if (loss <= 0) return;
   game.money -= loss;
@@ -114,6 +123,13 @@ export function onGiantStep(game, z) {
     game.camera.shake(0.16 * vol);
     game.sfx.stomp(vol);
   }
+}
+
+// Reloj de las rachas que lleva este equipo: la propia y, de anfitrión, la del compañero.
+export function updateCombo(game, dt) {
+  comboTick(game.player, dt);
+  const peer = game.mode.hostedPeer();
+  if (peer) comboTick(peer, dt);
 }
 
 export function addXp(game, n) {

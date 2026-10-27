@@ -22,6 +22,10 @@ de un cerco, no para pasear.
 
 Cuando un zombi te golpea **pierdes dinero** ($16–$40 al azar, nunca te deja en negativo) y lo ves en un
 indicador rojo junto a tu dinero. El zombi dorado parpadea cuando está por escaparse; si se va, no da nada.
+
+**Racha:** cada baja hecha antes de 2,5 s de la anterior alarga tu racha (un dorado suma 10). Con 10 bajas
+seguidas cada zombi da **×1,5** de dinero y experiencia, con 25 **×2**, con 50 **×3** y con 100 **×4**. Un
+golpe de zombi (fuera del robot) o caer la corta. La mejor racha de la partida sale en el resumen final.
 La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
 
 ### Cuentas y clasificación
