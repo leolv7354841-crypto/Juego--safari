@@ -71,8 +71,7 @@ test('2 jugadores: el segundo entra por el enlace de invitación y empiezan', as
   expect(new URL(enlace).searchParams.get('sala')).toBe(codigo);
 
   // Beto abre el enlace: cae en la pantalla en línea con el código ya escrito
-  const erroresB = await abrir(b, enlace);
-  await expect(b.locator('#screen-online')).toBeVisible();
+  const erroresB = await abrir(b, enlace, '#screen-online');
   await expect(b.locator('#ol-code-in')).toHaveValue(codigo);
   await b.locator('#ol-name').fill('Beto');
   await b.locator('#ol-code-in').press('Enter');
@@ -86,8 +85,14 @@ test('2 jugadores: el segundo entra por el enlace de invitación y empiezan', as
     await expect.poll(() => p.evaluate(() => window.__deadzone.state), { timeout: 30_000 }).toBe('play');
     expect(await p.evaluate(() => window.__deadzone.online.active)).toBe(true);
   }
-  // al salir de la sala vuelves a Solo separado: la partida no se guarda
   expect(await b.evaluate(() => window.__deadzone.mode.kind)).toBe('online');
+  // al salir de la sala vuelves a Solo separado: la partida no se guarda
+  await b.evaluate(() => window.__deadzone.online.leave());
+  const modo = await b.evaluate(() => {
+    const m = window.__deadzone.mode;
+    return [m.kind, m.detached, m.savesProgress()];
+  });
+  expect(modo).toEqual(['solo', true, false]);
   expect(erroresA.filter((e) => !CONOCIDO.test(e))).toEqual([]);
   expect(erroresB.filter((e) => !CONOCIDO.test(e))).toEqual([]);
 });

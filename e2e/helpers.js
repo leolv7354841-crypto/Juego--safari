@@ -1,8 +1,9 @@
 // Ayudas comunes de las pruebas de navegador.
 import { expect } from '@playwright/test';
 
-// Abre el juego y falla si hay errores de consola o de página.
-export async function abrir(page, ruta = '/index.html') {
+// Abre el juego y falla si hay errores de consola o de página. `listo`: lo que debe verse al terminar
+// (el menú; con un enlace de invitación, la pantalla en línea).
+export async function abrir(page, ruta = '/index.html', listo = '#btn-start') {
   const errores = [];
   page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
@@ -17,7 +18,7 @@ export async function abrir(page, ruta = '/index.html') {
     await page.locator('#acct-pin-in').fill('1234');
     await form.locator('button[type=submit]').click();
   }
-  await expect(page.locator('#btn-start')).toBeVisible();
+  await expect(page.locator(listo)).toBeVisible();
   return errores;
 }
 

@@ -1,5 +1,6 @@
 // Cuentas: pantalla para crear o elegir una (nombre y PIN de 4 dígitos).
 import { on } from './dom.js';
+import { openInvite } from './lobby.js';
 
 export function showAccount(game) {
   game.setState('account');
@@ -36,6 +37,8 @@ export async function submitAccount(game, e) {
   await game.accounts.cloudPull();
   game.newWorld();
   game.setupMenu();
+  // quien llegó con un enlace de invitación sin cuenta entra a la sala al terminar de crearla
+  if (game.inviteCode) openInvite(game);
 }
 
 // Botones de la pantalla de cuenta y del menú que la abre.
