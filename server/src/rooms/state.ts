@@ -26,6 +26,7 @@ export const LobbyState = schema(
     ownerId: t.string(),
     code: t.string(),
     maxPlayers: t.uint8(),
+    minPlayers: t.uint8(),
     wave: t.uint16(),
     members: t.map(Member),
   },

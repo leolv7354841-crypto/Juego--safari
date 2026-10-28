@@ -297,11 +297,8 @@ export class Horde {
   update(dt: number, game: GameHost) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
     const targets = game.targets || null;
-    // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
     const p0 = targets ? IDLE : (game.player ?? IDLE);
-    const hosted = targets ? null : game.mode.hostedPeer();
-    const peer = hosted && hosted.alive ? hosted : null;
-    // objetivo actual: Player, compañero remoto o el IDLE sin jugadores (por eso any)
+    // objetivo actual: Player o el IDLE sin jugadores (por eso any)
     let p: any = p0;
     const world = game.world;
     const time = game.time;
@@ -323,9 +320,6 @@ export class Horde {
           IDLE.x = z.x + 1;
           IDLE.y = z.y;
         }
-      } else if (peer) {
-        const d0 = p0.alive ? (z.x - p0.x) ** 2 + (z.y - p0.y) ** 2 : Infinity;
-        p = (z.x - peer.x) ** 2 + (z.y - peer.y) ** 2 < d0 ? peer : p0;
       }
       z.flash -= dt;
       z.slow -= dt;
@@ -407,7 +401,6 @@ export class Horde {
         // ruta: hacia su punto de flanqueo mientras esté lejos; después, directo por ti
         let field = world.main;
         if (targets) field = p.field || world.main;
-        else if (p !== p0) field = world.main2;
         else if (!z.planned && d > 320 && p.alive) this.planRoute(z, p, world);
         if (!targets && p === p0 && z.anchor >= 0) {
           const a = world.anchors[z.anchor];
@@ -542,7 +535,7 @@ export class Horde {
     for (const z of list) grid.insert(z);
     this.separate(dt);
     for (const z of list) {
-      for (const pl of targets || (peer ? [p0, peer] : [p0])) {
+      for (const pl of targets || [p0]) {
         if (!pl.alive) continue;
         const dx = pl.x - z.x;
         const dy = pl.y - z.y;
@@ -553,15 +546,11 @@ export class Horde {
           const ov = rr - d;
           const nx = dx / d;
           const ny = dy / d;
-          // al compañero lo mueve su propio celular: aquí sólo se aparta el zombi
-          const tm = pl === peer ? z.mass : z.mass + pl.mass;
-          const zk = pl === peer ? 1 : pl.mass / tm;
-          z.x -= nx * ov * zk;
-          z.y -= ny * ov * zk;
-          if (pl !== peer) {
-            pl.x += nx * ov * (z.mass / tm);
-            pl.y += ny * ov * (z.mass / tm);
-          }
+          const tm = z.mass + pl.mass;
+          z.x -= nx * ov * (pl.mass / tm);
+          z.y -= ny * ov * (pl.mass / tm);
+          pl.x += nx * ov * (z.mass / tm);
+          pl.y += ny * ov * (z.mass / tm);
         }
       }
       world.lastBlock = null;

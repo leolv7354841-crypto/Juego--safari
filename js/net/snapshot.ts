@@ -1,8 +1,8 @@
-// Foto del mundo: el único formato con el que el anfitrión del cooperativo (coop.js) y el servidor en línea
-// (server/src/sim/ServerSim.ts) le cuentan a un jugador lo que ve. Lo decodifica js/net/remote.js.
+// Foto del mundo: el formato con el que el servidor en línea
+// (server/src/sim/ServerSim.ts) le cuenta a un jugador lo que ve. Lo decodifica js/net/remote.js.
 //
-// Una foto = parte del mundo (esta, igual en los dos modos) + parte propia del modo:
-//   cooperativo  q, ts, o, z, zx, zh, pl, rb, pk, b, gr, fi, so, ms, bl, w, ds, tm  + lv, xp, xn (equipo), kl, blk, wir, sc
+// Una foto = parte del mundo (esta) + parte propia de cada jugador:
+//   mundo        q, ts, o, z, zx, zh, pl, rb, pk, b, gr, fi, so, ms, bl, w, ds, tm
 //   en línea     lo mismo + ack, me, st, wp, ec, ps, iv, ab, hv, up, fx, tt, dg, kl, ml, lft, blk, wir, sc (cada jugador)
 // Todo son listas planas de números (poco peso); las posiciones de los zombis van relativas a `o`.
 // El contrato de tipos está en js/core/types.d.ts (WorldSnap). No importa nada del navegador.
@@ -25,7 +25,7 @@ export const PEER_N = 19;
 /** Números por robot en `rb`: idx, x, y, ángulo, piernas, paso, vida, pilotado. */
 export const ROBOT_N = 8;
 
-/** Claves de la parte del mundo (encodeWorld): están en toda foto, del cooperativo o del servidor. */
+/** Claves de la parte del mundo (encodeWorld): están en toda foto del servidor. */
 export const WORLD_KEYS = ['o', 'z', 'zx', 'zh', 'pl', 'rb', 'pk', 'b', 'gr', 'fi', 'so', 'ms', 'bl', 'w', 'ds', 'tm'];
 
 const r100 = (v: number) => Math.round(v * 100);
@@ -39,7 +39,7 @@ export type RobotEntry = { idx: number; r: Robot };
 /** Lo que encodeScene y encodeStatic leen de `Structures`. */
 type SceneStructures = Pick<Structures, 'grenades' | 'fires' | 'stuck' | 'missiles' | 'blasts'>;
 type StaticStructures = Pick<Structures, 'blocks' | 'wires' | 'scorches'>;
-/** Lo que encodeWorld lee de la partida (el anfitrión del cooperativo o la simulación del servidor). */
+/** Lo que encodeWorld lee de la partida (la simulación del servidor). */
 export type WorldSource = {
   horde: Pick<Horde, 'list'>;
   pickups: Pick<Pickups, 'list'>;

@@ -468,7 +468,7 @@ test('torreta pesada: se compra con sus balas, se monta y dispara en línea', ()
   assert.equal(t.manned, null, 'libre al caer');
 });
 
-test('la foto del servidor lleva la parte del mundo común con el cooperativo, y el jugador de otro entra con el mismo tamaño', () => {
+test('la foto del servidor lleva la parte del mundo y el jugador de otro entra con el mismo tamaño', () => {
   const sim = new ServerSim(5, [
     { id: 'a', idx: 1, name: 'Ana' },
     { id: 'b', idx: 2, name: 'Beto' },
@@ -479,7 +479,7 @@ test('la foto del servidor lleva la parte del mundo común con el cooperativo, y
   assert.equal(snap.pl.length, PEER_N, 'un solo compañero');
   assert.equal(snap.pl[0], 2, 'el compañero es Beto (idx 2)');
   assert.ok(snap.z.length % ZOMBIE_N === 0);
-  // lo propio de cada jugador sigue ahí (el cooperativo no lo manda)
+  // lo propio de cada jugador sigue ahí
   for (const k of ['me', 'st', 'wp', 'ec', 'ps', 'iv', 'ab']) assert.ok(k in snap, `falta ${k}`);
 });
 

@@ -43,7 +43,7 @@ export function setClassPick(game, id) {
   if (game.online.room && !game.online.playing) game.online.send('cls', { v: id });
 }
 
-// Selector compacto de clase en las salas del cooperativo y en línea.
+// Selector compacto de clase en la sala en línea.
 export function renderClassRows(game) {
   for (const row of game.root.querySelectorAll('.class-row')) {
     row.innerHTML = '';

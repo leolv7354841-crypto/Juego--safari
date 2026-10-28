@@ -70,9 +70,7 @@ export function renderShop(game) {
       </div>
     </div>`;
     });
-  // en cooperativo la torreta pesada es del anfitrión
-  const noHeavy = !game.mode.hasHeavy();
-  const gear = SHOP_ORDER.filter((k) => !(noHeavy && SHOP[k].manned)).map((k) => {
+  const gear = SHOP_ORDER.map((k) => {
     const it = SHOP[k];
     const poor = game.money < it.price;
     return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
@@ -83,7 +81,7 @@ export function renderShop(game) {
   });
   game.$('shop-items').innerHTML = `
     <h3 class="shop-sec">Armas</h3>${guns.join('')}
-    <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}${noHeavy ? '' : heavyAmmoItem(game)}
+    <h3 class="shop-sec">Munición</h3>${ammo.length ? ammo.join('') : '<p class="shop-empty">Compra un arma para poder comprarle balas. El subfusil tiene balas infinitas.</p>'}${heavyAmmoItem(game)}
     <h3 class="shop-sec">Defensas, granadas y molotovs</h3>${gear.join('')}
     <h3 class="shop-sec">Robot de combate</h3>${robotShopItem(game)}`;
   game
@@ -127,7 +125,6 @@ export function heavyAmmoItem(game) {
 }
 
 export function robotShopItem(game) {
-  if (!game.mode.hasRobot()) return '<p class="shop-empty">En cooperativo el robot es del anfitrión.</p>';
   const rb = game.robot;
   let btn;
   let info;

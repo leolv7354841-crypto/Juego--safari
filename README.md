@@ -78,18 +78,13 @@ atasca, se escurre de lado y recalcula su camino.
 Caminan de forma algo irregular (se desvían y tropiezan), algunos se quedan rezagados, se esquivan
 entre ellos para no amontonarse y los más rápidos adelantan a los más lentos.
 
-### Cooperativo (2 jugadores)
+### Jugar con amigos (en línea, de 2 a 4)
 
-En el menú, **Cooperativo · 2 jugadores**: uno toca *Crear sala* y le pasa el código de 4 letras al
-otro, que toca *Unirse*. Juegan en el mismo mapa contra hordas con **la mitad de zombis** que en solitario
-(pero con 1,4 veces más vida); los zombis van por el jugador más cercano. No hay competitivo: cada uno
-tiene su dinero, armas, vida y mejoras, la experiencia es del equipo, y si uno cae revive con media
-vida al terminar la oleada (si caen los dos, se acaba la partida). Las mejoras y la tienda se abren
-entre oleadas. El robot es del anfitrión.
-
-Por dentro: el anfitrión simula el mundo y le manda al invitado lo que pasa ~8–12 veces por segundo.
-Primero intenta una conexión directa entre los celulares (WebRTC); como en muchas redes móviles no se
-logra, mientras tanto todo viaja por la sala de Firebase (en tiempo real), que siempre funciona.
+El juego tiene dos modos: **Un jugador** y **En línea · 2 a 4**. Para jugar con un amigo, uno toca
+*En línea* → *Crear sala* y le pasa el **código** de 6 caracteres o el **enlace de invitación**
+(`?sala=CÓDIGO`) que muestra la sala; el otro abre el enlace (o escribe el código) y entra. La partida
+empieza cuando hay **de 2 a 4 jugadores conectados y listos**; con una sola persona el botón
+*Iniciar partida* avisa de que hace falta otra. Ver «Multijugador en línea» más abajo.
 
 ### Robot de combate
 
@@ -200,20 +195,14 @@ En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de in
         ".write": true,
         ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('wave').isNumber() && newData.child('wave').val() <= 999 && newData.child('kills').isNumber()"
       }
-    },
-    "rooms": {
-      "$code": {
-        ".read": true,
-        ".write": true
-      }
     }
   }
 }
 ```
 
-`rooms` es para las salas del modo cooperativo (sólo guardan unos segundos la "dirección" de cada
-celular para conectarlos). La partida en sí va directo entre los dos celulares (WebRTC, P2P); algunas
-redes móviles bloquean la conexión directa y en ellas el cooperativo no conecta.
+Firebase sólo guarda la clasificación mundial (`scores`). Ya **no hace falta** para jugar con amigos:
+el cooperativo directo (P2P, WebRTC) desapareció y las partidas de 2 a 4 pasan por el servidor en línea.
+Si tu base todavía tiene una regla `rooms` de antes, puedes borrarla.
 
 4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
    `js/core/config.ts`. El juego usa la API REST: no hace falta ninguna librería ni clave.
@@ -221,13 +210,13 @@ redes móviles bloquean la conexión directa y en ellas el cooperativo no conect
 Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
 no a prueba de trampas.
 
-## Multijugador en línea (servidor, 4 por sala y 5 salas)
+## Multijugador en línea (servidor, de 2 a 4 por sala y 8 salas)
 
-Además del cooperativo directo de 2, el botón **En línea · hasta 4** usa un servidor propio
-(carpeta `server/`). Capacidad: **4 jugadores por sala y 5 salas a la vez** (`MAX_PLAYERS`,
-`MAX_ROOMS`); con todas las salas ocupadas el juego avisa de que el servidor está lleno. **Cómo
+El botón **En línea · 2 a 4** usa un servidor propio (carpeta `server/`). Capacidad: **de 2 a 4
+jugadores por sala** (`MIN_PLAYERS`, `MAX_PLAYERS`) **y 8 salas a la vez** (`MAX_ROOMS`); con todas las
+salas ocupadas el juego avisa de que el servidor está lleno. **Cómo
 publicarlo en una máquina virtual y qué comprar: [`deploy/README.md`](deploy/README.md).** Todos se conectan a él por WebSocket, así que funciona en cualquier red
-(también donde la conexión directa entre celulares falla).
+(sin conexión directa entre celulares ni Firebase de por medio).
 
 **Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
 partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/sim/world.ts`,
@@ -248,12 +237,12 @@ recibe 20 fotos por segundo de lo que tiene cerca.
 
 **Salas.** Crear sala da un código de 6 caracteres (generado con `crypto`) y un enlace de
 invitación (`?sala=CÓDIGO`). Hay lista de jugadores con su estado (listo, jugando, caído,
-reconectando), botón *Estoy listo* y *Iniciar partida* sólo para el propietario (cuando los demás
-están listos). Fases: esperando → cargando → jugando → finalizada (con resultados). Si el
+reconectando), botón *Estoy listo* y *Iniciar partida* sólo para el propietario (cuando hay al menos
+`MIN_PLAYERS` = 2 conectados y los demás están listos). Fases: esperando → cargando → jugando → finalizada (con resultados). Si el
 propietario se va, la sala pasa al más antiguo. Una sala vacía se borra a los 30 s, y una sala
 sin partida (esperando o en resultados) se cierra a los 20 minutos para liberar su cupo.
 
-**Reglas del modo en línea (fase 1).** Como en el cooperativo, cada uno tiene su dinero, armas y
+**Reglas del modo en línea (fase 1).** Cada uno tiene su dinero, armas y
 mejoras, y la experiencia es del equipo: el dinero se gana como en solitario (recompensas por zombi y
 el dorado, para quien lo mata; cada golpe de zombi cuesta dinero, salvo dentro del robot). Al subir de
 nivel a mitad de oleada aparece el botón **¡Mejora!** (tecla <kbd>U</kbd>): la partida no se detiene,
@@ -263,8 +252,7 @@ combate (uno por jugador). Lo que compras lo usas cuando quieras, también en pl
 (<kbd>F</kbd>), lanzar (<kbd>G</kbd>/<kbd>T</kbd>) y subir al robot (<kbd>E</kbd>) los hace el
 servidor, que también simula las torretas, minas, fuego, cohetes y el ácido del gordo. Se conservan
 armas de cajas, munición y botiquines.
-Zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra (y 1,4 veces su vida, como en el
-cooperativo). Si caes, revives al terminar la oleada junto a un compañero; la partida termina cuando
+Zombis por oleada: 0,5 del solitario + 0,15 por cada jugador extra (y 1,4 veces su vida). Si caes, revives al terminar la oleada junto a un compañero; la partida termina cuando
 caen todos. La siguiente oleada la inicia cualquiera (o empieza sola a los 45 s). El zombi dorado
 da dinero a quien lo mata. Quien entra a una sala con la partida empezada espera en la sala y juega la
 siguiente. Si alguien pierde la conexión, su personaje se queda quieto, los zombis lo ignoran y no
@@ -303,7 +291,7 @@ navegador).
 ```bash
 npm run server:test      # salas, cupos, permisos, entradas inválidas, reconexión, limpieza, predicción
 npm run server           # en otra terminal, para la prueba de carga
-npm run server:load      # 20 clientes: 5 salas de 4 (60 s)
+npm run server:load      # 20 clientes: 5 salas de 4 (60 s); para la capacidad actual: -- --rooms 8x4
 node server/tools/load.ts --url wss://servidor.tu-dominio.com --origin https://tu-juego.com --secs 60
 ```
 
@@ -316,7 +304,8 @@ medidas de red real). Las filas de salas de 10 son de cuando el cupo era 10 (`MA
 | 1 sala de 10, 10 fotos/s (`SNAP_HZ=10`) | 10,0 | ~15 | 60,0 (0 descartados) | 0,8 ms · 10 ms | 15 % de un núcleo |
 | 5 salas de 2 | 15,5 (las salas terminan al morir los bots) | ~17 | 60 por sala (3 descartados) | 0,9 ms · 22 ms | 34 % de un núcleo |
 | 1 sala de 10 con `COLYSEUS_LATENCY=100` | 20,0 | ~25 | 60,0 | 0,8 ms · 6 ms | 16 % de un núcleo |
-| **5 salas de 4, 20 fotos/s (capacidad actual)** | 17,0 (las salas terminan al morir los bots) | ~22 | 60,6 por sala (0 descartados) | 0,44 ms · 4,8 ms | 18 % de un núcleo (pico 51 %), 150 MB |
+| 5 salas de 4, 20 fotos/s (capacidad anterior) | 17,0 (las salas terminan al morir los bots) | ~22 | 60,6 por sala (0 descartados) | 0,44 ms · 4,8 ms | 18 % de un núcleo (pico 51 %), 150 MB |
+| **8 salas de 4, 20 fotos/s (capacidad actual, 45 s)** | 16,4 (mín. 8,1; los bots comparten el PC) | ~28 | 60,2 por sala (0 descartados) | 0,26 ms · 3,2 ms | 21,5 % de un núcleo (pico 60 %), 170 MB |
 
 Con 100 ms de latencia simulada el RTT medido fue de 124 ms de mediana, y en el navegador el
 personaje propio empezó a moverse en el primer fotograma (unas 10 entradas sin confirmar, 0
@@ -421,13 +410,11 @@ js/render/            Todo el dibujo (una pieza por módulo de sim/ que se ve)
   lighting.js         Oscuridad, linterna, farolas y fuegos
   particles.js        Partículas y restos en el suelo
 js/net/
-  mode.js             game.mode: Solo, CoopHost, CoopGuest, OnlineClient, ServerMode
+  mode.js             game.mode: Solo (con `detached`), OnlineClient, ServerMode
   protocol.js         Tablas y bits del protocolo (cliente y servidor)
   netcode.js          Predicción/reconciliación e interpolación (compartido con el servidor)
-  snapshot.js         Codificador de la foto del mundo (anfitrión del cooperativo y servidor)
+  snapshot.js         Codificador de la foto del mundo (servidor)
   remote.js           Lo que llega por la red: jugadores, zombis y balas de adorno
-  net.js              Conexión entre 2 celulares (código de sala + WebRTC)
-  coop.js             Modo cooperativo: anfitrión, invitado y sincronización
   online.js           Modo en línea: sala, predicción, interpolación y diagnóstico
 js/ui/                Entrada (input.js), sonido (audio.js), música (music.js), cuentas (accounts.js)
                       y una pieza por pantalla: hud, shop, class, look, levelup, over, menu, account, board, lobby

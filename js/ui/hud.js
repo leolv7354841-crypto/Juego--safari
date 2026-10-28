@@ -246,7 +246,7 @@ export function bindHud(game) {
   });
 }
 
-// Indicador de conexión del cooperativo y de la partida en línea (se actualiza una vez por segundo).
+// Indicador de conexión de la partida en línea (se actualiza una vez por segundo).
 export function updateNetStat(game, dt) {
   const ns = game.$('net-stat');
   if (game.mode.inGroup() && game.state !== 'menu') {

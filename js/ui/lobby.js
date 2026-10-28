@@ -1,4 +1,4 @@
-// Salas: lobby de la partida en línea (hasta 4) y sala del cooperativo de 2 por código.
+// Salas: sala de la partida en línea (de 2 a 4) por código o enlace de invitación.
 import { fmtTime } from '../core/util.ts';
 import { CLASSES } from '../sim/abilities.ts';
 import { validName, explainOnline } from '../net/online.ts';
@@ -74,10 +74,17 @@ export function renderLobby(game) {
   game.$('btn-ol-ready').textContent = me && me.ready ? 'Ya no estoy listo' : 'Estoy listo';
   game.$('btn-ol-start').hidden = !owner || !lobbyLike;
   const waitingFor = rows.filter(([id, m]) => id !== st.ownerId && m.connected && !m.ready).length;
-  game.$('btn-ol-start').disabled = waitingFor > 0;
-  game.$('btn-ol-start').textContent = waitingFor
-    ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
-    : 'Iniciar partida';
+  const here = rows.filter(([, m]) => m.connected).length;
+  const min = st.minPlayers || 2;
+  const start = game.$('btn-ol-start');
+  start.disabled = here < min || waitingFor > 0;
+  start.textContent =
+    here < min
+      ? `Hace falta ${min - here === 1 ? 'otra persona' : `${min - here} personas más`} (de ${min} a ${st.maxPlayers})`
+      : waitingFor
+        ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
+        : 'Iniciar partida';
+  game.$('ol-link').value = inviteUrl(game);
   game.$('btn-ol-lobby').hidden = !owner || phase !== 'finished';
   const ph =
     {
@@ -121,7 +128,7 @@ export async function onlineCreate(game) {
   onlineStatus(game, 'Conectando con el servidor…');
   try {
     await game.online.create(name);
-    onlineStatus(game, 'Sala creada: comparte el código o la invitación.');
+    onlineStatus(game, 'Sala creada: pasa el código o el enlace a tus amigos (de 2 a 4 jugadores).');
     renderLobby(game);
   } catch (err) {
     onlineStatus(game, explainOnline(err), true);
@@ -147,16 +154,22 @@ export async function onlineJoin(game) {
   game.onlineBusy = false;
 }
 
-export function copyInvite(game) {
+// Enlace de invitación a la sala actual (?sala=CÓDIGO; conserva ?servidor= si lo hay).
+export function inviteUrl(game) {
   const room = game.online.room;
-  if (!room) return;
+  if (!room) return '';
   const u = new URL(location.href);
   u.search = '';
   u.hash = '';
   const keep = new URLSearchParams(location.search).get('servidor');
   if (keep) u.searchParams.set('servidor', keep);
   u.searchParams.set('sala', room.roomId);
-  const text = u.toString();
+  return u.toString();
+}
+
+export function copyInvite(game) {
+  const text = inviteUrl(game);
+  if (!text) return;
   const done = () => onlineStatus(game, 'Invitación copiada: ' + text);
   if (navigator.clipboard && navigator.clipboard.writeText)
     navigator.clipboard.writeText(text).then(done, () => onlineStatus(game, text));
@@ -175,81 +188,8 @@ export function toggleDiag(game) {
   el.hidden = !el.hidden;
 }
 
-export function showCoop(game) {
-  game.sfx.unlock();
-  game.setState('coop');
-  game.renderClassRows();
-  game.$('coop-choose').hidden = false;
-  game.$('coop-wait').hidden = true;
-  game.$('coop-code-in').value = '';
-  coopStatus(
-    game,
-    game.coop.net.available ? '' : 'El cooperativo necesita internet y un navegador con conexión directa (WebRTC).',
-  );
-}
-
-export function coopStatus(game, text, bad = false) {
-  const el = game.$('coop-status');
-  el.textContent = text;
-  el.classList.toggle('bad', bad);
-}
-
-export function coopError(game, err) {
-  const m = String((err && err.message) || err);
-  if (m === 'cancelado') return;
-  const msg =
-    {
-      'no-existe': 'No existe una sala con ese código (o ya caducó).',
-      llena: 'Esa sala ya está llena: sólo se puede jugar de 2.',
-      permiso: 'Firebase no da permiso para crear salas: revisa la pestaña Reglas (ver README).',
-      tiempo: 'El anfitrión no respondió. Pídele que cree una sala nueva y vuelve a intentar.',
-      directa:
-        'No se pudo conectar directo entre los celulares. Prueben los dos en la misma red Wi‑Fi o con otra red (algunas redes móviles lo bloquean).',
-    }[m] || 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.';
-  coopStatus(game, msg, true);
-  game.$('coop-choose').hidden = false;
-  game.$('coop-wait').hidden = true;
-  game.coop.cancel();
-}
-
-export async function coopCreate(game) {
-  if (!game.coop.net.available) return;
-  game.$('coop-choose').hidden = true;
-  game.$('coop-wait').hidden = false;
-  game.$('coop-code').textContent = '····';
-  coopStatus(game, 'Creando sala…');
-  try {
-    await game.coop.create((code) => {
-      game.$('coop-code').textContent = code;
-      coopStatus(game, 'Esperando a tu compañero…');
-    });
-  } catch (err) {
-    coopError(game, err);
-  }
-}
-
-export async function coopJoin(game) {
-  const code = game.$('coop-code-in').value.trim().toUpperCase();
-  if (!/^[A-Z]{4}$/.test(code)) return coopStatus(game, 'El código tiene 4 letras.', true);
-  if (!game.coop.net.available) return;
-  coopStatus(game, 'Conectando…');
-  try {
-    await game.coop.join(code);
-    coopStatus(game, '¡Conectado! Esperando al anfitrión…');
-    // si el anfitrión no arranca en un rato, algo falló
-    const t0 = performance.now();
-    while (!game.mode.inGroup() && game.state === 'coop') {
-      if (performance.now() - t0 > 20000) throw new Error('tiempo');
-      await new Promise((r) => setTimeout(r, 250));
-    }
-  } catch (err) {
-    coopError(game, err);
-  }
-}
-
-// Botones de las salas (en línea y cooperativo) y el panel de diagnóstico de red.
+// Botones de la sala en línea y el panel de diagnóstico de red.
 export function bindLobby(game) {
-  on(game, 'btn-coop', () => showCoop(game));
   on(game, 'btn-online', () => showOnline(game));
   on(game, 'btn-ol-create', () => onlineCreate(game));
   on(game, 'btn-ol-back', () => {
@@ -274,14 +214,5 @@ export function bindLobby(game) {
       e.preventDefault();
       toggleDiag(game);
     }
-  });
-  on(game, 'btn-coop-create', () => coopCreate(game));
-  on(game, 'btn-coop-back', () => {
-    game.coop.cancel();
-    game.setupMenu();
-  });
-  game.$('coop-join-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    coopJoin(game);
   });
 }

@@ -51,18 +51,6 @@ export class Lighting {
       g.globalAlpha = 0.6;
       g.drawImage(this.soft, game.camera.x - 320, game.camera.y - 320, 640, 640);
     }
-    // linterna del compañero (cooperativo)
-    const q = game.mode.companion();
-    if (q && q.alive && game.state !== 'menu') {
-      g.globalAlpha = 0.7;
-      g.drawImage(this.soft, q.x - 200, q.y - 200, 400, 400);
-      g.save();
-      g.translate(q.x, q.y);
-      g.rotate(q.angle);
-      g.globalAlpha = 0.75;
-      g.drawImage(this.cone, 8, -150, 460, 300);
-      g.restore();
-    }
     for (const l of game.world.lights) {
       if (l.x + l.r < view.x0 || l.x - l.r > view.x1 || l.y + l.r < view.y0 || l.y - l.r > view.y1) continue;
       l.cur = this.flicker(l, t);

@@ -12,13 +12,12 @@ Fecha de referencia: octubre de 2026 (tras la refactorización por etapas de
 ## 1. Resumen
 
 Dead Zone es un juego de supervivencia zombi en vista cenital que corre en el navegador
-(Chrome y Safari, computadora y celular). Tiene cuatro modos de juego:
+(Chrome y Safari, computadora y celular). Tiene tres piezas de juego:
 
 | Modo | Dónde se simula | Conexión | Jugadores |
 |---|---|---|---|
 | Un jugador | En el navegador | Ninguna (sólo Firebase para la clasificación mundial) | 1 |
-| Cooperativo directo | En el navegador del anfitrión | WebRTC P2P, con Firebase sólo para la señalización | 2 |
-| En línea | En el servidor (autoritativo) | WebSocket a Colyseus en `wss://servidor.yeyo.games` (máquina virtual de Vultr) | 4 por sala, 5 salas a la vez |
+| En línea | En el servidor (autoritativo) | WebSocket a Colyseus en `wss://servidor.yeyo.games` (máquina virtual de Vultr) | de 2 a 4 por sala, 8 salas a la vez |
 | Clasificación | Firebase Realtime Database (REST) | HTTPS | — |
 
 Piezas del sistema:
@@ -30,7 +29,7 @@ Piezas del sistema:
 2. **Servidor en línea**: Node 24 + TypeScript (sin compilar, sintaxis borrable) + Colyseus 0.18
    en `server/`. Reutiliza los módulos de `js/core`, `js/sim` y parte de `js/net` para simular la
    partida.
-3. **Firebase Realtime Database**: clasificación mundial y señalización del cooperativo directo.
+3. **Firebase Realtime Database**: clasificación mundial (ya no hace falta para jugar con amigos).
    No se usa Firebase Auth ni Firestore.
 
 ---
@@ -66,7 +65,7 @@ js/                   Código del cliente (ver tabla siguiente). Los módulos de
                       net/{protocol,netcode,mode,snapshot} también los ejecuta el servidor.
 public/               Archivos estáticos tal cual: manifiesto e íconos de la PWA (icons/).
 test/                 Pruebas del núcleo con node:test (combate, mundo, director, netcode, modos, reglas de carga).
-e2e/                  Pruebas de navegador con Playwright (Chromium y WebKit): solo, tienda, guardado, táctil, coop y en línea.
+e2e/                  Pruebas de navegador con Playwright (Chromium y WebKit): solo, tienda, guardado, táctil y en línea (2 jugadores, también por enlace de invitación).
 
 server/               Servidor en línea (Node + TypeScript + Colyseus 0.18); su propio package.json.
 server/src/           Código del servidor.
@@ -89,7 +88,7 @@ render.yaml           Blueprint de Render (histórico, respaldo).
 | Carpeta / módulo | Responsabilidad |
 |---|---|
 | `main.js` | Clase `Game`: construye los módulos, guarda el estado de la partida (dinero, bajas, inventario…), corre el bucle y expone los métodos `game.xxx(...)` que usan sim, net y las pruebas. Sólo coordina. |
-| `states.js` | Máquina de estados como tabla (`menu`, `play`, `pause`, `levelup`, `shop`, `over`, `account`, `board`, `look`, `coop`, `online`, `class`): pantalla, música, `enter`, `exit`, `update`. |
+| `states.js` | Máquina de estados como tabla (`menu`, `play`, `pause`, `levelup`, `shop`, `over`, `account`, `board`, `look`, `online`, `class`): pantalla, música, `enter`, `exit`, `update`. |
 | `events.js`, `actions.js`, `save.js` | Eventos de combate del jugador local; acciones de tecla/botón (habilidad, robot, construir, lanzar); guardado y carga del progreso. |
 | `core/config.js` | Todo el equilibrio (armas, zombis, tienda, robot, cohetes, dorado, racha), `ONLINE` (Firebase) y `NET` (servidor, tasas, reconexión). |
 | `core/util.js`, `core/version.js`, `core/types.d.ts` | Utilidades (azar, geometría, almacenamiento), versión del build y tipos compartidos (`GameHost`, `Cmd`…). |
@@ -101,9 +100,8 @@ render.yaml           Blueprint de Render (histórico, respaldo).
 | `render/scene.js`, `render/camera.js` | El fotograma completo (y el tamaño del lienzo y la calidad adaptable); cámara con sacudida. |
 | `render/sprites.js`, `render/world.js`, `render/particles.js`, `render/lighting.js` | Arte generado por código; suelo por trozos; partículas y restos; oscuridad, linterna y farolas. |
 | `render/<x>.js` (zombies, bullets, pickups, build, robot, remote) | Dibujo de lo que simula `sim/<x>.js` (y de los jugadores remotos). |
-| `net/mode.js` | `game.mode`: `Solo`, `CoopHost`, `CoopGuest`, `OnlineClient`, `ServerMode`. Se pregunta por intención (`authority()`, `canBuild()`, `savesProgress()`…), no por identidad. |
-| `net/protocol.js`, `net/netcode.js`, `net/snapshot.js`, `net/remote.js` | Tablas y bits del protocolo; `Predictor` e `Interp`; el codificador único de la parte del mundo de una foto; su decodificador para invitado y cliente en línea. |
-| `net/net.js`, `net/coop.js` | Cooperativo directo: conexión WebRTC con código de 4 letras y simulación en el anfitrión. |
+| `net/mode.js` | `game.mode`: `Solo` (con `detached`), `OnlineClient`, `ServerMode`. Se pregunta por intención (`authority()`, `canBuild()`, `savesProgress()`…), no por identidad. |
+| `net/protocol.js`, `net/netcode.js`, `net/snapshot.js`, `net/remote.js` | Tablas y bits del protocolo; `Predictor` e `Interp`; el codificador único de la parte del mundo de una foto; su decodificador para el cliente en línea. |
 | `net/online.js` | Cliente del modo en línea: sala, entrada a 60 Hz, predicción, interpolación y diagnóstico (F3). Carga `@colyseus/sdk` con `import()`. |
 | `ui/input.js`, `ui/audio.js`, `ui/music.js`, `ui/accounts.js` | Entrada (teclado, ratón, táctil), efectos sintetizados, música dinámica, cuentas (nombre + PIN) y clasificación. |
 | `ui/<pantalla>.js` (hud, shop, class, look, levelup, over, menu, account, board, lobby, icons, dom) | Una pieza por pantalla; cada una conecta sus botones con `bindXxx(game)`. |
@@ -148,22 +146,24 @@ render.yaml           Blueprint de Render (histórico, respaldo).
    puntajes a la nube (`cloudSave`, `cloudPull`, `cloudClear`). Fuera de ahí esa ruta está inactiva.
 5. La clasificación mundial escribe en `scores/<uid>` de Firebase por REST, sin librerías ni clave.
 
-### 4.3 Cooperativo directo (2 jugadores, WebRTC)
+### 4.3 Jugar con amigos: sala en línea de 2 a 4
 
-1. El anfitrión toca **Crear sala**. Se genera un código de 4 letras y se escribe
-   `rooms/<código>` en Firebase con su oferta SDP.
-2. El invitado escribe el código, lee la oferta y responde con su SDP en el mismo nodo.
-3. Ambos abren dos canales de datos WebRTC: `rel` (confiable y ordenado) y `fast` (sin
-   retransmisión). Los servidores STUN vienen de `ICE`. **No hay TURN.**
-4. Cuando los canales abren, se borra `rooms/<código>`. Si no abren antes de `OPEN_LIMIT`, la
-   unión falla con el error `directa`.
-5. El anfitrión (`CoopHost`) simula el mundo y manda fotos al invitado de 8 a 12 veces por segundo
-   (`net/snapshot.js`). El invitado (`CoopGuest`) las aplica con `net/remote.js`, predice su
-   personaje y devuelve sus entradas.
-6. Las balas del invitado son cosméticas: `game.mode.authority()` es falso y el daño se calcula en
-   el anfitrión. Este reparto debe preservarse al agregar mecánicas de combate.
+El cooperativo directo (WebRTC con Firebase de señalización) se eliminó. Jugar con un amigo es
+usar el modo En línea:
 
-### 4.4 En línea (4 por sala, 5 salas, servidor autoritativo)
+1. El anfitrión toca **En línea · 2 a 4** → **Crear sala**. La sala muestra el código de 6
+   caracteres y el enlace de invitación (`?sala=CÓDIGO`, que conserva `?servidor=` si lo hay).
+2. El amigo abre el enlace (la pantalla En línea aparece con el código escrito) o escribe el
+   código, pone su nombre y toca **Unirse**.
+3. Cada quien toca **Estoy listo**. **Iniciar partida** (sólo el propietario) exige entre
+   `MIN_PLAYERS` (2) y `MAX_PLAYERS` (4) jugadores conectados y listos; con una sola persona el
+   botón queda desactivado y dice «Hace falta otra persona».
+4. Al salir de la sala el jugador vuelve a `Solo` con `detached`: esa partida no se guarda y no
+   toca su progreso (`savesProgress()`), que es sólo del modo Un jugador.
+5. Las balas del cliente son cosméticas: `game.mode.authority()` es falso y el daño lo calcula el
+   servidor. Este reparto debe preservarse al agregar mecánicas de combate.
+
+### 4.4 En línea (de 2 a 4 por sala, 8 salas, servidor autoritativo)
 
 Ciclo de vida de una sala:
 
@@ -182,7 +182,7 @@ Secuencia típica:
    `locked`/`full`; si no existe, `not found`. El origen y el nombre se comprueban en `onAuth`,
    antes de crear la sala.
 3. **Lobby.** Cada jugador manda `ready` y su clase (`cls`). Sólo el dueño manda `start` (y `lobby`
-   para volver).
+   para volver); `start` falla si hay menos de `MIN_PLAYERS` conectados o falta alguno por estar listo.
 4. **Carga.** Cada cliente manda `loaded` al terminar de cargar el mapa. Si no todos llegan en
    `LOAD_SECONDS`, empieza igual.
 5. **Partida.** Por cada tick (60 Hz, `NET.tickHz`) el servidor avanza `ServerSim`:
@@ -219,7 +219,7 @@ Mensajes del cliente al servidor: `ready`, `cls`, `start`, `lobby`, `loaded`, `n
   al caducar la reserva (unos 15 s).
 - Una sala sin partida (esperando o en resultados) se cierra a los `IDLE_ROOM_MINUTES` (20 min)
   con el código 4101, para liberar su cupo.
-- Con `MAX_ROOMS` (5) salas abiertas, crear otra da el error `servidor-lleno`; entrar a una
+- Con `MAX_ROOMS` (8) salas abiertas, crear otra da el error `servidor-lleno`; entrar a una
   existente sigue funcionando hasta `MAX_PLAYERS` (4).
 - Expulsión por datos no válidos: código 4100 (el 4003 es de Colyseus: «no se pudo reconectar»).
 - Al cerrarse el proceso (`SIGTERM`), el servidor avisa con el mensaje `shutdown` antes de salir.
@@ -244,7 +244,7 @@ Todo el ajuste está en [`js/core/config.ts`](../js/core/config.ts):
 
 | Objeto | Campo | Valor actual | Qué controla |
 |---|---|---|---|
-| `ONLINE` | `url` | `https://dead-zone-73dcc-default-rtdb.firebaseio.com` | Base de Firebase para clasificación y salas del cooperativo. |
+| `ONLINE` | `url` | `https://dead-zone-73dcc-default-rtdb.firebaseio.com` | Base de Firebase para la clasificación mundial. |
 | `NET` | `server` | `wss://servidor.yeyo.games` | Servidor en línea. Vacío = `ws://<host>:2567` en localhost. |
 | `NET` | `tickHz` | `60` | Pasos de simulación por segundo. **Debe ser igual en servidor y cliente.** |
 | `NET` | `snapHz` | `20` | Fotos por segundo (el servidor lo puede sobreescribir con `SNAP_HZ`). |
@@ -254,7 +254,6 @@ Todo el ajuste está en [`js/core/config.ts`](../js/core/config.ts):
 | `NET` | `reconnectSeconds` | `20` | Ventana de reconexión. |
 | `NET` | `view`, `zombieView` | `1000`, `[900, 760]` | Mitad del cuadro que se manda a cada jugador (general y para zombis). |
 | `NET` | `crowd` | `[0.5, 0.15]` | Zombis por oleada: 0,5 del solitario + 0,15 por jugador extra. |
-| `ICE` (en `net/net.js`) | — | STUN de Google y Twilio | Servidores para WebRTC del cooperativo directo. |
 
 Para cambiar el servidor: edita `NET.server` y publica el juego.
 Para probar sin publicar: abre el juego con `?servidor=wss://…`.
@@ -272,8 +271,9 @@ Están documentadas en [`server/.env.example`](../server/.env.example) y, para l
 | `SNAP_HZ` | `20` | `20` (`NET.snapHz`) | Fotos por segundo por jugador. |
 | `PORT` | `2567` (detrás de Caddy) | `2567` | Puerto. |
 | `HOST` | `0.0.0.0` | `0.0.0.0` | Dirección de escucha. |
+| `MIN_PLAYERS` | `2` | `2` | Jugadores conectados que hacen falta para iniciar (nunca más que `MAX_PLAYERS`). |
 | `MAX_PLAYERS` | `4` | `4` | Jugadores por sala. Máximo 10. |
-| `MAX_ROOMS` | `5` | `5` | Salas a la vez. Con todas ocupadas, crear otra da `servidor-lleno`. |
+| `MAX_ROOMS` | `8` | `8` | Salas a la vez. Con todas ocupadas, crear otra da `servidor-lleno`. |
 | `IDLE_ROOM_MINUTES` | — | `20` | Una sala sin partida se cierra pasado este tiempo. |
 | `MAX_CATCHUP` | — | `8` | Pasos atrasados que se recuperan de una vez tras una pausa. |
 | `RECONNECT_SECONDS` | — | `20` | Ventana de reconexión. |
@@ -339,7 +339,7 @@ trabajo con LF.
   determinista) y `act` (apuntado y armas). No mezclar.
 - Las reglas de combate compartidas van en `js/sim/rules.ts` y `js/sim/combat.ts`, nunca
   duplicadas en `main.js` y `ServerSim.ts`.
-- Preguntar el modo por `game.mode` (`authority()`, `canBuild()`…), nunca por `coop.isHost`
+- Preguntar el modo por `game.mode` (`authority()`, `canBuild()`…), nunca por `coop.isHost` ni `game.coop`
   (`test/llamadas.test.js` falla si aparece).
 
 ---
@@ -418,9 +418,8 @@ Lo que no está medido: redes móviles, celulares y FPS en un celular de gama me
 ## 13. Limitaciones conocidas
 
 **Juego**
-- La clasificación y el cooperativo dependen de Firebase con reglas abiertas. Cualquiera puede
+- La clasificación depende de Firebase con reglas abiertas. Cualquiera puede
   escribir. Es para jugar entre amigos, no a prueba de trampas.
-- El cooperativo directo no conecta en algunas redes móviles, porque no hay TURN.
 
 **En línea**
 - No hay compensación de latencia para disparos.
@@ -466,9 +465,6 @@ Lo que no está medido: redes móviles, celulares y FPS en un celular de gama me
 - **Predicción**: el cliente mueve su personaje antes de recibir confirmación del servidor.
 - **Reconciliación**: al llegar la foto confirmada, el cliente vuelve a aplicar sus entradas pendientes.
 - **Interpolación**: dibujar otros objetos entre dos fotos recientes, con retraso.
-- **Foto (snapshot)**: estado del mundo que envía quien manda (servidor o anfitrión).
+- **Foto (snapshot)**: estado del mundo que envía el servidor.
 - **Tick / paso**: una iteración de la simulación (60 por segundo).
-- **P2P / WebRTC**: conexión directa entre navegadores, sin pasar por un servidor.
-- **STUN / TURN**: STUN ayuda a descubrir la dirección pública; TURN retransmite el tráfico. Este proyecto usa sólo STUN.
-- **Señalización**: intercambio inicial de direcciones para abrir WebRTC. Aquí va por Firebase.
 - **Hash de versión**: Vite nombra los archivos con un hash, así que el caché nunca sirve código viejo.

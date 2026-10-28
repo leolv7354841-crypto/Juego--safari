@@ -1,4 +1,4 @@
-// Lo que ve un jugador que no simula el mundo: el invitado del cooperativo y el cliente en línea.
+// Lo que ve un jugador que no simula el mundo: el cliente en línea.
 //
 // Los dos reciben fotos con el mismo formato (js/net/snapshot.js) y las usan igual: los zombis, los demás
 // jugadores y los robots se dibujan un poco en diferido, interpolando entre dos fotos (`Interp`), y los
@@ -16,8 +16,8 @@ import { DECAL_SYNC, PARTICLE_SKIP, PICKS, SFX_SYNC, TYPES } from './protocol.ts
 import type { WorldSnap, Zombie, ZombieDef } from '../core/types.d.ts';
 import { PEER_N, ROBOT_N, ZOMBIE_N } from './snapshot.ts';
 
-/** Nombre y aspecto de un jugador: `look` ya listo (cooperativo) o `code` (en línea, se convierte al cambiar). */
-export type Identity = { name?: string; look?: unknown; code?: string };
+/** Nombre y aspecto de un jugador: `code` del aspecto (se convierte al cambiar). */
+export type Identity = { name?: string; code?: string };
 export type Identify = (idx: number) => Identity | null;
 /** Jugador remoto: un Player con lo que le añade este módulo. */
 export type Peer = Player & { it?: Interp; away?: boolean; lookCode?: string; manned?: unknown };
@@ -48,10 +48,6 @@ type Row = [string, number, number, number, number, number, number];
 type StructSnap = Partial<Omit<WorldSnap, 'blk' | 'wir' | 'sc'>> & { blk?: Row[]; wir?: Row[]; sc?: number[][] };
 type ShopDef = { hp: number; ground?: boolean; consumable?: boolean };
 const shopDef = (k: string): ShopDef | undefined => (SHOP as unknown as Record<string, ShopDef>)[k];
-
-/** Índice de jugador en el cooperativo (en línea lo da el servidor): el anfitrión es 0 y el invitado 1. */
-export const HOST_IDX = 0;
-export const GUEST_IDX = 1;
 
 /** Contador del indicador de conexión: fotos y fotogramas por segundo (una lectura cada segundo). */
 export class NetStats {
@@ -102,7 +98,7 @@ export class Remote {
   constructor(game: any, deps: { zombieSprites?: () => any } = {}) {
     this.game = game;
     this.sprites = deps.zombieSprites || zombieSprites;
-    /** ¿Se está jugando como espectador del mundo de otro? (lo ponen coop.js y online.js) */
+    /** ¿Se está jugando como espectador del mundo de otro? (lo pone online.js) */
     this.active = false;
     this.extrapolate = NET.maxExtrapolate;
     this.zs = new Map();
@@ -116,10 +112,9 @@ export class Remote {
     this.net = new NetStats();
   }
 
-  /** Empieza (o termina) una partida remota. extrapolate: ms que se adelanta algo sin foto nueva. */
-  start(extrapolate = NET.maxExtrapolate) {
+  /** Empieza (o termina) una partida remota. */
+  start() {
     this.reset();
-    this.extrapolate = extrapolate;
     this.active = true;
   }
 
@@ -281,8 +276,7 @@ export class Remote {
   /* ---------- jugadores y robots ---------- */
 
   /**
-   * Los demás jugadores. identify(idx) da su nombre y su aspecto: `look` ya listo (cooperativo) o `code`
-   * (en línea, se convierte al cambiar).
+   * Los demás jugadores. identify(idx) da su nombre y el `code` de su aspecto (se convierte al cambiar).
    */
   applyPeers(pl: number[], t: number, identify?: Identify) {
     const seen = new Set<number>();
@@ -298,8 +292,7 @@ export class Remote {
       if (!q.it) q.it = new Interp([2, 3], 24, this.extrapolate);
       const who = identify ? identify(idx) : null;
       q.name = (who && who.name) || q.name || 'Jugador';
-      if (who && who.look) q.look = who.look;
-      else if (who && who.code !== undefined && q.lookCode !== who.code) {
+      if (who && who.code !== undefined && q.lookCode !== who.code) {
         q.lookCode = who.code;
         q.look = lookFromCode(who.code);
       }
@@ -332,7 +325,6 @@ export class Remote {
     for (const idx of this.peers.keys()) if (!seen.has(idx)) this.peers.delete(idx);
   }
 
-  // Los jugadores simulados aquí (el compañero del anfitrión) no tienen `it`: su movimiento lo lleva coop.js.
   placePeers(rt: number, dt: number) {
     const out: number[] = [];
     for (const q of this.peers.values()) {

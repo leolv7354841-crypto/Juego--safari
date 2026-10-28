@@ -5,7 +5,6 @@ import { showClass } from './class.js';
 import { comboMult, multText } from '../sim/combo.ts';
 
 export function gameOver(game) {
-  game.mode.onGameOver();
   game.setState('over');
   const p = game.player;
   const total = game.totalKills();
@@ -60,12 +59,10 @@ export function gameOver(game) {
 
 // Botones de reiniciar y volver al menú (de la pausa y del fin de partida).
 export function bindOver(game) {
-  // en cooperativo reinicia el anfitrión (el invitado espera)
   const again = () => {
     const why = game.mode.restartBlocked();
     if (why) return game.toast(why);
-    if (game.mode.restart()) return;
-    // venías del cooperativo: al menú, donde sigue tu partida normal
+    // venías de una sala en línea: al menú, donde sigue tu partida normal
     if (game.mode.detached) {
       game.newWorld();
       return game.setupMenu();
@@ -75,7 +72,6 @@ export function bindOver(game) {
   on(game, 'btn-restart', again);
   on(game, 'btn-again', again);
   const toMenu = () => {
-    game.coop.leave();
     game.online.leave();
     game.newWorld();
     game.setupMenu();

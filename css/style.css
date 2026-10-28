@@ -1163,9 +1163,9 @@ kbd {
 .ver { margin: 10px 0 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(156, 150, 138, 0.7); }
 .hall-list .online-err { color: #e0a060; font-size: 13px; }
 
-/* ---------- Cooperativo ---------- */
+/* ---------- Salas en línea ---------- */
 
-#btn-coop, #btn-online { width: min(300px, 100%); font-size: 20px; padding: 10px 18px 7px; border-color: rgba(159, 208, 255, 0.45); color: #cfe6ff; }
+#btn-online { width: min(300px, 100%); font-size: 20px; padding: 10px 18px 7px; border-color: rgba(159, 208, 255, 0.45); color: #cfe6ff; }
 .panel.coop-panel { width: min(460px, 100%); }
 .coop-step { display: grid; gap: 12px; margin: 6px 0 4px; }
 .coop-or { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
@@ -1188,6 +1188,7 @@ kbd {
 .coop-join .btn { width: auto; font-size: 22px; }
 .coop-label { margin: 0; font-size: 14px; color: var(--dim); }
 .coop-code { font-family: var(--display); font-size: 84px; line-height: 0.9; letter-spacing: 0.25em; color: #cfe6ff; text-shadow: 0 0 22px rgba(120, 180, 255, 0.5); padding-left: 0.25em; }
+.ol-link { font: inherit; font-size: 13px; padding: 7px 8px; color: var(--ink); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 0; -webkit-user-select: text; user-select: text; width: 100%; box-sizing: border-box; }
 .coop-status { min-height: 1.3em; margin: 10px 0; font-size: 15px; color: #cfc8b8; }
 .coop-status.bad { color: #e0a060; }
 

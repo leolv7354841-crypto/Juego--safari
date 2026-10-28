@@ -15,8 +15,10 @@ export const CONFIG = {
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean),
   maxPlayers: Math.min(10, num('MAX_PLAYERS', NET.maxPlayers)),
+  // jugadores conectados que hacen falta para iniciar una partida (nunca más que el cupo de la sala)
+  minPlayers: Math.min(Math.min(10, num('MAX_PLAYERS', NET.maxPlayers)), num('MIN_PLAYERS', 2)),
   // salas a la vez en este proceso: con todas ocupadas, crear una más da 'servidor-lleno'
-  maxRooms: num('MAX_ROOMS', 5),
+  maxRooms: num('MAX_ROOMS', 8),
   // igual que la predicción del cliente: se cambia sólo en NET.tickHz (js/core/config.js)
   tickHz: NET.tickHz,
   snapHz: num('SNAP_HZ', NET.snapHz),

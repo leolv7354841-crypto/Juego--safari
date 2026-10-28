@@ -151,11 +151,37 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   await leaveAll([owner, guest]);
 });
 
-test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', async () => {
+test(`iniciar exige de ${CONFIG.minPlayers} a ${MAX} jugadores conectados y listos`, async () => {
+  assert.equal(CONFIG.minPlayers, 2);
   const [owner] = await fill(1);
+  const oIn = inbox(owner);
+  await waitFor(() => owner.state.minPlayers === 2, 2000, 'minPlayers en el estado');
+  owner.send('start');
+  await waitFor(() => oIn.error?.length, 2000, 'faltan jugadores');
+  assert.match(oIn.error[0].m, /al menos 2 jugadores/);
+  assert.equal(owner.state.phase, 'waiting');
+  // con otra persona sigue haciendo falta que esté lista
+  const guest = await client(url).joinById(owner.roomId, { name: 'Amigo' });
+  guest.onMessage('*', () => {});
+  await waitFor(() => owner.state.members.size === 2, 2000, '2 integrantes');
+  owner.send('start');
+  await waitFor(() => oIn.error?.length > 1, 2000, 'falta que esté listo');
+  assert.match(oIn.error[1].m, /listos/);
+  guest.send('ready', { v: true });
+  await sleep(100);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading', 2000, 'cargando');
+  await leaveAll([owner, guest]);
+});
+
+test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', async () => {
+  const [owner, guest] = await fill(2);
+  guest.send('ready', { v: true });
+  await sleep(100);
   owner.send('start');
   await waitFor(() => owner.state.phase === 'loading');
   owner.send('loaded');
+  guest.send('loaded');
   await waitFor(() => owner.state.phase === 'playing');
   const l = serverRoom(owner.roomId).limits.get(owner.sessionId);
   // un mensaje por fotograma durante 3 s, como js/net/online.js (antes, a partir de 2 s, eran faltas)
@@ -167,7 +193,7 @@ test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', a
   }
   await sleep(100);
   assert.equal(l.bad, 0, 'sin faltas');
-  await leaveAll([owner]);
+  await leaveAll([owner, guest]);
 });
 
 test('desconexión y reconexión sin duplicados', async () => {
@@ -314,11 +340,14 @@ test('/health responde con métricas', async () => {
 });
 
 test('entre oleadas llegan las mejoras y la tienda funciona por la red', async () => {
-  const [owner] = await fill(1);
+  const [owner, guest] = await fill(2);
   const got = inbox(owner);
+  guest.send('ready', { v: true });
+  await sleep(100);
   owner.send('start');
   await waitFor(() => owner.state.phase === 'loading');
   owner.send('loaded');
+  guest.send('loaded');
   await waitFor(() => owner.state.phase === 'playing');
   const room = serverRoom(owner.roomId);
   const sim = room.sim;

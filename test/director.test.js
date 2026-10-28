@@ -57,13 +57,13 @@ test('toros desde la oleada 3, gordos desde la 2, blindados tras la 10', () => {
   assert.ok(seen[10].heavy > 0);
 });
 
-test('cooperativo reduce la cola a la mitad y online usa crowd', () => {
+test('en grupo la cola se reduce a la mitad y online usa crowd', () => {
   const solo = new Director();
   solo.startWave(fakeGame());
-  const co = new Director();
-  co.coop = true;
-  co.startWave(fakeGame());
-  assert.ok(co.queue.length < solo.queue.length * 0.6);
+  const grupo = new Director();
+  grupo.coop = true;
+  grupo.startWave(fakeGame());
+  assert.ok(grupo.queue.length < solo.queue.length * 0.6);
   const on = new Director();
   on.coop = true;
   on.crowd = 1;

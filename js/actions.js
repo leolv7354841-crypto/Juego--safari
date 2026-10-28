@@ -9,7 +9,7 @@ export function useAbility(game) {
   if (!p.cls || !p.alive) return;
   if (p.abCd > 0) return game.toast(`Habilidad lista en ${Math.ceil(p.abCd)} s`);
   const t = abilityTarget(game, p);
-  // en línea la usa el servidor y en cooperativo el anfitrión; aquí se ve al instante (el misil llega con la siguiente foto)
+  // en línea la usa el servidor; aquí se ve al instante (el misil llega con la siguiente foto)
   game.mode.sendAbility(p, t);
   Abilities.use(game, p, t.x, t.y, null);
   game.updateHud(false);
@@ -22,11 +22,10 @@ export function toggleRobot(game) {
   if (game.mode.viaServer() && (p.manned || (!p.inRobot && game.structures.nearHeavy(p))))
     return game.online.act('robot');
   if (p.manned) return leaveHeavy(game);
-  if (!p.inRobot && game.mode.hasHeavy()) {
+  if (!p.inRobot) {
     const h = game.structures.nearHeavy(p);
     if (h) return mountHeavy(game, h);
   }
-  if (!game.mode.hasRobot()) return game.toast('En cooperativo el robot es del anfitrión');
   const rb = game.robot;
   if (!rb.owned) {
     if (game.structures.blocks.some((b) => b.kind === 'heavy'))
@@ -80,7 +79,7 @@ export function tryBuild(game) {
     }
     game.buildSel = next;
   }
-  // en línea lo coloca el servidor y en cooperativo el anfitrión (y descuentan la pieza); aquí sólo se avisa si no cabe
+  // en línea lo coloca el servidor (y descuenta la pieza); aquí sólo se avisa si no cabe
   if (!game.mode.canBuild()) {
     if (game.structures.placement(game, game.buildSel).ok) game.mode.sendBuild(game.buildSel);
     else game.toast('No cabe ahí');
@@ -126,7 +125,7 @@ export function tryGrenade(game, kind = 'grenade') {
     ty = p.y + Math.sin(p.angle) * 220;
   }
   game.inv[kind]--;
-  // en línea la lanza el servidor y en cooperativo el anfitrión; la cuenta se corrige con su siguiente foto
+  // en línea la lanza el servidor; la cuenta se corrige con su siguiente foto
   if (game.mode.sendThrow(kind, tx, ty)) return;
   if (kind === 'molotov') game.structures.throwMolotov(game, tx, ty);
   else game.structures.throwGrenade(game, tx, ty);

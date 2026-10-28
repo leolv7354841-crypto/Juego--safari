@@ -38,7 +38,6 @@ function miembros(ruta, clase) {
 
 // Objeto del juego -> archivo y clase que lo define
 const OBJETOS = {
-  coop: ['js/net/coop.ts', 'Coop'],
   online: ['js/net/online.ts', 'Online'],
   mode: ['js/net/mode.ts', 'Mode'],
   structures: ['js/sim/build.ts', 'Structures'],
@@ -59,9 +58,8 @@ const OBJETOS = {
 
 const JS = archivos('js', ['vendor']);
 
-// En coop.js y online.js el juego se llama también `g`.
-const recibe = (ruta) =>
-  /net\/(coop|online)\.(js|ts)$/.test(ruta) ? '(?:this\\.game|game|g)' : '(?:this\\.game|game)';
+// En online.js el juego se llama también `g`.
+const recibe = (ruta) => (/net\/online\.(js|ts)$/.test(ruta) ? '(?:this\\.game|game|g)' : '(?:this\\.game|game)');
 
 test('todo game.algo( existe en la clase Game', () => {
   const game = miembros('js/main.js', 'Game');
@@ -85,8 +83,8 @@ test('todo game.<objeto>.algo( existe en la clase del objeto', () => {
   assert.deepEqual([...new Set(faltan)], []);
 });
 
-test('los módulos no usan los campos viejos del modo (coop.isHost, coop.isGuest, coopRun, remoteSim)', () => {
-  const viejos = /coop\.(isHost|isGuest)\b|\bcoopRun\b|\bremoteSim\b/;
+test('los módulos no usan los campos viejos del modo ni nada del cooperativo P2P', () => {
+  const viejos = /coop\.(isHost|isGuest)\b|\bcoopRun\b|\bremoteSim\b|\bgame\.coop\b|\bhostedPeer\b|\bcompanion\(/;
   const mal = [...JS, ...archivos('server/src')].filter((r) => viejos.test(leer(r)));
   assert.deepEqual(mal, []);
 });

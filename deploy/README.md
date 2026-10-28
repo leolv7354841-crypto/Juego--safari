@@ -1,9 +1,11 @@
-# Servidor en línea en una máquina virtual (5 salas × 4 jugadores)
+# Servidor en línea en una máquina virtual (8 salas de 2 a 4 jugadores)
 
 Guía para dejar el servidor del modo **En línea** en una máquina virtual propia, siempre
-encendida, con HTTPS (`wss://`) y reinicio automático. Capacidad configurada: **4 jugadores por
-sala y 5 salas a la vez** (20 jugadores en total). Si se piden más salas, el juego muestra
-«El servidor está lleno»; a una sala existente se puede seguir entrando hasta que tenga 4.
+encendida, con HTTPS (`wss://`) y reinicio automático. Capacidad configurada: **de 2 a 4 jugadores
+por sala (`MIN_PLAYERS`=2, `MAX_PLAYERS`=4) y 8 salas a la vez** (hasta 32 jugadores en total).
+Como el cooperativo directo P2P ya no existe, jugar con un amigo también gasta servidor: por eso
+`MAX_ROOMS` subió de 5 a 8. Si se piden más salas, el juego muestra «El servidor está lleno»;
+a una sala existente se puede seguir entrando hasta que tenga 4.
 
 Fecha de referencia de precios: octubre de 2026 (API pública de Vultr).
 
@@ -29,7 +31,17 @@ jugadores eso son ~3,5 Mbit/s de salida: 4 horas diarias con el servidor lleno g
 200 GB al mes de los 4 TB incluidos. Un vCPU de servidor es algo más lento que un PC de escritorio,
 y para eso está el margen.
 
-| Opción | Precio/mes | ¿Sirve para 5×4? |
+**Prueba de carga con 8 salas de 4 (`--rooms 8x4`, 45 s).** Hecha en el PC de desarrollo (20 hilos),
+con el servidor y los 32 bots en la misma máquina, **no en la máquina de Vultr de 2 vCPU**: 60,2
+pasos/s por sala (objetivo 60), 0 pasos descartados, paso medio 0,26 ms y peor 3,2 ms (el límite es
+16,7 ms), CPU del servidor 21,5 % de un núcleo de media y 60 % de pico, 170 MB de RAM, ~28 KB/s por
+jugador (891 KB/s en total) y RTT p95 de 6,7 ms. Los clientes recibieron 16,4 fotos/s de media
+(mínimo 8,1) porque los 32 bots compiten por el mismo PC con el servidor. Con ese margen (un núcleo
+de la VM rinde bastante menos que uno del PC, pero hay dos) se deja `MAX_ROOMS=8`. **Falta repetir la
+prueba contra la VM** (comando de abajo): si «pasos/s por sala» baja de 60 o «descartados» no es 0,
+vuelve a `MAX_ROOMS=5` en `deploy/.env`.
+
+| Opción | Precio/mes | ¿Sirve para 8×4? |
 | --- | --- | --- |
 | **Vultr High Performance AMD 2 vCPU / 2 GB, Ciudad de México** | **18 USD** | **Sí, con margen (recomendado)** |
 | Vultr High Performance AMD 1 vCPU / 2 GB, Ciudad de México | 12 USD | Sí, justo: los picos compiten con el sistema |
@@ -86,10 +98,10 @@ mientras Caddy consigue el certificado.
 Prueba el juego sin publicar nada abriendo tu página con `?servidor=wss://servidor.yeyo.games`
 (por ejemplo `https://yeyo.games/deadzone/?servidor=wss://servidor.yeyo.games`).
 
-Prueba de carga con 20 bots desde tu PC (5 salas de 4, contra el servidor real):
+Prueba de carga con 32 bots desde tu PC (8 salas de 4, contra el servidor real):
 
 ```bash
-node server/tools/load.ts --url wss://servidor.yeyo.games --origin https://yeyo.games --secs 60
+node server/tools/load.ts --url wss://servidor.yeyo.games --origin https://yeyo.games --secs 60 --rooms 8x4
 ```
 
 Mira que «pasos/s por sala» quede en 60 y «descartados» en 0.

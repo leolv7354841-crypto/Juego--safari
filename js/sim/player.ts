@@ -126,8 +126,6 @@ export class Player {
   declare heavyAmmo: number;
   /** aspecto del personaje (lo pone Game; ver cleanLook) */
   declare look: any;
-  /** compañero de cooperativo (lo pone coop.js) */
-  declare remote?: boolean;
   /** dentro del robot (lo pone main.js / el servidor) */
   declare inRobot?: boolean;
   declare reloadProg: number;
@@ -279,12 +277,6 @@ export class Player {
   hurt(dmg: number, game: GameHost) {
     // Booster: inmune mientras dura el impulso
     if (!this.alive || this.boostT > 0) return;
-    // compañero en cooperativo: su vida la lleva su propio celular
-    if (this.remote) {
-      this.hurtT = 0.3;
-      game.coop.send({ t: 'hurt', d: dmg });
-      return;
-    }
     // dentro del robot, el daño lo recibe el robot
     if (this.inRobot) {
       game.onRobotHit(dmg, this);
@@ -296,7 +288,7 @@ export class Player {
     this.hp -= real;
     this.damageTaken += real;
     this.hurtT = 0.3;
-    // el temblor es de quien recibe el golpe (en cooperativo el anfitrión también simula al invitado)
+    // el temblor es de quien recibe el golpe (el servidor simula a todos)
     if (this === game.player) game.camera.shake(0.28);
     game.hurtFlash = Math.min(1, game.hurtFlash + 0.5);
     game.sfx.hurt();
@@ -605,8 +597,6 @@ export class Player {
     else game.particles.casing(this.x + ca * 8, this.y + sa * 8, this.angle + Math.PI / 2);
     game.particles.muzzleSmoke(sx, sy, this.angle);
     game.sfx.shot(d.id);
-    // invitado en cooperativo: el anfitrión crea las balas que de verdad hacen daño
-    game.mode.reportShot(ox, oy, fired, d, this.stats);
     if (w.mag === 0 && w.reserve > 0) this.startReload(game);
   }
 }

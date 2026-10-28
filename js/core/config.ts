@@ -421,7 +421,7 @@ export const xpForLevel = (lvl: number) => Math.round(25 + 20 * lvl + 6 * lvl * 
 export const BOUNTY = { normal: 2, sprinter: 6, swat: 20, fat: 10, heavy: 50, bull: 30, giant: 10, golden: 0 };
 
 // Tamaño y ritmo de las oleadas: rondas cortas.
-// count: fracción de zombis por oleada (se aplica igual en solitario, cooperativo y en línea, ver NET.crowd)
+// count: fracción de zombis por oleada (se aplica igual en solitario y en línea, ver NET.crowd)
 // hp / speed: vida y velocidad base de los zombis de oleada · straggle: s antes de acercar a los rezagados
 // spawnTime: toda la oleada aparece en estos s (en ráfagas cada burst s), salvo que se llegue al tope de vivos
 // view: media caja (px) que se da por vista de los demás jugadores (cubre celular vertical y pantalla ancha);
