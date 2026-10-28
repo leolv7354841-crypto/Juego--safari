@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Multijugador en línea (hasta NET.maxPlayers jugadores por sala) contra el servidor autoritativo (carpeta server/).
 //
 // El servidor simula todo; aquí sólo se manda lo que quiere hacer el jugador (dirección,
@@ -505,6 +504,7 @@ export class Online {
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
   identify(idx) {
     const ms = this.room && this.room.state && this.room.state.members;
+    /** @type {{ name?: string, look?: string } | null} */
     let found = null;
     if (ms) ms.forEach((m) => m.idx === idx && (found = m));
     return { name: (found && found.name) || 'Jugador', code: (found && found.look) || '' };
