@@ -267,6 +267,10 @@ export class OnlineClient extends Mode {
 
 /** El servidor: simula (authority) y hay grupo, pero no guarda, no pide nada ni dibuja. */
 export class ServerMode extends Mode {
+  // El modo del servidor no consulta `game`: la simulación es el propio objeto que ven los módulos.
+  constructor() {
+    super(undefined as unknown as GameHost);
+  }
   get kind(): ModeKind {
     return 'server';
   }

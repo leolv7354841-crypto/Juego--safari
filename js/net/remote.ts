@@ -347,7 +347,7 @@ export class Remote {
       q.flashT -= dt;
       q.hurtT -= dt;
       q.recoil = Math.max(0, q.recoil - dt * 8);
-      if (q.inRobot) this.followRobot(this.robots.get(q.idx), q, dt);
+      if (q.inRobot && q.idx !== undefined) this.followRobot(this.robots.get(q.idx), q, dt);
     }
   }
 
@@ -497,7 +497,7 @@ export class Remote {
           w: q[3],
           h: q[4],
           hp: q[5],
-          max: shopDef(q[0]).hp,
+          max: shopDef(q[0])?.hp ?? 0,
           ang: q[6] / 100,
           low: true,
           block: true,
@@ -519,7 +519,16 @@ export class Remote {
     if (Array.isArray(s.wir))
       st.wires = s.wir
         .filter((q) => Array.isArray(q) && shopDef(q[0])?.ground)
-        .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: shopDef(q[0]).hp, hitT: 0 }));
+        .map((q) => ({
+          kind: q[0],
+          x: q[1],
+          y: q[2],
+          w: q[3],
+          h: q[4],
+          hp: q[5],
+          max: shopDef(q[0])?.hp ?? 0,
+          hitT: 0,
+        }));
     if (Array.isArray(s.sc))
       st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
   }

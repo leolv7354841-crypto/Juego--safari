@@ -167,7 +167,7 @@ export interface GameHost {
   killZombie(z: Zombie, ...a: any[]): void;
   collectFor?(p: Player, it: any): boolean;
   onPlayerDeath(...a: any[]): void;
-  onZombieHit(z: Zombie, p: any): void;
+  onZombieHit(z: Zombie | null, p: any): void;
   onRobotHit(dmg: number, p: any): void;
   applyAcid(p: any): void;
   rocketHit(z: Zombie, x: number, y: number, b: Bullet): void;

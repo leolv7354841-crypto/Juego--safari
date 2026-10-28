@@ -4,16 +4,16 @@ import { TAU, rand, clamp } from '../core/util.ts';
 import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
 import type { Player } from './player.ts';
 
-// Ficha de la tienda: sólo los campos que usa este módulo (todas las piezas no los tienen todos).
+// Ficha de la tienda: sólo los campos que usa este módulo; w/h/hp existen en todas las piezas que se construyen.
 interface ShopDef {
-  w?: number;
-  h?: number;
-  hp?: number;
+  w: number;
+  h: number;
+  hp: number;
   rotates?: boolean;
   ground?: boolean;
   turret?: boolean;
 }
-const shopDef = (kind: string): ShopDef => (SHOP as Record<string, ShopDef>)[kind];
+const shopDef = (kind: string): ShopDef => (SHOP as unknown as Record<string, ShopDef>)[kind];
 
 // Pieza en pie (barricada, torreta...) registrada en el mundo como obstáculo dinámico.
 export interface Block {
@@ -187,6 +187,7 @@ export class Structures {
   placement(game: GameHost, kind: string) {
     const def = shopDef(kind);
     const p = game.player;
+    if (!p) return { x: 0, y: 0, w: def.w, h: def.h, ok: false };
     const ca = Math.cos(p.angle);
     const sa = Math.sin(p.angle);
     let w = def.w;
@@ -235,7 +236,8 @@ export class Structures {
   // owner: de quién son las bajas de sus minas y torretas (en línea)
   place(game: GameHost, kind: string, owner: string | null = null) {
     const pl = this.placement(game, kind);
-    if (!pl.ok) return false;
+    const p = game.player;
+    if (!pl.ok || !p) return false;
     const def = shopDef(kind);
     if (def.ground) {
       this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0, owner });
@@ -253,7 +255,7 @@ export class Structures {
         max: def.hp,
         hitT: 0,
         cd: 0,
-        ang: game.player.angle,
+        ang: p.angle,
         owner,
       };
       this.blocks.push(o);
@@ -335,6 +337,7 @@ export class Structures {
 
   throwGrenade(game: GameHost, tx: number, ty: number, owner: string | null = null) {
     const p = game.player;
+    if (!p) return;
     const dx = tx - p.x;
     const dy = ty - p.y;
     const d = Math.min(Math.hypot(dx, dy) || 1, 300);
@@ -512,7 +515,8 @@ export class Structures {
     for (let i = 0; i < 4; i++) game.decals.acid(x + rand(-R, R) * 0.6, y + rand(-R, R) * 0.6, rand(14, 26));
     game.sfx.acid();
     game.camera.shake(0.2, x, y);
-    for (const p of game.targets || [game.player]) if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
+    for (const p of game.targets || (game.player ? [game.player] : []))
+      if (Math.hypot(p.x - x, p.y - y) < R + p.r) game.applyAcid(p);
     game.mode.onAcid(x, y, R);
   }
 

@@ -150,7 +150,7 @@ export class ServerSim {
       this.world.collide(p, p.r, true);
       p.field = this.newField();
       // clase elegida en el lobby (si no eligió, bomber)
-      p.cls = isClass(pl.cls) ? pl.cls : CLASS_ORDER[0];
+      p.cls = isClass(pl.cls ?? '') ? pl.cls : CLASS_ORDER[0];
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
       this.slots.set(pl.id, {
         id: pl.id,
@@ -239,7 +239,7 @@ export class ServerSim {
       decals: recorder('d', (n) => DECAL_SYNC.includes(n)),
       sfx: recorder('s', (n) => SFX_SYNC.includes(n)),
       camera: { viewW: 1280, viewH: 760, shake: rec('c', 'shake'), kick: noop },
-      mode: new ServerMode(null),
+      mode: new ServerMode(),
       structures: this.structures,
       // el punto al que apunta el jugador que se está moviendo (sale del ángulo que mandó)
       mouseWorld: () => {

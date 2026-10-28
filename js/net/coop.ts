@@ -158,8 +158,9 @@ const HORIZON = 900; // ms máximos que se predice sin datos nuevos
 
 function track(o: Tracked, t: number, x: number, y: number) {
   if (o.st !== undefined && t > o.st && t - o.st < 1000) {
-    let vx = (x - o.sx) / (t - o.st);
-    let vy = (y - o.sy) / (t - o.st);
+    // st definido implica sx/sy definidos (se escriben juntos al final)
+    let vx = (x - (o.sx ?? x)) / (t - o.st);
+    let vy = (y - (o.sy ?? y)) / (t - o.st);
     const v = Math.hypot(vx, vy);
     if (v > MAX_V) {
       vx *= MAX_V / v;
@@ -181,8 +182,8 @@ function track(o: Tracked, t: number, x: number, y: number) {
 function place(o: Tracked, now: number, dt: number) {
   if (o.st === undefined) return;
   const ahead = Math.min(Math.max(0, now - o.st), HORIZON);
-  const px = o.sx + (o.vx || 0) * ahead;
-  const py = o.sy + (o.vy || 0) * ahead;
+  const px = (o.sx ?? o.x) + (o.vx || 0) * ahead;
+  const py = (o.sy ?? o.y) + (o.vy || 0) * ahead;
   if (o.rendered === undefined || Math.hypot(px - o.x, py - o.y) > 140) {
     // primera vez o salto grande (empujón, explosión): directo a su sitio
     o.x = px;
@@ -280,7 +281,10 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld();
     g.resetRun();
-    g.player.cls = g.classPick;
+    const me = g.player;
+    const R = g.remote;
+    if (!me || !R) return; // resetRun y el constructor los crean siempre
+    me.cls = g.classPick;
     this.role = 'host';
     this.clock = new Clock();
     this.snapSeq = 0;
@@ -288,22 +292,23 @@ export class Coop {
     g.mode = new CoopHost(g);
     g.director.coop = true;
     const s = g.world.spawn;
-    this.peer = new Player(s.x + 46, s.y + 10);
-    this.peer.look = this.peerLook;
-    this.peer.remote = true;
-    this.peer.tx = this.peer.x;
-    this.peer.ty = this.peer.y;
-    this.peer.idx = GUEST_IDX;
-    this.peer.name = this.peerName || 'Compañero';
+    const peer: Puppet = new Player(s.x + 46, s.y + 10);
+    this.peer = peer;
+    peer.look = this.peerLook;
+    peer.remote = true;
+    peer.tx = peer.x;
+    peer.ty = peer.y;
+    peer.idx = GUEST_IDX;
+    peer.name = this.peerName || 'Compañero';
     // el compañero lo simulo yo: se dibuja con los demás jugadores pero no se interpola (lo mueve hostTick)
-    g.remote.start();
-    g.remote.peers.set(GUEST_IDX, this.peer);
+    R.start();
+    R.peers.set(GUEST_IDX, peer);
     this.installRecording();
     this.send({
       t: 'start',
       seed: g.world.seedBase,
-      x: Math.round(this.peer.x),
-      y: Math.round(this.peer.y),
+      x: Math.round(peer.x),
+      y: Math.round(peer.y),
       name: this.myName(),
       look: g.look,
     });
@@ -326,7 +331,10 @@ export class Coop {
     g.sfx.unlock();
     g.newWorld(m.seed);
     g.resetRun();
-    g.player.cls = g.classPick;
+    const me = g.player;
+    const R = g.remote;
+    if (!me || !R) return;
+    me.cls = g.classPick;
     this.role = 'guest';
     this.clock = new Clock();
     this.lastSeq = 0;
@@ -336,15 +344,16 @@ export class Coop {
     this.peerLook = cleanLook(m.look);
     g.director.coop = true;
     g.director.state = 'waiting';
-    g.player.x = m.x;
-    g.player.y = m.y;
-    this.peer = new Player(g.world.spawn.x, g.world.spawn.y);
-    this.peer.look = this.peerLook;
-    this.peer.puppet = true;
-    this.peer.idx = HOST_IDX;
+    me.x = m.x;
+    me.y = m.y;
+    const peer: Puppet = new Player(g.world.spawn.x, g.world.spawn.y);
+    this.peer = peer;
+    peer.look = this.peerLook;
+    peer.puppet = true;
+    peer.idx = HOST_IDX;
     // el anfitrión se dibuja y se mueve igual que los jugadores del modo en línea (js/net/remote.js)
-    g.remote.start(EXTRAPOLATE);
-    g.remote.peers.set(HOST_IDX, this.peer);
+    R.start(EXTRAPOLATE);
+    R.peers.set(HOST_IDX, peer);
     this.lastDs = null;
     this.levelSeen = 1;
     g.camera.x = m.x;
@@ -421,7 +430,7 @@ export class Coop {
     return [
       {
         type: z.type,
-        si: z.si | 0,
+        si: (z.si ?? 0) | 0,
         x: Math.round(z.x),
         y: Math.round(z.y),
         r: z.r,
@@ -490,7 +499,8 @@ export class Coop {
       this.fx = [];
     }
     if (g.state !== 'menu') {
-      this.send(this.snapshot(), true);
+      const snap = this.snapshot();
+      if (snap) this.send(snap, true);
       this.lastSnapAt = performance.now();
     }
   }
@@ -498,6 +508,8 @@ export class Coop {
   snapshot() {
     const g = this.game;
     const peer = this.peer;
+    const me = g.player;
+    if (!peer || !me) return null;
     // la parte del mundo es la misma que arma el servidor en línea (js/net/snapshot.js)
     const s: CoopSnap = {
       t: 's',
@@ -507,8 +519,8 @@ export class Coop {
         g,
         { x: peer.x, y: peer.y, vw: peer.vw, vh: peer.vh },
         {
-          players: [{ idx: HOST_IDX, p: g.player }],
-          robots: [{ idx: HOST_IDX, r: g.robot }],
+          players: [{ idx: HOST_IDX, p: me }],
+          robots: g.robot ? [{ idx: HOST_IDX, r: g.robot }] : [],
           // las balas del compañero ya las vio en su celular
           skipBullet: (b) => b.owner === 'peer',
         },
@@ -533,7 +545,7 @@ export class Coop {
     if (q.ta !== undefined) q.angle = angleTo(q.angle, q.ta, dt * 14);
     if (q.tla !== undefined) q.legAngle = angleTo(q.legAngle, q.tla, dt * 10);
     // el paso de las piernas sale del movimiento que se ve, así no salta
-    if (q.lx !== undefined) q.walkPhase += Math.hypot(q.x - q.lx, q.y - q.ly) * 0.11;
+    if (q.lx !== undefined && q.ly !== undefined) q.walkPhase += Math.hypot(q.x - q.lx, q.y - q.ly) * 0.11;
     q.lx = q.x;
     q.ly = q.y;
   }
@@ -560,16 +572,21 @@ export class Coop {
 
   onGuestMessage(m: GuestMsg) {
     const g = this.game;
+    const me = g.player;
     const peer = this.peer;
+    if (!peer || !me) {
+      if (m.t === 'hello') this.onHello(m);
+      return;
+    }
     switch (m.t) {
       case 'hello':
         this.onHello(m);
         break;
       case 'in': {
         if (Number(m.ak) > (this.peerAck || 0)) this.peerAck = Number(m.ak);
-        peer.tx = Number(m.x) || peer.tx;
-        peer.ty = Number(m.y) || peer.ty;
-        track(peer, this.clock.stamp(Number(m.ts)), peer.tx, peer.ty);
+        const tx = (peer.tx = Number(m.x) || peer.tx || 0);
+        const ty = (peer.ty = Number(m.y) || peer.ty || 0);
+        track(peer, this.clock.stamp(Number(m.ts)), tx, ty);
         peer.ta = Number(m.a) || 0;
         peer.tla = Number(m.la) || 0;
         peer.speedNow = Number(m.sp) || 0;
@@ -629,7 +646,7 @@ export class Coop {
       }
       case 'dead':
         peer.alive = false;
-        if (!g.player.alive) g.deathT = 1.2;
+        if (!me.alive) g.deathT = 1.2;
         g.toast(`${this.peerName || 'Tu compañero'} cayó: revive al terminar la oleada`);
         break;
       case 'next':
@@ -641,6 +658,7 @@ export class Coop {
   // Las acciones traen la posición y la mira exactas del invitado en ese instante.
   syncPeer(m: { x: number; y: number; a: number }) {
     const q = this.peer;
+    if (!q) return;
     if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
       q.x = q.tx = m.x;
       q.y = q.ty = m.y;
@@ -657,6 +675,7 @@ export class Coop {
     const d = WEAPON_DEFS[m.w];
     if (!d || !Array.isArray(m.a)) return;
     const peer = this.peer;
+    if (!peer) return;
     for (const a of m.a.slice(0, 12)) {
       g.bullets.spawn({
         x: Number(m.x),
@@ -684,12 +703,14 @@ export class Coop {
   onHostMessage(m: HostMsg) {
     const g = this.game;
     const p = g.player;
+    const R = g.remote;
+    if (!p || !R) return;
     switch (m.t) {
       case 's':
         this.applySnapshot(m);
         break;
       case 'fx':
-        if (Array.isArray(m.e)) for (const e of m.e) g.remote.replay(e);
+        if (Array.isArray(m.e)) for (const e of m.e) R.replay(e);
         break;
       case 'k': {
         // empujones sumados de varios golpes: se limitan para que no den tirones bruscos
@@ -710,7 +731,7 @@ export class Coop {
         p.hurt(Number(m.d) || 0, g);
         break;
       case 'hit':
-        g.onZombieHit(null, null);
+        g.onZombieHit(null, null); // el golpe al compañero no trae zombi (events.js lo ignora)
         break;
       case 'earn': {
         const n = Math.max(0, Number(m.n) || 0);
@@ -727,7 +748,7 @@ export class Coop {
         if (PICKS.includes(m.k)) g.pickups.collect({ k: m.k, x: p.x, y: p.y }, g);
         break;
       case 'acid':
-        g.applyAcid(g.player);
+        g.applyAcid(p);
         break;
       case 'built': {
         const kind = this.pendingBuild;
@@ -752,6 +773,7 @@ export class Coop {
   guestTick(dt: number) {
     const g = this.game;
     const p = g.player;
+    if (!p) return;
     this.inT -= dt;
     if (this.inT > 0) return;
     this.inT = 1 / IN_HZ;
@@ -807,8 +829,9 @@ export class Coop {
   guestBuild(kind: string) {
     const g = this.game;
     if (this.pendingBuild) return;
-    this.pendingBuild = kind;
     const p = g.player;
+    if (!p) return;
+    this.pendingBuild = kind;
     this.send({
       t: 'build',
       kind,
@@ -821,6 +844,7 @@ export class Coop {
   // game.mode.sendThrow: tryGrenade ya eligió el blanco y descontó la granada
   guestThrow(kind: string, tx: number, ty: number) {
     const p = this.game.player;
+    if (!p) return;
     this.send({
       t: 'throw',
       kind,
@@ -834,6 +858,7 @@ export class Coop {
 
   guestMissile(tx: number, ty: number) {
     const p = this.game.player;
+    if (!p) return;
     this.send({
       t: 'ab',
       tx: Math.round(tx),
@@ -847,6 +872,9 @@ export class Coop {
   applySnapshot(s: CoopSnap) {
     const g = this.game;
     const d = g.director;
+    const me = g.player;
+    const R = g.remote;
+    if (!me || !R) return;
     // fin de oleada: tienda y mejoras para el invitado también
     if (this.lastDs === 'active' && s.ds === 'waiting') {
       g.shopPending = true;
@@ -866,14 +894,14 @@ export class Coop {
     if (s.kl) g.kills = s.kl;
     // una foto vieja que llegó tarde no deshace una más nueva
     if (Number(s.q) <= (this.lastSeq || 0)) return;
-    g.remote.net.count();
+    R.net.count();
     this.lastSeq = Number(s.q);
-    applyCombo(g.player.combo, s.cb);
+    applyCombo(me.combo, s.cb);
     // jugadores, robots, zombis, objetos, balas y estructuras: lo mismo que ve el cliente en línea
     // el reloj de llegada puede retroceder un poco: el instante de la foto nunca baja (Interp lo exige)
     const t = Math.max(this.clock.stamp(Number(s.ts)), (this.lastT || 0) + 1);
     this.lastT = t;
-    g.remote.applyWorld(s, t, {
+    R.applyWorld(s, t, {
       myIdx: GUEST_IDX,
       identify: () => ({ name: this.peerName || 'Anfitrión', look: this.peerLook }),
       // las barricadas del anfitrión no estorban a su compañero (como antes de unificar)
@@ -885,6 +913,8 @@ export class Coop {
   guestUpdate(dt: number) {
     const g = this.game;
     const p = g.player;
+    const R = g.remote;
+    if (!p || !R) return;
     if (g.input.consume('pause')) return g.pause();
     if (p.alive) {
       p.update(dt, g);
@@ -897,7 +927,6 @@ export class Coop {
       if (g.input.consume('nextRound')) g.startNextRound();
     }
     // zombis y compañero: recorren el camino entre las posiciones recibidas (un poco en diferido)
-    const R = g.remote;
     const rt = performance.now() - this.clock.delay;
     R.placePeers(rt, dt);
     R.placeZombies(rt, dt, p);
@@ -969,6 +998,7 @@ export class Coop {
     const g = this.game;
     const p = g.player;
     const peer = this.peer;
+    if (!p) return;
     if (!p.alive && peer.alive) this.revive(p, peer.x + 40, peer.y);
     if (!peer.alive) {
       peer.alive = true;
@@ -996,7 +1026,7 @@ export class Coop {
 
   // Texto corto para la pantalla: tipo de conexión, retraso, fotos por segundo y FPS.
   stats(dt: number) {
-    const r = this.game.remote.net.tick(dt);
+    const r = this.game.remote?.net.tick(dt);
     if (!r) return null;
     const via = 'Directa';
     const lag = Math.round(this.clock.delay);
@@ -1021,7 +1051,7 @@ export class Coop {
     // el cooperativo termina pero la partida sigue sin guardarse (viene de un grupo)
     if (this.role) {
       g.mode = new Solo(g, true);
-      g.remote.stop();
+      g.remote?.stop();
     }
     this.role = null;
     this.peer = null;

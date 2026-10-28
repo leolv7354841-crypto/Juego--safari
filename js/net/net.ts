@@ -127,7 +127,9 @@ export class Net {
     this.wire(this.fast);
     await pc.setLocalDescription(await pc.createOffer());
     await gathered(pc);
-    const offer = pc.localDescription.sdp;
+    const local = pc.localDescription;
+    if (!local) throw new Error('directa');
+    const offer = local.sdp;
     let code = '';
     for (let tries = 0; tries < 8; tries++) {
       code = Array.from({ length: 4 }, () => LETTERS[(Math.random() * LETTERS.length) | 0]).join('');
@@ -178,7 +180,7 @@ export class Net {
       await pc.setRemoteDescription({ type: 'offer', sdp: room.offer });
       await pc.setLocalDescription(await pc.createAnswer());
       await gathered(pc);
-      answer = pc.localDescription.sdp;
+      answer = pc.localDescription?.sdp ?? null;
     } catch {
       answer = null;
     }
@@ -191,6 +193,7 @@ export class Net {
   send(m: object, fast = false) {
     if (!this.open || !this.direct) return;
     const ch = fast ? this.fast : this.rel;
+    if (!ch) return;
     // si el canal rápido está saturado, se salta este estado (llegará el siguiente)
     if (fast && ch.bufferedAmount > 256 * 1024) return;
     try {

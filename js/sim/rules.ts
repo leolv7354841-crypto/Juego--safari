@@ -145,7 +145,7 @@ export function goldenTick(game: GameHost, t: number, dt: number, toast: (msg: s
 
 /** ¿Puede el ácido quemar a este jugador? No en el menú, ni dentro del robot ni con el impulso. */
 export const canBurn = (game: GameHost, p: Burnable) =>
-  game.state !== 'menu' && p.alive && !p.inRobot && !(p.boostT > 0);
+  game.state !== 'menu' && p.alive && !p.inRobot && !((p.boostT ?? 0) > 0);
 
 /** Empieza (o renueva) la quemadura de `h`, que guarda `acidT` y `acidTick`. */
 export function startAcid(h: AcidState) {

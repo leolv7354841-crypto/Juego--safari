@@ -46,15 +46,16 @@ export class Pickups {
             p = q;
           }
         }
-        if (!p) {
-          if (it.t > LIFE) this.list.splice(i, 1);
-          continue;
-        }
       } else if (
         peer &&
+        p &&
         (!p.alive || (peer.x - it.x) ** 2 + (peer.y - it.y) ** 2 < (p.x - it.x) ** 2 + (p.y - it.y) ** 2)
       )
         p = peer;
+      if (!p) {
+        if (it.t > LIFE) this.list.splice(i, 1);
+        continue;
+      }
       const dx = p.x - it.x;
       const dy = p.y - it.y;
       const d = Math.hypot(dx, dy);
@@ -71,7 +72,7 @@ export class Pickups {
       if (
         Math.hypot(p.x - it.x, p.y - it.y) < reach &&
         usable &&
-        (targets ? game.collectFor(p, it) : p === peer ? game.coop.peerPickup(it) : this.collect(it, game))
+        (targets ? game.collectFor?.(p, it) : p === peer ? game.coop.peerPickup(it) : this.collect(it, game))
       ) {
         it.taken = true;
         this.list.splice(i, 1);
@@ -90,6 +91,7 @@ export class Pickups {
 
   collect(it: Pick<Pickup, 'k' | 'x' | 'y'>, game: GameHost) {
     const p = game.player;
+    if (!p) return false;
     if (it.k === 'ammo') {
       if (!p.addAmmo(1)) return false;
       game.toast('+ Munición');

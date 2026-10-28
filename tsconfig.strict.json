@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "noImplicitAny": true },
+  "compilerOptions": { "noImplicitAny": true, "strictNullChecks": true },
   "include": ["js/core/**/*.ts", "js/sim/**/*.ts", "js/net/**/*.ts"]
 }

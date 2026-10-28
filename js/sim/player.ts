@@ -447,6 +447,7 @@ export class Player {
   // Montado en la torreta pesada: el cañón gira despacio hacia la mira y dispara sus balas.
   actMounted(dt: number, game: GameHost, mv: Vec) {
     const b = this.manned;
+    if (!b) return;
     // la torreta reventó: quedas de pie donde estabas
     if (b.hp <= 0) {
       b.manned = null;

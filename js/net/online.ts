@@ -295,10 +295,11 @@ export class Online {
     ws.dzCounted = true;
     ws.addEventListener('message', (e) => (this.bytesIn += e.data.byteLength || e.data.size || e.data.length || 0));
     if (!conn.dzSend) {
-      conn.dzSend = conn.send.bind(conn);
+      const raw = conn.send.bind(conn);
+      conn.dzSend = raw;
       conn.send = (d: { byteLength?: number; length?: number }) => {
         this.bytesOut += (d && (d.byteLength || d.length)) || 0;
-        conn.dzSend(d);
+        raw(d);
       };
     }
   }
@@ -599,8 +600,12 @@ export class Online {
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
   identify(idx: number) {
     const ms = this.room && this.room.state && this.room.state.members;
-    let found: LobbyMember | null = null;
-    if (ms) ms.forEach((m) => m.idx === idx && (found = m));
+    const hit: { m?: LobbyMember } = {};
+    if (ms)
+      ms.forEach((m) => {
+        if (m.idx === idx) hit.m = m;
+      });
+    const found = hit.m;
     return { name: (found && found.name) || 'Jugador', code: (found && found.look) || '' };
   }
 

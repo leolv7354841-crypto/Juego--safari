@@ -84,11 +84,20 @@ export interface FlowField {
 
 type Pt = { x: number; y: number };
 
+// Campo de flanqueo: siempre con su índice k y su punto de anclaje
+export type Anchor = FlowField & { k: number; x: number; y: number };
+
+// k 0 es rectángulo (w, h presentes) y el resto círculo (r presente)
+type RectObs = Obstacle & { w: number; h: number };
+type CircObs = Obstacle & { r: number };
+const isRect = (o: Obstacle): o is RectObs => o.k === 0;
+const isCirc = (o: Obstacle): o is CircObs => o.k !== 0;
+
 // Por qué cara entra en el rectángulo `o` el segmento (x0, y0) → (x1, y1): 0 izquierda, 1 derecha,
 // 2 arriba, 3 abajo; -1 si no entra o si ya empezaba dentro. En entryT queda la fracción del
 // segmento donde toca la cara.
 let entryT = 0;
-function entryFace(x0: number, y0: number, x1: number, y1: number, o: Obstacle): number {
+function entryFace(x0: number, y0: number, x1: number, y1: number, o: RectObs): number {
   const dx = x1 - x0;
   const dy = y1 - y0;
   let t0 = 0;
@@ -135,13 +144,13 @@ export class World {
   declare obsN: number;
   declare obsGrid: Obstacle[][];
   declare stamp: number;
-  declare lastBlock: Block;
+  declare lastBlock: Block | null;
   declare navN: number;
   declare blocked: Uint8Array;
   declare queue: Int32Array;
   declare main: FlowField;
   declare dist: Uint16Array;
-  declare anchors: FlowField[];
+  declare anchors: Anchor[];
   declare main2: FlowField;
   declare anchorTurn: number;
   constructor(seed = (Math.random() * 1e9) | 0) {
@@ -193,16 +202,16 @@ export class World {
     if ((sx - cx) ** 2 + (sy - cy) ** 2 < SPAWN_CLEAR * SPAWN_CLEAR) return false;
     for (const o of this.obstacles) {
       let ox, oy, ow, oh;
-      if (o.k === 0) {
+      if (isRect(o)) {
         ox = o.x;
         oy = o.y;
         ow = o.w;
         oh = o.h;
-      } else {
+      } else if (isCirc(o)) {
         ox = o.x - o.r;
         oy = o.y - o.r;
         ow = oh = o.r * 2;
-      }
+      } else continue;
       if (x < ox + ow + pad && x + w + pad > ox && y < oy + oh + pad && y + h + pad > oy) return false;
     }
     return true;
@@ -620,7 +629,11 @@ export class World {
       o.id = idx;
       o.stamp = 0;
       if (o.prop) return;
-      const [x, y, w, h] = o.k === 0 ? [o.x, o.y, o.w, o.h] : [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2];
+      const [x, y, w, h] = isRect(o)
+        ? [o.x, o.y, o.w, o.h]
+        : isCirc(o)
+          ? [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2]
+          : [o.x, o.y, 0, 0];
       const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
       const y0 = clamp(Math.floor(y / OBS_CELL), 0, n - 1);
       const x1 = clamp(Math.floor((x + w) / OBS_CELL), 0, n - 1);
@@ -652,7 +665,7 @@ export class World {
           if (o.stamp === stamp) continue;
           o.stamp = stamp;
           if (passBlocks && o.block) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             const face = swept ? entryFace(ox, oy, e.x, e.y, o) : -1;
             if (face >= 0) {
               // vuelve a donde tocó la cara, apoyado por fuera
@@ -687,7 +700,7 @@ export class World {
               else if (m === t) e.y = o.y - r;
               else e.y = o.y + o.h + r;
             }
-          } else {
+          } else if (isCirc(o)) {
             const dx = e.x - o.x;
             const dy = e.y - o.y;
             const rr = r + o.r;
@@ -706,7 +719,7 @@ export class World {
 
   /* ---------- barricadas del jugador ---------- */
 
-  addDynamic(o: Obstacle) {
+  addDynamic(o: RectObs) {
     const n = this.obsN;
     o.stamp = 0;
     o.cells = [];
@@ -723,8 +736,8 @@ export class World {
     this.refreshNav(o.x, o.y, o.w, o.h);
   }
 
-  removeDynamic(o: Obstacle) {
-    for (const idx of o.cells) {
+  removeDynamic(o: RectObs) {
+    for (const idx of o.cells ?? []) {
       const arr = this.obsGrid[idx];
       const i = arr.indexOf(o);
       if (i >= 0) arr.splice(i, 1);
@@ -761,9 +774,9 @@ export class World {
       for (let i = x0; i <= x1; i++) {
         for (const o of this.obsGrid[j * n + i]) {
           if (ignoreBlocks && o.block) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return false;
-          } else {
+          } else if (isCirc(o)) {
             const px = clamp(o.x, x, x + w);
             const py = clamp(o.y, y, y + h);
             if ((px - o.x) ** 2 + (py - o.y) ** 2 < o.r * o.r) return false;
@@ -786,9 +799,9 @@ export class World {
         if (i < 0 || i >= n) continue;
         for (const o of this.obsGrid[j * n + i]) {
           if (bulletsOnly && o.low) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             if (x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad) return o;
-          } else {
+          } else if (isCirc(o)) {
             const dx = x - o.x;
             const dy = y - o.y;
             const rr = o.r + pad;

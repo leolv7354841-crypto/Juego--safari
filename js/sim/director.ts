@@ -271,7 +271,9 @@ export class Director {
       const c = this.edgePoint(game, rand(70, 180), views, attempt < 6);
       if (c.x < 80 || c.y < 80 || c.x > WORLD_SIZE - 80 || c.y > WORLD_SIZE - 80) continue;
       if (world.pointBlocked(c.x, c.y, 26) || this.seen(views, c.x, c.y, 26)) continue;
-      game.horde.spawn(this.queue.shift(), c.x, c.y, this.hpMult, this.speedMult);
+      const type = this.queue.shift();
+      if (!type) break;
+      game.horde.spawn(type, c.x, c.y, this.hpMult, this.speedMult);
       left--;
     }
   }
