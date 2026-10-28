@@ -167,6 +167,8 @@ declare global {
   interface Window {
     __deadzone?: unknown;
     DZ_VERSION?: string;
+    /** Sólo existe cuando el juego corre como Artifact de Claude (nube de accounts.js). */
+    claude?: { use?: (name: string) => Promise<any> };
   }
 }
 

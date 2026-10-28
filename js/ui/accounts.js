@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Cuentas de jugador y clasificación.
 // - Siempre: cuentas con nombre + PIN guardadas en este navegador, cada una con su
 //   propio progreso y su mejor marca; clasificación de las cuentas de este dispositivo.
