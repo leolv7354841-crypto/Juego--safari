@@ -6,9 +6,9 @@
 //   en línea     lo mismo + ack, me, st, wp, ec, ps, iv, ab, hv, up, fx, tt, dg, kl, ml, lft, blk, wir, sc (cada jugador)
 // Todo son listas planas de números (poco peso); las posiciones de los zombis van relativas a `o`.
 // El contrato de tipos está en js/core/types.d.ts (WorldSnap). No importa nada del navegador.
-import { ABILITY, GOLDEN, NET, WEAPON_ORDER } from '../core/config.js';
-import { TAU } from '../core/util.js';
-import { PICKS, TYPES } from './protocol.js';
+import { ABILITY, GOLDEN, NET, WEAPON_ORDER } from '../core/config.ts';
+import { TAU } from '../core/util.ts';
+import { PICKS, TYPES } from './protocol.ts';
 
 /** Números por zombi en `z`: id, tipo, dx, dy, ángulo (64 pasos), banderas. */
 export const ZOMBIE_N = 6;
@@ -22,11 +22,11 @@ export const WORLD_KEYS = ['o', 'z', 'zx', 'zh', 'pl', 'rb', 'pk', 'b', 'gr', 'f
 
 const r100 = (v) => Math.round(v * 100);
 
-/**
- * @typedef {{ x: number, y: number, vw?: number, vh?: number }} Viewer  a quién se le manda la foto
- * @typedef {{ idx: number, p: any, away?: boolean }} PeerEntry  un jugador que ve el espectador
- * @typedef {{ idx: number, r: any }} RobotEntry
- */
+/** A quién se le manda la foto. */
+export type Viewer = { x: number; y: number; vw?: number; vh?: number };
+/** Un jugador que ve el espectador. */
+export type PeerEntry = { idx: number; p: any; away?: boolean };
+export type RobotEntry = { idx: number; r: any };
 
 /** Zombis cercanos a la pantalla del espectador: z, zx (en el aire / hinchados), zh (vida de los heridos, en %). */
 export function encodeZombies(list, viewer) {
@@ -177,7 +177,11 @@ export function encodeScene(src, viewer, skipBullet) {
  * @param {Viewer} viewer
  * @param {{ players?: PeerEntry[], robots?: RobotEntry[], skipBullet?: (b: any) => boolean }} [opts]
  */
-export function encodeWorld(src, viewer, opts = {}) {
+export function encodeWorld(
+  src: { horde: any; pickups: any; bullets: any; structures: any; director: any; time: number },
+  viewer: Viewer,
+  opts: { players?: PeerEntry[]; robots?: RobotEntry[]; skipBullet?: (b: any) => boolean } = {},
+) {
   const d = src.director;
   return {
     ...encodeZombies(src.horde.list, viewer),

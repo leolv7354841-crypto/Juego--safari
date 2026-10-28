@@ -2,13 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
-import { IN_FIRE } from '../../js/net/protocol.js';
-import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.js';
-import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.js';
-import { UPGRADES } from '../../js/sim/upgrades.js';
-import { cooldownOf } from '../../js/sim/abilities.js';
-import { comboBreak, comboMult } from '../../js/sim/combo.js';
-import { WALK } from '../../js/sim/player.js';
+import { IN_FIRE } from '../../js/net/protocol.ts';
+import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.ts';
+import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import { UPGRADES } from '../../js/sim/upgrades.ts';
+import { cooldownOf } from '../../js/sim/abilities.ts';
+import { comboBreak, comboMult } from '../../js/sim/combo.ts';
+import { WALK } from '../../js/sim/player.ts';
 import { cleanAct, cleanClass } from '../src/validate.ts';
 
 const aimAt = (sim: ServerSim, id: string) => {

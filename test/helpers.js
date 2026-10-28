@@ -1,6 +1,6 @@
 // Ayudas comunes de las pruebas del núcleo.
 
-import { Solo } from '../js/net/mode.js';
+import { Solo } from '../js/net/mode.ts';
 
 export const silent = new Proxy({}, { get: () => () => {} });
 

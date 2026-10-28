@@ -1,6 +1,6 @@
 // Dibujo del robot pilotable. La lógica vive en sim/robot.js.
-import { ROBOT, GUN_REACH } from '../core/config.js';
-import { TAU, roundRect } from '../core/util.js';
+import { ROBOT, GUN_REACH } from '../core/config.ts';
+import { TAU, roundRect } from '../core/util.ts';
 import { OUT, drawGunScaled } from './sprites.js';
 
 export function drawRobot(g, rb, p, time) {

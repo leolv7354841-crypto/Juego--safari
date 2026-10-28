@@ -1,6 +1,6 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.js';
-import { TAU, rand, clamp } from '../core/util.js';
+import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.ts';
+import { TAU, rand, clamp } from '../core/util.ts';
 
 const SNAP = 20;
 const TRAP_WIRE = { slow: 0.35, dps: 14 };
@@ -32,6 +32,17 @@ export function turretBullet(x, y, a, owner = null) {
 
 // Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
 export class Structures {
+  declare blocks: any;
+  declare wires: any;
+  declare grenades: any;
+  declare blasts: any;
+  declare scorches: any;
+  declare pending: any;
+  declare fires: any;
+  declare stuck: any;
+  declare missiles: any;
+  declare fireId: any;
+  declare time: any;
   constructor() {
     this.blocks = [];
     this.wires = [];
@@ -63,7 +74,7 @@ export class Structures {
    * @param {import('../core/types.js').GameHost} game
    * @param {string} kind
    */
-  placement(game, kind) {
+  placement(game: import('../core/types.js').GameHost, kind: string) {
     const def = SHOP[kind];
     const p = game.player;
     const ca = Math.cos(p.angle);
@@ -117,7 +128,7 @@ export class Structures {
    * @param {string} kind
    * @param {string | null} [owner]
    */
-  place(game, kind, owner = null) {
+  place(game: import('../core/types.js').GameHost, kind: string, owner: string | null = null) {
     const pl = this.placement(game, kind);
     if (!pl.ok) return false;
     const def = SHOP[kind];
@@ -178,7 +189,7 @@ export class Structures {
    * @param {any} o
    * @param {number} dmg
    */
-  damageBlock(game, o, dmg) {
+  damageBlock(game: import('../core/types.js').GameHost, o: any, dmg: number) {
     if (o.hp <= 0) return;
     o = this.topOf(o);
     o.hp -= dmg;
@@ -275,7 +286,13 @@ export class Structures {
    * @param {number} y
    * @param {import('../core/types.js').Bullet} b
    */
-  stickRocket(game, z, x, y, b) {
+  stickRocket(
+    game: import('../core/types.js').GameHost,
+    z: import('../core/types.js').Zombie,
+    x: number,
+    y: number,
+    b: import('../core/types.js').Bullet,
+  ) {
     const fat = z.type === 'fat';
     // posición relativa al cuerpo, en el sistema del zombi, para que se mueva con él
     const c = Math.cos(-z.angle);
@@ -469,7 +486,7 @@ export class Structures {
    * @param {number} dt
    * @param {import('../core/types.js').GameHost} game
    */
-  update(dt, game) {
+  update(dt: number, game: import('../core/types.js').GameHost) {
     this.time = (this.time || 0) + dt;
     for (let i = this.grenades.length - 1; i >= 0; i--) {
       const g = this.grenades[i];

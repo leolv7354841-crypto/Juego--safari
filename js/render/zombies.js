@@ -1,6 +1,6 @@
 // Dibujo de la horda. La lógica vive en sim/zombies.js.
-import { GOLDEN } from '../core/config.js';
-import { TAU } from '../core/util.js';
+import { GOLDEN } from '../core/config.ts';
+import { TAU } from '../core/util.ts';
 import { zombieSprites, flameSprite } from './sprites.js';
 
 // Juego de imágenes de un zombi (lo guarda en z.spr la primera vez). En el servidor no se usa.

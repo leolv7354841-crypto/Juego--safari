@@ -1,10 +1,10 @@
 // Máquina de estados del juego como tabla. Cada estado dice qué pantalla muestra (`screen`), si la
 // música suena (`music`), qué hace al entrar y al salir (`enter`, `exit`) y qué hace en cada
 // fotograma (`update`). El resto del juego sólo llama a `setState`; el bucle, a `stepState`.
-import { CLASS_ORDER } from './core/config.js';
-import { rand } from './core/util.js';
-import { Abilities } from './sim/abilities.js';
-import * as Rules from './sim/rules.js';
+import { CLASS_ORDER } from './core/config.ts';
+import { rand } from './core/util.ts';
+import { Abilities } from './sim/abilities.ts';
+import * as Rules from './sim/rules.ts';
 import * as Act from './actions.js';
 import { saveProgress } from './save.js';
 import { updateAcid, updateCombo } from './events.js';

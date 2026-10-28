@@ -1,4 +1,4 @@
-import { rand, TAU, pick } from '../core/util.js';
+import { rand, TAU, pick } from '../core/util.ts';
 import { zombieSprite } from './zombies.js';
 
 const BLOOD = ['#8a1f1a', '#6e1714', '#a3281f', '#5a1210'];

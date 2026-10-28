@@ -1,8 +1,21 @@
-import { ABILITY, WEAPONS } from '../core/config.js';
-import { cooldownOf } from './abilities.js';
+import { ABILITY, WEAPONS } from '../core/config.ts';
+import { cooldownOf } from './abilities.ts';
 
 // Cada mejora modifica las estadísticas reales del jugador.
-export const UPGRADES = [
+export type Upgrade = {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  apply: (p: any) => any;
+  max?: number;
+  repeat?: boolean;
+  when?: (p: any) => boolean;
+  weight?: number;
+  minLevel?: number;
+};
+
+export const UPGRADES: Upgrade[] = [
   {
     id: 'dmg',
     name: 'Munición pesada',

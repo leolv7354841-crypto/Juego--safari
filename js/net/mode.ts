@@ -13,8 +13,10 @@
 // No importa nada: carga igual en el navegador y en Node.
 
 export class Mode {
+  declare game: any;
+  declare detached: any;
   /** @param {any} game */
-  constructor(game, detached = false) {
+  constructor(game: any, detached = false) {
     this.game = game;
     /** Solo tras un cooperativo o una partida en línea: la partida no se guarda ni toca tu progreso. */
     this.detached = detached;
@@ -119,6 +121,7 @@ export class Mode {
 export class Solo extends Mode {}
 
 export class CoopHost extends Mode {
+  declare game: any;
   get kind() {
     return 'coopHost';
   }
@@ -154,6 +157,7 @@ export class CoopHost extends Mode {
 }
 
 export class CoopGuest extends Mode {
+  declare game: any;
   get kind() {
     return 'coopGuest';
   }
@@ -212,6 +216,7 @@ export class CoopGuest extends Mode {
 }
 
 export class OnlineClient extends Mode {
+  declare game: any;
   get kind() {
     return 'online';
   }

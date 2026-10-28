@@ -1,8 +1,8 @@
 // Interfaz de juego: marcador (vida, aguante, arma, inventario), avisos, carteles y dinero flotante.
-import { BUILD_ORDER, COMBO, SHOP, ROBOT, WEAPONS } from '../core/config.js';
-import { fmtTime } from '../core/util.js';
-import { CLASSES, cooldownOf } from '../sim/abilities.js';
-import { comboMult, comboTier, multText } from '../sim/combo.js';
+import { BUILD_ORDER, COMBO, SHOP, ROBOT, WEAPONS } from '../core/config.ts';
+import { fmtTime } from '../core/util.ts';
+import { CLASSES, cooldownOf } from '../sim/abilities.ts';
+import { comboMult, comboTier, multText } from '../sim/combo.ts';
 import { ITEM_ICONS, SHORT } from './icons.js';
 import { closest, on } from './dom.js';
 

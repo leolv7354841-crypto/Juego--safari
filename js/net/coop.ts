@@ -6,17 +6,17 @@
 // El invitado mueve a su personaje en su propio celular (sin retraso), dispara balas de
 // adorno al instante y le avisa al anfitrión, que crea las balas que de verdad hacen daño.
 // Cada jugador tiene su propio dinero, armas, vida y mejoras; la experiencia es del equipo.
-import { Net } from './net.js';
-import { Player } from '../sim/player.js';
-import { WEAPONS, SHOP, ABILITY } from '../core/config.js';
+import { Net } from './net.ts';
+import { Player } from '../sim/player.ts';
+import { WEAPONS, SHOP, ABILITY } from '../core/config.ts';
 import { cleanLook } from '../render/sprites.js';
-import { Abilities } from '../sim/abilities.js';
-import { applyCombo, packCombo } from '../sim/combo.js';
-import { rand, angleTo } from '../core/util.js';
-import { PARTICLE_SKIP, PICKS, SFX_SYNC, DECAL_SYNC } from './protocol.js';
-import { encodeStatic, encodeWorld } from './snapshot.js';
-import { GUEST_IDX, HOST_IDX } from './remote.js';
-import { CoopHost, CoopGuest, Solo } from './mode.js';
+import { Abilities } from '../sim/abilities.ts';
+import { applyCombo, packCombo } from '../sim/combo.ts';
+import { rand, angleTo } from '../core/util.ts';
+import { PARTICLE_SKIP, PICKS, SFX_SYNC, DECAL_SYNC } from './protocol.ts';
+import { encodeStatic, encodeWorld } from './snapshot.ts';
+import { GUEST_IDX, HOST_IDX } from './remote.ts';
+import { CoopHost, CoopGuest, Solo } from './mode.ts';
 
 const SNAP_HZ = 12;
 const IN_HZ = 20;
@@ -32,6 +32,10 @@ const r100 = (v) => Math.round(v * 100);
 // atrasar el dibujo para tener siempre dos posiciones entre las que trazar el camino,
 // aunque los datos lleguen disparejos o en grupitos (sobre todo por Firebase).
 class Clock {
+  declare off: any;
+  declare prevTs: any;
+  declare gap: any;
+  declare late: any;
   constructor() {
     this.off = null;
     this.prevTs = null;
@@ -106,6 +110,29 @@ function place(o, now, dt) {
 }
 
 export class Coop {
+  declare game: any;
+  declare net: any;
+  declare role: any;
+  declare peer: any;
+  declare peerName: any;
+  declare peerLook: any;
+  declare fx: any;
+  declare rec: any;
+  declare depth: any;
+  declare orig: any;
+  declare sendT: any;
+  declare inT: any;
+  declare snapN: any;
+  declare pendingBuild: any;
+  declare lastDs: any;
+  declare levelSeen: any;
+  declare clock: any;
+  declare snapSeq: any;
+  declare peerAck: any;
+  declare lastSeq: any;
+  declare lastT: any;
+  declare lastSnapAt: any;
+  declare peerAbAt: any;
   constructor(game) {
     this.game = game;
     this.net = new Net();
@@ -250,11 +277,7 @@ export class Coop {
         this.orig.push([obj, n]);
         obj[n] = function (...args) {
           if (self.rec && self.depth === 0 && self.fx.length < FX_MAX && self.nearPeer(tag, n, args)) {
-            self.fx.push([
-              tag,
-              n,
-              tag === 'd' && n === 'corpse' ? self.packCorpse(/** @type {[any, any, any]} */ (args)) : args,
-            ]);
+            self.fx.push([tag, n, tag === 'd' && n === 'corpse' ? self.packCorpse(args as [any, any, any]) : args]);
           }
           self.depth++;
           try {
@@ -381,8 +404,7 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     // la parte del mundo es la misma que arma el servidor en línea (js/net/snapshot.js)
-    /** @type {Record<string, any>} */
-    const s = {
+    const s: Record<string, any> = {
       t: 's',
       q: ++this.snapSeq,
       ts: Math.round(performance.now()),

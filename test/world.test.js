@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { World } from '../js/sim/world.js';
+import { World } from '../js/sim/world.ts';
 import './helpers.js';
 
 // Huella del terreno: recorre una rejilla y anota qué puntos y rectángulos están bloqueados.

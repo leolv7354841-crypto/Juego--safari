@@ -2,19 +2,19 @@
 // el invitado del cooperativo y el cliente en línea.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { NET } from '../js/core/config.js';
-import { Coop } from '../js/net/coop.js';
-import { Interp } from '../js/net/netcode.js';
-import { NetStats, Remote, GUEST_IDX, HOST_IDX } from '../js/net/remote.js';
-import { PEER_N, ROBOT_N, ZOMBIE_N, WORLD_KEYS, encodeStatic, encodeWorld } from '../js/net/snapshot.js';
-import { Bullets } from '../js/sim/bullets.js';
-import { Director } from '../js/sim/director.js';
-import { Pickups } from '../js/sim/pickups.js';
-import { Player } from '../js/sim/player.js';
-import { Robot } from '../js/sim/robot.js';
-import { Structures } from '../js/sim/build.js';
-import { Horde } from '../js/sim/zombies.js';
-import { World } from '../js/sim/world.js';
+import { NET } from '../js/core/config.ts';
+import { Coop } from '../js/net/coop.ts';
+import { Interp } from '../js/net/netcode.ts';
+import { NetStats, Remote, GUEST_IDX, HOST_IDX } from '../js/net/remote.ts';
+import { PEER_N, ROBOT_N, ZOMBIE_N, WORLD_KEYS, encodeStatic, encodeWorld } from '../js/net/snapshot.ts';
+import { Bullets } from '../js/sim/bullets.ts';
+import { Director } from '../js/sim/director.ts';
+import { Pickups } from '../js/sim/pickups.ts';
+import { Player } from '../js/sim/player.ts';
+import { Robot } from '../js/sim/robot.ts';
+import { Structures } from '../js/sim/build.ts';
+import { Horde } from '../js/sim/zombies.ts';
+import { World } from '../js/sim/world.ts';
 import { silent } from './helpers.js';
 
 // Un mundo "de verdad" (sin pantalla): lo que arma el anfitrión o el servidor.

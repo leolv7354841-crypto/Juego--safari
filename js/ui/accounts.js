@@ -3,8 +3,8 @@
 //   propio progreso y su mejor marca; clasificación de las cuentas de este dispositivo.
 // - Abierto como Artifact de Claude con base de datos: el progreso se copia también a
 //   la nube de tu cuenta de Claude y los récords van a una clasificación global.
-import { storage } from '../core/util.js';
-import { ONLINE } from '../core/config.js';
+import { storage } from '../core/util.ts';
+import { ONLINE } from '../core/config.ts';
 
 const ACC_KEY = 'dz-accounts';
 const ACTIVE_KEY = 'dz-active';

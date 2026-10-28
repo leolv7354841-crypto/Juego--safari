@@ -9,9 +9,9 @@ import { join } from 'node:path';
 const JS = fileURLToPath(new URL('../js/', import.meta.url));
 const DEL_SERVIDOR = [
   ...['core', 'sim'].flatMap((d) => readdirSync(join(JS, d)).map((f) => `${d}/${f}`)),
-  'net/protocol.js',
-  'net/netcode.js',
-].filter((f) => f.endsWith('.js'));
+  'net/protocol.ts',
+  'net/netcode.ts',
+].filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'));
 
 test('hay módulos que revisar', () => {
   assert.ok(DEL_SERVIDOR.length > 15);
@@ -25,7 +25,7 @@ test('el entorno de la prueba no tiene document ni window', () => {
 for (const f of DEL_SERVIDOR) {
   test(`${f} carga en Node sin document`, async () => {
     const mod = await import(pathToFileURL(join(JS, f)).href);
-    assert.ok(Object.keys(mod).length > 0 || f.endsWith('version.js'));
+    assert.ok(Object.keys(mod).length > 0 || f.endsWith('version.ts'));
   });
 
   test(`${f} no importa render ni ui`, () => {

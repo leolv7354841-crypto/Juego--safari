@@ -1,6 +1,6 @@
 // Capa de oscuridad a media resolución: se "recortan" las zonas iluminadas
 // (linterna, farolas, fuegos, fogonazos) y luego se compone sobre la escena.
-import { makeCanvas } from '../core/util.js';
+import { makeCanvas } from '../core/util.ts';
 import { lightSprite, coneSprite } from './sprites.js';
 
 const SCALE = 0.5;

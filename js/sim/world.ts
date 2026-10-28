@@ -2,8 +2,8 @@
 // - obstáculos (rectángulos y círculos) con rejilla espacial
 // - campo de flujo (BFS) para que los zombis rodeen edificios y coches
 // - lista de ops de dibujo (datos: render/world.js las pinta en trozos con caché LRU)
-import { WORLD_SIZE, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL, CAR_COLORS } from '../core/config.js';
-import { mulberry32, rrange, rpick, clamp, TAU } from '../core/util.js';
+import { WORLD_SIZE, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL, CAR_COLORS } from '../core/config.ts';
+import { mulberry32, rrange, rpick, clamp, TAU } from '../core/util.ts';
 
 const OBS_CELL = 128;
 const ROAD_W = ROAD_HALF * 2;
@@ -46,6 +46,29 @@ function entryFace(x0, y0, x1, y1, o) {
 }
 
 export class World {
+  declare size: any;
+  declare rng: any;
+  declare seedBase: number;
+  declare obstacles: any;
+  declare ops: any;
+  declare trees: any;
+  declare overhead: any;
+  declare lights: any;
+  declare fires: any;
+  declare spawn: any;
+  declare bands: any[];
+  declare obsN: any;
+  declare obsGrid: any;
+  declare stamp: any;
+  declare lastBlock: any;
+  declare navN: any;
+  declare blocked: any;
+  declare queue: any;
+  declare main: any;
+  declare dist: any;
+  declare anchors: any;
+  declare main2: any;
+  declare anchorTurn: any;
   constructor(seed = (Math.random() * 1e9) | 0) {
     this.size = WORLD_SIZE;
     this.rng = mulberry32(seed);
@@ -134,7 +157,7 @@ export class World {
     return true;
   }
 
-  addCar(x, y, horizontal, opts = {}) {
+  addCar(x, y, horizontal, opts: { kind?: string; pad?: number; burnt?: boolean; burning?: boolean } = {}) {
     const rng = this.rng;
     const kind = opts.kind || rpick(rng, ['sedan', 'sedan', 'sedan', 'hatch', 'taxi', 'pickup', 'van', 'police']);
     let len =

@@ -1,9 +1,9 @@
 // Racha de bajas: cada baja hecha antes de COMBO.window s de la anterior la alarga, y mientras más
 // larga, más dinero y experiencia da cada zombi. Un golpe de zombi la corta. Vive en el jugador
 // (p.combo); la llevan quien simula (solitario, anfitrión, servidor) y la foto se la manda a los demás.
-import { COMBO } from '../core/config.js';
+import { COMBO } from '../core/config.ts';
 
-/** @typedef {{ n: number, t: number, best: number }} Combo */
+export type Combo = { n: number; t: number; best: number };
 
 /** @returns {Combo} */
 export const newCombo = () => ({ n: 0, t: 0, best: 0 });
@@ -26,7 +26,7 @@ export function comboMult(n) {
  * Devuelve el multiplicador que toca a esa baja.
  * @param {Combo} c
  */
-export function comboKill(c, type) {
+export function comboKill(c: Combo, type) {
   c.n += type === 'golden' ? COMBO.golden : 1;
   c.t = COMBO.window;
   if (c.n > c.best) c.best = c.n;
@@ -43,7 +43,7 @@ export function comboTick(p, dt) {
 }
 
 /** Golpe de zombi: la racha se corta. @param {Combo} c */
-export function comboBreak(c) {
+export function comboBreak(c: Combo) {
   c.n = 0;
   c.t = 0;
 }
@@ -52,7 +52,7 @@ export function comboBreak(c) {
 export const multText = (m) => `×${String(m).replace('.', ',')}`;
 
 /** Racha y reloj (en décimas) para la foto. @param {Combo} c */
-export const packCombo = (c) => [c.n, Math.ceil(c.t * 10)];
+export const packCombo = (c: Combo) => [c.n, Math.ceil(c.t * 10)];
 
 /** Racha que llega en la foto (invitado del cooperativo o cliente en línea); la mejor se lleva aquí. */
 export function applyCombo(c, a) {

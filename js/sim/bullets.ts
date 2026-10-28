@@ -1,10 +1,11 @@
-import { segCircleT } from '../core/util.js';
+import { segCircleT } from '../core/util.ts';
 
 const near = [];
 // Parte de las balas rebota en la armadura del super blindado (sin hacer daño).
 const RICOCHET = 0.45;
 
 export class Bullets {
+  declare list: any;
   constructor() {
     this.list = [];
   }
@@ -22,7 +23,7 @@ export class Bullets {
    * @param {number} dt
    * @param {import('../core/types.js').GameHost} game
    */
-  update(dt, game) {
+  update(dt: number, game: import('../core/types.js').GameHost) {
     const list = this.list;
     const world = game.world;
     const grid = game.horde.grid;

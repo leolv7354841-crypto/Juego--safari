@@ -5,15 +5,15 @@
 // efectos que ocurrieron donde manda el mundo (partículas, sonidos, manchas) se repiten aquí. Las balas
 // que se ven son de adorno: el daño lo calcula quien manda.
 // `game.remote` es la única instancia; se dibuja desde js/render/remote.js.
-import { NET, PLAYER_BASE, ROBOT, SHOP, WEAPON_ORDER, WEAPONS, ZOMBIES } from '../core/config.js';
-import { angleTo, rand, TAU } from '../core/util.js';
-import { turretBullet } from '../sim/build.js';
-import { Player } from '../sim/player.js';
-import { Robot } from '../sim/robot.js';
+import { NET, PLAYER_BASE, ROBOT, SHOP, WEAPON_ORDER, WEAPONS, ZOMBIES } from '../core/config.ts';
+import { angleTo, rand, TAU } from '../core/util.ts';
+import { turretBullet } from '../sim/build.ts';
+import { Player } from '../sim/player.ts';
+import { Robot } from '../sim/robot.ts';
 import { lookFromCode, zombieSprites } from '../render/sprites.js';
-import { Interp } from './netcode.js';
-import { DECAL_SYNC, PARTICLE_SKIP, PICKS, SFX_SYNC, TYPES } from './protocol.js';
-import { PEER_N, ROBOT_N, ZOMBIE_N } from './snapshot.js';
+import { Interp } from './netcode.ts';
+import { DECAL_SYNC, PARTICLE_SKIP, PICKS, SFX_SYNC, TYPES } from './protocol.ts';
+import { PEER_N, ROBOT_N, ZOMBIE_N } from './snapshot.ts';
 
 /** Índice de jugador en el cooperativo (en línea lo da el servidor): el anfitrión es 0 y el invitado 1. */
 export const HOST_IDX = 0;
@@ -21,6 +21,9 @@ export const GUEST_IDX = 1;
 
 /** Contador del indicador de conexión: fotos y fotogramas por segundo (una lectura cada segundo). */
 export class NetStats {
+  declare secs: any;
+  declare frames: any;
+  declare snaps: any;
   constructor() {
     this.secs = 0;
     this.frames = 0;
@@ -46,11 +49,24 @@ export class NetStats {
 }
 
 export class Remote {
+  declare game: any;
+  declare sprites: any;
+  declare active: boolean;
+  declare extrapolate: any;
+  declare zs: any;
+  declare peers: any;
+  declare robots: any;
+  declare fireMap: any;
+  declare bullets: any;
+  declare blkGeo: any;
+  declare danger: any;
+  declare nearCount: any;
+  declare net: NetStats;
   /**
    * @param {any} game
    * @param {{ zombieSprites?: () => any }} [deps]  para probar sin lienzo
    */
-  constructor(game, deps = {}) {
+  constructor(game: any, deps: { zombieSprites?: () => any } = {}) {
     this.game = game;
     this.sprites = deps.zombieSprites || zombieSprites;
     /** ¿Se está jugando como espectador del mundo de otro? (lo ponen coop.js y online.js) */
@@ -99,7 +115,15 @@ export class Remote {
    *   myIdx: el robot de este jugador va en game.robot; identify: nombre y aspecto; collide: las barricadas también
    *   chocan en el mapa local (para predecir igual que el servidor).
    */
-  applyWorld(s, t, opts = {}) {
+  applyWorld(
+    s: any,
+    t: number,
+    opts: {
+      myIdx?: number;
+      identify?: (idx: number) => { name?: string; look?: any; code?: string } | null;
+      collide?: boolean;
+    } = {},
+  ) {
     this.applyPeers(s.pl || [], t, opts.identify);
     this.applyRobots(s.rb || [], opts.myIdx ?? -1);
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], t);

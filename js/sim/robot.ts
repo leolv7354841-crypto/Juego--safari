@@ -1,10 +1,20 @@
 // Robot de combate: se compra en la tienda, te subes con E (o el botón ROBOT) y caminas
 // entre la horda apartando zombis. Lleva tu arma en el brazo derecho y puedes cambiarla.
 // Tiene 10 000 de vida que no se recupera sola: se repara en la tienda entre oleadas.
-import { ROBOT, WORLD_SIZE } from '../core/config.js';
-import { clamp, angleTo } from '../core/util.js';
+import { ROBOT, WORLD_SIZE } from '../core/config.ts';
+import { clamp, angleTo } from '../core/util.ts';
 
 export class Robot {
+  declare owned: any;
+  declare piloted: any;
+  declare hp: any;
+  declare x: any;
+  declare y: any;
+  declare angle: any;
+  declare legAngle: any;
+  declare walk: any;
+  declare hitT: any;
+  declare stepSide: any;
   constructor() {
     this.reset();
   }

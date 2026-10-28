@@ -1,7 +1,7 @@
 // Efectos de sonido sintetizados con Web Audio (sin archivos externos).
 // Cada efecto se arma por capas (chasquido, cuerpo, golpe grave, cola) con pequeñas
 // variaciones aleatorias, y un límite de voces evita que la horda sature la mezcla.
-import { storage, rand } from '../core/util.js';
+import { storage, rand } from '../core/util.ts';
 
 const MAX_VOICES = 28;
 

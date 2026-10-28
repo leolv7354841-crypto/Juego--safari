@@ -1,5 +1,5 @@
 // Menú principal: preparar la escena de fondo, empezar o continuar una partida y el sonido.
-import { rand, fmtTime, storage, TAU } from '../core/util.js';
+import { rand, fmtTime, storage, TAU } from '../core/util.ts';
 import { loadProgress } from '../save.js';
 import { on } from './dom.js';
 import { showClass } from './class.js';

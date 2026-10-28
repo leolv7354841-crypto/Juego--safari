@@ -1,7 +1,7 @@
 // Salas: lobby de la partida en línea (hasta 4) y sala del cooperativo de 2 por código.
-import { fmtTime } from '../core/util.js';
-import { CLASSES } from '../sim/abilities.js';
-import { validName, explainOnline } from '../net/online.js';
+import { fmtTime } from '../core/util.ts';
+import { CLASSES } from '../sim/abilities.ts';
+import { validName, explainOnline } from '../net/online.ts';
 import { on } from './dom.js';
 
 export function showOnline(game, keepStatus) {

@@ -11,9 +11,9 @@ import {
   HEAVY,
   GUN_REACH,
   RELOAD_STEPS,
-} from '../core/config.js';
-import { clamp, rand, angleTo } from '../core/util.js';
-import { newCombo } from './combo.js';
+} from '../core/config.ts';
+import { clamp, rand, angleTo } from '../core/util.ts';
+import { newCombo } from './combo.ts';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
@@ -33,18 +33,66 @@ const GUN_TIP = {
 };
 
 export class Player {
+  declare x: any;
+  declare y: any;
+  declare vx: any;
+  declare vy: any;
+  declare kx: any;
+  declare ky: any;
+  declare r: any;
+  declare mass: number;
+  declare angle: any;
+  declare legAngle: any;
+  declare walkPhase: any;
+  declare speedNow: number;
+  declare stats: any;
+  declare hp: any;
+  declare stamina: any;
+  declare combo: { n: number; t: number; best: number };
+  declare exhausted: any;
+  declare running: any;
+  declare sinceRun: any;
+  declare weapons: any;
+  declare wi: any;
+  declare fireCd: any;
+  declare reloadT: any;
+  declare reloadDur: any;
+  declare bloom: any;
+  declare recoil: any;
+  declare flashT: any;
+  declare hurtT: any;
+  declare alive: any;
+  declare target: any;
+  declare shotsFired: any;
+  declare shotsHit: number;
+  declare damageTaken: any;
+  declare cls: null;
+  declare abCd: number;
+  declare boostT: any;
+  declare rageT: number;
+  declare rageAcc: number;
+  declare manned: any;
+  declare heavyAmmo: any;
+  /** aspecto del personaje (lo pone Game; ver cleanLook) */
+  declare look: any;
+  /** compañero de cooperativo (lo pone coop.js) */
+  declare remote?: boolean;
+  /** dentro del robot (lo pone main.js / el servidor) */
+  declare inRobot?: boolean;
+  declare reloadProg: any;
+  declare reloadStep: any;
   // Campos de un compañero remoto (marioneta en el cooperativo, js/net/coop.js); el jugador local no los usa.
-  /** @type {number | undefined} */ tx;
-  /** @type {number | undefined} */ ty;
-  /** @type {number | undefined} */ ta;
-  /** @type {number | undefined} */ tla;
-  /** @type {number | undefined} */ vw;
-  /** @type {number | undefined} */ vh;
-  /** @type {number | undefined} */ idx;
-  /** @type {string | undefined} */ name;
-  /** @type {boolean | undefined} */ puppet;
-  /** @type {boolean | undefined} */ needAmmo;
-  /** @type {number | undefined} */ st;
+  declare tx?: number;
+  declare ty?: number;
+  declare ta?: number;
+  declare tla?: number;
+  declare vw?: number;
+  declare vh?: number;
+  declare idx?: number;
+  declare name?: string;
+  declare puppet?: boolean;
+  declare needAmmo?: boolean;
+  declare st?: number;
   constructor(x, y) {
     this.x = x;
     this.y = y;
@@ -101,12 +149,6 @@ export class Player {
     // torreta pesada que maneja (estructura de build.js) y sus balas compradas
     this.manned = null;
     this.heavyAmmo = 0;
-    /** @type {any} aspecto del personaje (lo pone Game; ver cleanLook) */
-    this.look;
-    /** @type {boolean | undefined} compañero de cooperativo (lo pone coop.js) */
-    this.remote;
-    /** @type {boolean | undefined} dentro del robot (lo pone main.js / el servidor) */
-    this.inRobot;
   }
 
   get weapon() {
@@ -168,7 +210,7 @@ export class Player {
   }
 
   /** @param {unknown} [_game] lo pasan algunos llamadores; no se usa */
-  startReload(_game) {
+  startReload(_game?: unknown) {
     const w = this.weapon;
     if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
     this.reloadDur = w.def.reload / this.stats.reloadMult;
@@ -225,7 +267,13 @@ export class Player {
    * @param {boolean} run
    * @param {import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
    */
-  move(dt, mx, my, run, game) {
+  move(
+    dt: number,
+    mx: number,
+    my: number,
+    run: boolean,
+    game: import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>,
+  ) {
     const st = this.stats;
     const mv = { x: mx, y: my };
     const mag = Math.hypot(mv.x, mv.y);

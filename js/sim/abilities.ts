@@ -1,7 +1,7 @@
 // Habilidades de clase: cada partida el jugador elige una (Bomber, Berserker o Booster) y la usa
 // cada cierto tiempo. Lo usan el juego del navegador y el servidor en línea.
-import { ABILITY, CLASS_ORDER, WEAPONS } from '../core/config.js';
-import { rand } from '../core/util.js';
+import { ABILITY, CLASS_ORDER, WEAPONS } from '../core/config.ts';
+import { rand } from '../core/util.ts';
 
 const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 export const CLASSES = {
@@ -51,7 +51,7 @@ export const Abilities = {
   // Lanza la habilidad. owner: dueño de las bajas (en línea, el id del jugador).
   // Sin autoridad (invitado o cliente en línea) el misil lo crea quien simula.
   /** @param {string | null} [owner] */
-  use(game, p, tx, ty, owner = null) {
+  use(game, p, tx, ty, owner: string | null = null) {
     if (!this.ready(p)) return false;
     p.abCd = cooldownOf(p);
     if (p.cls === 'bomber') {

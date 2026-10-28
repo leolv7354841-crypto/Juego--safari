@@ -4,8 +4,8 @@
 //   amenaza → latido de tambores, bajo pulsante y trémolo de cuerdas
 //   horda   → batería de supervivencia, bajo ostinato y golpes de metales
 // El estado cambia con umbrales con histéresis y un tiempo mínimo, para no oscilar.
-import { MUSIC } from '../core/config.js';
-import { rand } from '../core/util.js';
+import { MUSIC } from '../core/config.ts';
+import { rand } from '../core/util.ts';
 
 const LOOKAHEAD = 0.12;
 const A = [55, 65.41, 73.42, 82.41, 98]; // A1 C2 D2 E2 G2 (escala menor pentatónica)

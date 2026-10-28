@@ -8,13 +8,18 @@ import {
   MOLOTOV,
   WAVES,
   ZOMBIE_VARIANTS,
-} from '../core/config.js';
-import { clamp, rand, angleTo, TAU } from '../core/util.js';
+} from '../core/config.ts';
+import { clamp, rand, angleTo, TAU } from '../core/util.ts';
+import type { Zombie } from '../core/types.d.ts';
 
 const CELL = 64;
 
 // Rejilla espacial: cada zombi se guarda en la celda de su centro.
 export class Grid {
+  declare cell: any;
+  declare n: any;
+  declare cells: any;
+  declare used: any;
   constructor(size, cell) {
     this.cell = cell;
     this.n = Math.ceil(size / cell);
@@ -170,6 +175,11 @@ function nearestAlive(list, z) {
 }
 
 export class Horde {
+  declare list: any;
+  declare grid: any;
+  declare frame: any;
+  declare danger: number;
+  declare nearCount: number;
   constructor() {
     this.list = [];
     this.grid = new Grid(WORLD_SIZE, CELL);
@@ -191,8 +201,7 @@ export class Horde {
 
   spawn(type, x, y, hpMult = 1, speedMult = 1) {
     const def = ZOMBIES[type];
-    /** @type {import('../core/types.js').Zombie} */
-    const z = {
+    const z: Zombie = {
       id: nextId++,
       type,
       def,
@@ -277,7 +286,7 @@ export class Horde {
    * @param {number} dt
    * @param {import('../core/types.js').GameHost} game
    */
-  update(dt, game) {
+  update(dt: number, game: import('../core/types.js').GameHost) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
     const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
@@ -285,8 +294,7 @@ export class Horde {
     const hosted = targets ? null : game.mode.hostedPeer();
     const peer = hosted && hosted.alive ? hosted : null;
     // objetivo actual: Player, compañero remoto o el IDLE sin jugadores (por eso any)
-    /** @type {any} */
-    let p = p0;
+    let p: any = p0;
     const world = game.world;
     const time = game.time;
     const list = this.list;

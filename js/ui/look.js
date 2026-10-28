@@ -1,6 +1,6 @@
 // Personaje: elegir colores y sombrero, con una vista previa que camina en su sitio.
-import { storage } from '../core/util.js';
-import { Player } from '../sim/player.js';
+import { storage } from '../core/util.ts';
+import { Player } from '../sim/player.ts';
 import { drawSurvivor, LOOK_PARTS, HATS, DEFAULT_LOOK, cleanLook } from '../render/sprites.js';
 import { on } from './dom.js';
 

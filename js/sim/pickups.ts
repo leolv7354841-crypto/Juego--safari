@@ -1,9 +1,10 @@
-import { rand, pick } from '../core/util.js';
-import { CRATE_WEAPONS, WEAPONS } from '../core/config.js';
+import { rand, pick } from '../core/util.ts';
+import { CRATE_WEAPONS, WEAPONS } from '../core/config.ts';
 
 export const LIFE = 22;
 
 export class Pickups {
+  declare list: any;
   constructor() {
     this.list = [];
   }
@@ -18,7 +19,7 @@ export class Pickups {
    * @param {number} dt
    * @param {import('../core/types.js').GameHost} game
    */
-  update(dt, game) {
+  update(dt: number, game: import('../core/types.js').GameHost) {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)
     // en línea (servidor): recoge el jugador vivo más cercano de game.targets
     const targets = game.targets || null;

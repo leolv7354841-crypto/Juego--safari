@@ -5,7 +5,7 @@
     "includes": [
       "js/**",
       "!js/vendor",
-      "!js/core/version.js",
+      "!js/core/version.ts",
       "server/src/**",
       "server/test/**",
       "server/tools/**",

@@ -1,11 +1,11 @@
 // Pruebas de la predicción con reconciliación y de la interpolación (js/net/netcode.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { World } from '../../js/sim/world.js';
-import { Player } from '../../js/sim/player.js';
-import { Predictor, Interp, applyMove, packBody, unpackBody, TICK } from '../../js/net/netcode.js';
-import { IN_RUN } from '../../js/net/protocol.js';
-import { NET } from '../../js/core/config.js';
+import { World } from '../../js/sim/world.ts';
+import { Player } from '../../js/sim/player.ts';
+import { Predictor, Interp, applyMove, packBody, unpackBody, TICK } from '../../js/net/netcode.ts';
+import { IN_RUN } from '../../js/net/protocol.ts';
+import { NET } from '../../js/core/config.ts';
 
 const world = new World(777);
 const quiet = { world, sfx: new Proxy({}, { get: () => () => {} }) };

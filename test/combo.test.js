@@ -1,7 +1,7 @@
 // Racha de bajas (js/sim/combo.js): multiplicador por niveles, reloj, golpes y la foto.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { COMBO } from '../js/core/config.js';
+import { COMBO } from '../js/core/config.ts';
 import {
   applyCombo,
   comboBreak,
@@ -12,7 +12,7 @@ import {
   multText,
   newCombo,
   packCombo,
-} from '../js/sim/combo.js';
+} from '../js/sim/combo.ts';
 
 test('el multiplicador sube por niveles según las bajas seguidas', () => {
   assert.equal(comboMult(0), 1);

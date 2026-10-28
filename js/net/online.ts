@@ -5,14 +5,14 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/net/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, GOLDEN, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE, CLASS_ORDER } from '../core/config.js';
-import { Predictor, ServerClock, unpackBody, TICK } from './netcode.js';
-import { IN_RUN, IN_FIRE, IN_RELOAD } from './protocol.js';
+import { NET, WEAPONS, GOLDEN, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE, CLASS_ORDER } from '../core/config.ts';
+import { Predictor, ServerClock, unpackBody, TICK } from './netcode.ts';
+import { IN_RUN, IN_FIRE, IN_RELOAD } from './protocol.ts';
 import { lookCode } from '../render/sprites.js';
-import { UPGRADES } from '../sim/upgrades.js';
-import { Abilities } from '../sim/abilities.js';
-import { applyCombo } from '../sim/combo.js';
-import { OnlineClient, Solo } from './mode.js';
+import { UPGRADES } from '../sim/upgrades.ts';
+import { Abilities } from '../sim/abilities.ts';
+import { applyCombo } from '../sim/combo.ts';
+import { OnlineClient, Solo } from './mode.ts';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
@@ -50,6 +50,36 @@ export function explainOnline(err) {
 }
 
 export class Online {
+  declare game: any;
+  declare room: any;
+  declare playing: any;
+  declare leaving: any;
+  declare reconnecting: any;
+  declare seed: any;
+  declare clock: any;
+  declare batch: any;
+  declare rtt: any;
+  declare jitter: any;
+  declare diag: any;
+  declare bytesIn: any;
+  declare bytesOut: any;
+  declare results: any;
+  declare sdkP: any;
+  declare shutdown: any;
+  declare pingT: any;
+  declare pred: any;
+  declare phys: any;
+  declare fresh: any;
+  declare acc: any;
+  declare lastQ: any;
+  declare wantReload: any;
+  declare up: any;
+  declare upDone: any;
+  declare lastDs: any;
+  declare left: number;
+  declare myKills: number;
+  declare abAt: any;
+  declare shopSig: any;
   constructor(game) {
     this.game = game;
     this.room = null;
@@ -215,7 +245,7 @@ export class Online {
     }
   }
 
-  send(type, m) {
+  send(type, m?) {
     if (this.room && !this.reconnecting) this.room.send(type, m);
   }
 
@@ -385,7 +415,13 @@ export class Online {
       f |= IN_RELOAD;
       this.wantReload = false;
     }
-    const cmd = { mx: r3(mv.x), my: r3(mv.y), f, a: r3(p.angle), w: p.wi };
+    const cmd: { mx: number; my: number; f: number; a: number; w: any; s?: number } = {
+      mx: r3(mv.x),
+      my: r3(mv.y),
+      f,
+      a: r3(p.angle),
+      w: p.wi,
+    };
     p.x = this.phys.x;
     p.y = this.phys.y;
     this.pred.step(cmd, g);
@@ -504,8 +540,7 @@ export class Online {
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
   identify(idx) {
     const ms = this.room && this.room.state && this.room.state.members;
-    /** @type {{ name?: string, look?: string } | null} */
-    let found = null;
+    let found: { name?: string; look?: string } | null = null;
     if (ms) ms.forEach((m) => m.idx === idx && (found = m));
     return { name: (found && found.name) || 'Jugador', code: (found && found.look) || '' };
   }

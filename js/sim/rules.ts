@@ -2,22 +2,26 @@
 // (js/main.js) y el servidor en línea (server/src/sim/ServerSim.ts). Aquí vive lo que es igual
 // en los dos lados (bajas, botín, zombi dorado, ácido, cohetes, golpes); lo que cambia
 // (de quién es el dinero, cómo se avisa, de quién es la experiencia) lo pone quien llama con ganchos.
-import { BOUNTY, DROPS, GOLDEN, HEAVY, MONEY_LOSS, ROCKET, WORLD_SIZE, xpForLevel } from '../core/config.js';
-import { rand, randInt } from '../core/util.js';
-import { ACID } from './build.js';
-import { bulletHit } from './combat.js';
+import { BOUNTY, DROPS, GOLDEN, HEAVY, MONEY_LOSS, ROCKET, WORLD_SIZE, xpForLevel } from '../core/config.ts';
+import { rand, randInt } from '../core/util.ts';
+import { ACID } from './build.ts';
+import { bulletHit } from './combat.ts';
 
-/** @typedef {import('../core/types').GameHost} GameHost */
+import type { GameHost } from '../core/types.d.ts';
 
-/**
- * Ganchos de una baja: lo que depende de quién juega.
- * @typedef {object} KillHooks
- * @property {Record<string, number>} kills contador de bajas por tipo
- * @property {(z: any) => void} xp reparte la experiencia del zombi
- * @property {(z: any) => void} bounty paga la recompensa del zombi a quien lo mató
- * @property {(z: any, reward: number) => void} golden paga la recompensa única del dorado
- * @property {(msg: string) => void} toast aviso para todos (gigante abatido)
- */
+/** Ganchos de una baja: lo que depende de quién juega. */
+export type KillHooks = {
+  /** contador de bajas por tipo */
+  kills: Record<string, number>;
+  /** reparte la experiencia del zombi */
+  xp: (z: any) => void;
+  /** paga la recompensa del zombi a quien lo mató */
+  bounty: (z: any) => void;
+  /** paga la recompensa única del dorado */
+  golden: (z: any, reward: number) => void;
+  /** aviso para todos (gigante abatido) */
+  toast: (msg: string) => void;
+};
 
 /** Recompensa única del zombi dorado. */
 export const goldenReward = () => randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
@@ -50,7 +54,7 @@ export function gainXp(h, n) {
  * @param {GameHost} game
  * @param {(b: any) => void} shotHit
  */
-export function hitZombie(game, z, b, hx, hy, shotHit) {
+export function hitZombie(game: GameHost, z, b, hx, hy, shotHit: (b: any) => void) {
   if (z.dead) return false;
   z.lastOwner = b.owner || null;
   bulletHit(game, z, b, hx, hy);
@@ -67,7 +71,7 @@ export function hitZombie(game, z, b, hx, hy, shotHit) {
  * @param {GameHost} game
  * @param {KillHooks} h
  */
-export function killZombie(game, z, h) {
+export function killZombie(game: GameHost, z, h: KillHooks) {
   if (z.dead) return false;
   z.dead = true;
   h.kills[z.type] = (h.kills[z.type] || 0) + 1;
@@ -107,7 +111,7 @@ export function killZombie(game, z, h) {
  * @param {GameHost} game
  * @param {(msg: string) => void} toast
  */
-export function spawnGolden(game, toast) {
+export function spawnGolden(game: GameHost, toast: (msg: string) => void) {
   const d = game.director;
   for (let i = 0; i < 20; i++) {
     const c = d.edgePoint(game, rand(60, 140));
@@ -128,7 +132,7 @@ export function spawnGolden(game, toast) {
  * @param {GameHost} game
  * @param {(msg: string) => void} toast
  */
-export function goldenTick(game, t, dt, toast) {
+export function goldenTick(game: GameHost, t, dt, toast: (msg: string) => void) {
   t -= dt;
   if (t > 0) return t;
   const alive = game.horde.list.some((z) => z.type === 'golden' && !z.dead);
@@ -152,7 +156,7 @@ export function startAcid(h) {
  * (destello, sonido) y `onDeath` avisa de la caída. Devuelve lo que falta de quemadura.
  * @param {GameHost} game
  */
-export function acidStep(game, p, h, dt, onTick, onDeath) {
+export function acidStep(game: GameHost, p, h, dt, onTick, onDeath) {
   if (!(h.acidT > 0)) return 0;
   h.acidTick += dt;
   while (h.acidTick >= 1 && p.alive) {
@@ -179,7 +183,7 @@ export function acidStep(game, p, h, dt, onTick, onDeath) {
  * @param {GameHost} game
  * @param {string | null} [owner]
  */
-export function rocketBlast(game, x, y, owner = null) {
+export function rocketBlast(game: GameHost, x, y, owner: string | null = null) {
   if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
 }
@@ -189,7 +193,7 @@ export function rocketBlast(game, x, y, owner = null) {
  * @param {GameHost} game
  * @param {string | null} [owner]
  */
-export function heavyBlast(game, x, y, owner = null) {
+export function heavyBlast(game: GameHost, x, y, owner: string | null = null) {
   if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, HEAVY.blastR, HEAVY.blastPower, 0, true);
 }
@@ -213,7 +217,7 @@ export function superPunch(game, x, y) {
  * piloto sale despedido; devuelve true en ese caso.
  * @param {GameHost} game
  */
-export function robotHit(game, rb, dmg, p) {
+export function robotHit(game: GameHost, rb, dmg, p) {
   game.sfx.blockHit('metal');
   if (!rb.damage(dmg)) return false;
   game.structures.explode(game, { x: rb.x, y: rb.y }, 170, 450, 1);

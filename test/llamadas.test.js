@@ -38,16 +38,16 @@ function miembros(ruta, clase) {
 
 // Objeto del juego -> archivo y clase que lo define
 const OBJETOS = {
-  coop: ['js/net/coop.js', 'Coop'],
-  online: ['js/net/online.js', 'Online'],
-  mode: ['js/net/mode.js', 'Mode'],
-  structures: ['js/sim/build.js', 'Structures'],
-  horde: ['js/sim/zombies.js', 'Horde'],
-  bullets: ['js/sim/bullets.js', 'Bullets'],
-  director: ['js/sim/director.js', 'Director'],
-  pickups: ['js/sim/pickups.js', 'Pickups'],
-  robot: ['js/sim/robot.js', 'Robot'],
-  world: ['js/sim/world.js', 'World'],
+  coop: ['js/net/coop.ts', 'Coop'],
+  online: ['js/net/online.ts', 'Online'],
+  mode: ['js/net/mode.ts', 'Mode'],
+  structures: ['js/sim/build.ts', 'Structures'],
+  horde: ['js/sim/zombies.ts', 'Horde'],
+  bullets: ['js/sim/bullets.ts', 'Bullets'],
+  director: ['js/sim/director.ts', 'Director'],
+  pickups: ['js/sim/pickups.ts', 'Pickups'],
+  robot: ['js/sim/robot.ts', 'Robot'],
+  world: ['js/sim/world.ts', 'World'],
   particles: ['js/render/particles.js', 'Particles'],
   decals: ['js/render/particles.js', 'Decals'],
   camera: ['js/render/camera.js', 'Camera'],
@@ -60,7 +60,8 @@ const OBJETOS = {
 const JS = archivos('js', ['vendor']);
 
 // En coop.js y online.js el juego se llama también `g`.
-const recibe = (ruta) => (/net\/(coop|online)\.js$/.test(ruta) ? '(?:this\\.game|game|g)' : '(?:this\\.game|game)');
+const recibe = (ruta) =>
+  /net\/(coop|online)\.(js|ts)$/.test(ruta) ? '(?:this\\.game|game|g)' : '(?:this\\.game|game)';
 
 test('todo game.algo( existe en la clase Game', () => {
   const game = miembros('js/main.js', 'Game');
@@ -95,7 +96,7 @@ test('todo import relativo apunta a un archivo que existe', () => {
   for (const ruta of [...JS, ...archivos('server/src')]) {
     for (const m of leer(ruta).matchAll(/(?:from|import)\s*\(?\s*'(\.{1,2}\/[^']+)'/g)) {
       // los tipos de JSDoc (import('../core/types.js')) no son archivos que se carguen
-      if (/\/types(\.js)?$/.test(m[1])) continue;
+      if (/\/types(\.d)?\.(js|ts)$|\/types$/.test(m[1])) continue;
       try {
         statSync(join(RAIZ, ruta, '..', m[1]));
       } catch {

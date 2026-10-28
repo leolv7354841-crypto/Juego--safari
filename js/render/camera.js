@@ -1,6 +1,6 @@
 // Cámara: sigue al jugador con suavizado, temblor por trauma y empujón por retroceso.
-import { clamp, rand } from '../core/util.js';
-import { CAMERA } from '../core/config.js';
+import { clamp, rand } from '../core/util.ts';
+import { CAMERA } from '../core/config.ts';
 
 export class Camera {
   constructor() {

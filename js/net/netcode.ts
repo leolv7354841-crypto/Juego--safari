@@ -1,8 +1,8 @@
 // Piezas del multijugador en línea que no dependen del navegador (las usan el cliente y las
 // pruebas del servidor): predicción con reconciliación del jugador propio e interpolación
 // de los demás a partir de las fotos del servidor.
-import { NET } from '../core/config.js';
-import { IN_RUN } from './protocol.js';
+import { NET } from '../core/config.ts';
+import { IN_RUN } from './protocol.ts';
 
 export const TICK = 1 / NET.tickHz;
 
@@ -26,11 +26,15 @@ export function unpackBody(p, a) {
 
 // Aplica una entrada al cuerpo del jugador (igual en el servidor y en el cliente).
 /**
- * @param {import('../sim/player.js').Player} p
+ * @param {import('../sim/player.ts').Player} p
  * @param {import('../core/types.js').Cmd} cmd
  * @param {Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
  */
-export function applyMove(p, cmd, game) {
+export function applyMove(
+  p: import('../sim/player.ts').Player,
+  cmd: import('../core/types.js').Cmd,
+  game: Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>,
+) {
   p.move(TICK, cmd.mx, cmd.my, !!(cmd.f & IN_RUN), game);
 }
 
@@ -38,6 +42,16 @@ export function applyMove(p, cmd, game) {
 // confirma que la procesó. Al llegar el estado confirmado se restaura y se vuelven a
 // aplicar las pendientes. La diferencia con lo que se veía se borra poco a poco (offset).
 export class Predictor {
+  declare p: any;
+  declare quiet: any;
+  declare pending: any;
+  declare seq: any;
+  declare ox: any;
+  declare oy: any;
+  declare corrections: any;
+  declare corrSum: any;
+  declare corrMax: any;
+  declare snaps: any;
   constructor(player, world) {
     this.p = player;
     this.quiet = { world, sfx: silent };
@@ -52,7 +66,7 @@ export class Predictor {
   }
 
   // game: el juego real (para los sonidos); en las repeticiones se usa uno mudo.
-  step(cmd, game) {
+  step(cmd, game?) {
     cmd.s = ++this.seq;
     applyMove(this.p, cmd, game || this.quiet);
     this.pending.push(cmd);
@@ -118,6 +132,7 @@ export class Predictor {
 // Reloj del servidor visto desde aquí: off = hora local - hora del servidor (con el retraso de
 // ida más corto visto). Se ajusta despacio para que el dibujo no dé saltos.
 export class ServerClock {
+  declare off: any;
   constructor() {
     this.off = null;
   }
@@ -141,7 +156,12 @@ function lerpAngle(a, b, t) {
 // Fotos de una entidad (tiempo del servidor + valores) para dibujarla un poco en diferido.
 // ang = índices de los valores que son ángulos.
 export class Interp {
-  constructor(ang = [], max = 24, extrapolate = NET.maxExtrapolate) {
+  declare ang: any;
+  declare max: any;
+  declare extrapolate: any;
+  declare t: any;
+  declare v: any;
+  constructor(ang: number[] = [], max = 24, extrapolate = NET.maxExtrapolate) {
     this.ang = ang;
     this.max = max;
     this.extrapolate = extrapolate;

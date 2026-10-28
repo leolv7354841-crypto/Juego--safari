@@ -1,15 +1,15 @@
 // Tipos compartidos del juego (solo para la verificación con checkJs; no se carga en el navegador).
 // Uso en JSDoc: /** @param {import('../types').GameHost} game */
-import type { World } from '../sim/world.js';
-import type { Horde } from '../sim/zombies.js';
-import type { Bullets } from '../sim/bullets.js';
-import type { Director } from '../sim/director.js';
-import type { Pickups } from '../sim/pickups.js';
-import type { Player } from '../sim/player.js';
-import type { Structures } from '../sim/build.js';
-import type { Robot } from '../sim/robot.js';
-import type { Mode } from '../net/mode.js';
-import type { Remote } from '../net/remote.js';
+import type { World } from '../sim/world.ts';
+import type { Horde } from '../sim/zombies.ts';
+import type { Bullets } from '../sim/bullets.ts';
+import type { Director } from '../sim/director.ts';
+import type { Pickups } from '../sim/pickups.ts';
+import type { Player } from '../sim/player.ts';
+import type { Structures } from '../sim/build.ts';
+import type { Robot } from '../sim/robot.ts';
+import type { Mode } from '../net/mode.ts';
+import type { Remote } from '../net/remote.ts';
 
 export type Vec = { x: number; y: number };
 

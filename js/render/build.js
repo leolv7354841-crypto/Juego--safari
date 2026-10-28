@@ -1,6 +1,6 @@
 // Dibujo de barricadas, trampas, torreta pesada, granadas, fuegos y cohetes. La lógica vive en sim/build.js.
-import { ABILITY } from '../core/config.js';
-import { TAU, roundRect } from '../core/util.js';
+import { ABILITY } from '../core/config.ts';
+import { TAU, roundRect } from '../core/util.ts';
 import { OUT, flameSprite } from './sprites.js';
 import { drawRocket } from './bullets.js';
 

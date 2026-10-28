@@ -4,7 +4,7 @@
 // presentarlos: el anfitrión deja su "dirección" (oferta) en la sala, el invitado deja la suya
 // (respuesta) y, en cuanto se abre la conexión directa, la sala se borra.
 // Si la red no deja conectar directo (pasa en algunas redes móviles), no se puede jugar.
-import { ONLINE } from '../core/config.js';
+import { ONLINE } from '../core/config.ts';
 
 const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }];
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -16,7 +16,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const base = () => ONLINE.url.replace(/\/$/, '');
 const url = (path) => `${base()}/rooms/${path}.json`;
 
-async function db(path, method = 'GET', body) {
+async function db(path, method = 'GET', body?) {
   const r = await window.fetch(url(path), { method, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'permiso' : 'red');
   return r.json();
@@ -25,7 +25,7 @@ async function db(path, method = 'GET', body) {
 // Espera (poco) a que el navegador junte sus rutas de conexión directa.
 function gathered(pc, limit = 2500) {
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     pc.addEventListener('icegatheringstatechange', () => {
       if (pc.iceGatheringState === 'complete') resolve();
     });
@@ -34,6 +34,16 @@ function gathered(pc, limit = 2500) {
 }
 
 export class Net {
+  declare role: any;
+  declare code: any;
+  declare pc: any;
+  declare rel: any;
+  declare fast: any;
+  declare open: any;
+  declare onMessage: any;
+  declare onClose: any;
+  declare cancelled: any;
+  declare lastRecv: any;
   constructor() {
     this.role = null; // 'host' | 'guest'
     this.code = null;

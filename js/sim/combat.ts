@@ -1,6 +1,6 @@
 // Reglas de impacto compartidas por el juego local y el servidor en línea (mismo daño,
 // frenado, heridas y empuje en los dos sitios).
-import { rand } from '../core/util.js';
+import { rand } from '../core/util.ts';
 
 // Aplica una bala a un zombi. No lo mata: quien llama decide (y cuenta la baja).
 /**
@@ -10,7 +10,13 @@ import { rand } from '../core/util.js';
  * @param {number} hx
  * @param {number} hy
  */
-export function bulletHit(game, z, b, hx, hy) {
+export function bulletHit(
+  game: import('../core/types.js').GameHost,
+  z: import('../core/types.js').Zombie,
+  b: import('../core/types.js').Bullet,
+  hx: number,
+  hy: number,
+) {
   z.hp -= b.dmg;
   z.flash = 0.08;
   // reacción breve: sacudida hacia un lado y leve agrandado (no frena su comportamiento)

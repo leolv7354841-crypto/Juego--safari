@@ -1,7 +1,7 @@
 // game.mode: quién manda en cada modo y a quién se le piden las acciones (js/net/mode.js).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CoopGuest, CoopHost, Mode, OnlineClient, ServerMode, Solo } from '../js/net/mode.js';
+import { CoopGuest, CoopHost, Mode, OnlineClient, ServerMode, Solo } from '../js/net/mode.ts';
 
 // Un juego falso: cada llamada a coop u online queda anotada.
 function juego() {
