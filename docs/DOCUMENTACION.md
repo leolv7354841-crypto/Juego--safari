@@ -101,7 +101,7 @@ render.yaml           Blueprint de Render (histórico, respaldo).
 | `render/sprites.js`, `render/world.js`, `render/particles.js`, `render/lighting.js` | Arte generado por código; suelo por trozos; partículas y restos; oscuridad, linterna y farolas. |
 | `render/<x>.js` (zombies, bullets, pickups, build, robot, remote) | Dibujo de lo que simula `sim/<x>.js` (y de los jugadores remotos). |
 | `net/mode.js` | `game.mode`: `Solo` (con `detached`), `OnlineClient`, `ServerMode`. Se pregunta por intención (`authority()`, `canBuild()`, `savesProgress()`…), no por identidad. |
-| `net/protocol.js`, `net/netcode.js`, `net/snapshot.js`, `net/remote.js` | Tablas y bits del protocolo; `Predictor` e `Interp`; el codificador único de la parte del mundo de una foto; su decodificador para el cliente en línea. |
+| `net/protocol.js`, `net/netcode.js`, `net/snapshot.js`, `net/remote.js` | Tablas y bits del protocolo; `applyMove`, `BODY` e `Interp`; el codificador único de la parte del mundo de una foto; su decodificador para el cliente en línea. |
 | `net/online.js` | Cliente del modo en línea: sala, entrada a 60 Hz, predicción, interpolación y diagnóstico (F3). Carga `@colyseus/sdk` con `import()`. |
 | `ui/input.js`, `ui/audio.js`, `ui/music.js`, `ui/accounts.js` | Entrada (teclado, ratón, táctil), efectos sintetizados, música dinámica, cuentas (nombre + PIN) y clasificación. |
 | `ui/<pantalla>.js` (hud, shop, class, look, levelup, over, menu, account, board, lobby, icons, dom) | Una pieza por pantalla; cada una conecta sus botones con `bindXxx(game)`. |
@@ -187,8 +187,9 @@ Secuencia típica:
    `LOAD_SECONDS`, empieza igual.
 5. **Partida.** Por cada tick (60 Hz, `NET.tickHz`) el servidor avanza `ServerSim`:
    movimiento, disparos, zombis, daño, oleadas, estructuras, lanzables y robots.
-   - El cliente manda `in` con `[seq, mx, my, bits, angle, weapon]`. El servidor rechaza
-     secuencias repetidas o muy adelantadas y aplica él mismo velocidad y cadencia.
+   - El cliente manda sus entradas por el canal de Colyseus (`room.input()`; esquema `MoveInput`:
+     `mx my f a w`). El servidor acota los valores (`sanitize`), las consume de una en una y aplica
+     él mismo velocidad y cadencia; el ack es el contador de entradas consumidas.
    - Las compras (`buy`), las mejoras de nivel (`pick`) y las acciones (`act`: construir, lanzar,
      robot, marcadas con el `seq` de la última entrada) también las ejecuta el servidor; la tienda
      sólo entre oleadas.
@@ -196,16 +197,17 @@ Secuencia típica:
      mitad de cuadro): la parte común del mundo (`net/snapshot.js`) más los campos propios del modo
      en línea (dinero, estadísticas, inventario, mejoras pendientes, efectos…).
    - Los efectos (partículas, sonidos, restos) se envían a los clientes cercanos como eventos.
-6. **Predicción.** El cliente predice su propio personaje con `Player.move` y, al llegar una foto
-   confirmada, restaura y vuelve a aplicar sus entradas pendientes. Correcciones menores de
-   150 px se suavizan; mayores se aplican de golpe.
+6. **Predicción.** El cliente predice su propio personaje con `Player.move` (`predict.reconciler` del
+   SDK sobre `state.bodies`) y, al llegar el parche con el ack, restaura y vuelve a aplicar sus
+   entradas pendientes. Correcciones menores de 150 px se suavizan; mayores se aplican de golpe.
+   Medidas y alternativas descartadas: `docs/refactor/spike-colyseus.md`.
 7. **Interpolación.** Otros jugadores y zombis se dibujan 110 ms atrasados, interpolando entre
    fotos según el reloj del servidor.
 8. **Ronda siguiente.** Cualquiera manda `next` o empieza sola a los 45 s.
 9. **Fin.** Cuando caen todos. El estado `finished` muestra resultados.
 
 Mensajes del cliente al servidor: `ready`, `cls`, `start`, `lobby`, `loaded`, `next`, `pick`,
-`buy`, `act`, `in`, `p` (ping). Cualquier otro tipo se rechaza con `mensaje desconocido`.
+`buy`, `act`, `p` (ping), más las entradas por el canal `room.input()`. Cualquier otro tipo se rechaza con `mensaje desconocido`.
 
 ### 4.5 Reconexión
 

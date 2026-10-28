@@ -231,6 +231,39 @@ test('desconexión y reconexión sin duplicados', async () => {
   await leaveAll([owner, guest]);
 });
 
+test('tras reconectar, las entradas del canal de Colyseus siguen moviendo al jugador (buffer nuevo, contador desde 0)', async () => {
+  const [owner, guest] = await fill(2);
+  guest.reconnection.minUptime = 0;
+  guest.send('ready', { v: true });
+  await sleep(100);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading');
+  owner.send('loaded');
+  guest.send('loaded');
+  await waitFor(() => owner.state.phase === 'playing');
+  const room = serverRoom(owner.roomId);
+  const sid = guest.sessionId;
+  const slot = room.sim.slots.get(sid);
+  // el SDK reinicia solo este handle al caer la conexión; el servidor da un buffer nuevo al volver
+  const handle = guest.input({ mode: 'reliable' });
+  const mandar = async (mx: number) => {
+    for (let i = 0; i < 20; i++) {
+      handle.data.mx = mx;
+      handle.send();
+      await sleep(17);
+    }
+  };
+  await mandar(0.5);
+  await waitFor(() => slot.last.mx > 0.4, 2000, 'entradas antes de la caída');
+  let back = false;
+  guest.onReconnect(() => (back = true));
+  cut(owner.roomId, sid);
+  await waitFor(() => back, 8000, 'reconectado');
+  await mandar(-0.5);
+  await waitFor(() => slot.last.mx < -0.4, 3000, 'las entradas de después de reconectar mueven al jugador');
+  await leaveAll([owner, guest]);
+});
+
 test('el que no vuelve a tiempo sale de la sala', async () => {
   const [owner, guest] = await fill(2);
   guest.reconnection.enabled = false;

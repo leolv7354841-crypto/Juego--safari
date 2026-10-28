@@ -33,27 +33,6 @@ export function cleanView(raw: unknown): [number, number] | null {
   return [Math.min(1600, Math.max(100, Math.round(w))), Math.min(1600, Math.max(100, Math.round(h)))];
 }
 
-// Una entrada: [secuencia, mx, my, bits, ángulo, arma]. null si está mal formada.
-export function cleanCmd(raw: unknown): Cmd | null {
-  if (!Array.isArray(raw) || raw.length !== 6) return null;
-  const [s, mx0, my0, f, a0, w] = raw;
-  if (!Number.isSafeInteger(s) || s <= 0) return null;
-  if (typeof mx0 !== 'number' || typeof my0 !== 'number' || typeof a0 !== 'number') return null;
-  if (!Number.isFinite(mx0) || !Number.isFinite(my0) || !Number.isFinite(a0)) return null;
-  if (!Number.isInteger(f) || f < 0 || f > 7) return null;
-  if (!Number.isInteger(w) || w < -1 || w > 8) return null;
-  let mx = Math.max(-1, Math.min(1, mx0));
-  let my = Math.max(-1, Math.min(1, my0));
-  const m = Math.hypot(mx, my);
-  if (m > 1) {
-    mx /= m;
-    my /= m;
-  }
-  if (Math.abs(a0) > 1000) return null;
-  const a = Math.atan2(Math.sin(a0), Math.cos(a0));
-  return { s, mx, my, f, a, w };
-}
-
 const KIND_RE = /^[a-z]{1,12}$/;
 
 export function cleanAct(raw: any): Act | null {

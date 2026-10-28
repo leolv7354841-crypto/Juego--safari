@@ -290,15 +290,17 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
   // al cliente cuenta exactamente las que ya movieron al personaje).
   bindInputs(sim: ServerSim) {
     for (const id of sim.slots.keys()) {
-      const acc = this.inputs.get(id);
+      // el acceso se pide cada vez: al reconectar el SDK crea otro buffer para el mismo sessionId
+      const acc = () => this.inputs.get(id);
       const slot = sim.slots.get(id)!;
       slot.port = {
         get size() {
-          return acc.size;
+          return acc().size;
         },
-        ack: () => acc.consumedCount,
+        ack: () => acc().consumedCount,
         next: () => {
-          const inp = acc.next();
+          const a = acc();
+          const inp = a.next();
           if (!inp) return undefined;
           let mx = inp.mx;
           let my = inp.my;
@@ -307,7 +309,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
             mx /= m;
             my /= m;
           }
-          return { s: acc.consumedCount, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w };
+          return { s: a.consumedCount, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w };
         },
       };
     }
