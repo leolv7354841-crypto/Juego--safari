@@ -37,9 +37,14 @@ pasos/s por sala (objetivo 60), 0 pasos descartados, paso medio 0,26 ms y peor 3
 16,7 ms), CPU del servidor 21,5 % de un núcleo de media y 60 % de pico, 170 MB de RAM, ~28 KB/s por
 jugador (891 KB/s en total) y RTT p95 de 6,7 ms. Los clientes recibieron 16,4 fotos/s de media
 (mínimo 8,1) porque los 32 bots compiten por el mismo PC con el servidor. Con ese margen (un núcleo
-de la VM rinde bastante menos que uno del PC, pero hay dos) se deja `MAX_ROOMS=8`. **Falta repetir la
-prueba contra la VM** (comando de abajo): si «pasos/s por sala» baja de 60 o «descartados» no es 0,
-vuelve a `MAX_ROOMS=5` en `deploy/.env`.
+de la VM rinde bastante menos que uno del PC, pero hay dos) se dejó `MAX_ROOMS=8`.
+
+**Prueba de carga 8×4 contra la VM real** (`wss://servidor.yeyo.games`, 60 s, desde un PC por internet,
+28 de octubre de 2026): 60,4 pasos/s por sala (objetivo 60), paso medio 0,85 ms y peor 10 ms (el límite
+es 16,7 ms), CPU del servidor 60 % de un núcleo de media y 125 % de pico (la VM tiene 2), 184 MB de RAM,
+RTT de aplicación p50 17 ms y p95 53 ms, 0 desconexiones. **Se descartaron 4 pasos** de unos 28 800
+(0,01 %), probablemente al cargar los mapas. Se dejó `MAX_ROOMS=8`; si en uso real «descartados» sube de
+forma sostenida o los picos de CPU se acercan al 200 %, vuelve a `MAX_ROOMS=5` en `deploy/.env`.
 
 | Opción | Precio/mes | ¿Sirve para 8×4? |
 | --- | --- | --- |
