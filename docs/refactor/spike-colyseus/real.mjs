@@ -1,5 +1,5 @@
 // Partida real de 2 navegadores (Chromium) contra el servidor local: camina 40 s y mide bytes,
-// correcciones de posición y el diagnóstico F3. Uso: node .spike/real.mjs ETIQUETA PUERTO_SERVIDOR PUERTO_WEB
+// correcciones de posición y el diagnóstico F3. Uso: node docs/refactor/spike-colyseus/real.mjs ETIQUETA PUERTO_SERVIDOR PUERTO_WEB
 import { chromium } from '@playwright/test';
 const [label, SERVER, WEB] = process.argv.slice(2);
 const SECS = Number(process.env.SECS || 40);
@@ -37,8 +37,17 @@ await B.page.locator('#ol-name').fill('Beto');
 await B.page.locator('#ol-code-in').fill(code);
 await B.page.locator('#ol-code-in').press('Enter');
 await B.page.locator('#ol-lobby').waitFor({ state: 'visible' });
-await clic(B.page, '#btn-ol-ready');
-await A.page.waitForFunction(() => !document.querySelector('#btn-ol-start').disabled);
+for (let i = 0; i < 40; i++) {
+  // con latencia el estado de la sala llega tarde: se reintenta hasta que el dueño lo ve listo
+  if ((await B.page.locator('#btn-ol-ready').innerText()).toLowerCase().includes('estoy listo') && (await B.page.evaluate(() => !!window.__deadzone.online.me)))
+    await clic(B.page, '#btn-ol-ready');
+  await sleep(500);
+  if (await A.page.evaluate(() => !document.querySelector('#btn-ol-start').disabled)) break;
+}
+await A.page.waitForFunction(() => !document.querySelector('#btn-ol-start').disabled, null, { timeout: 90000 }).catch(async (e) => {
+  console.error('A:', await A.page.locator('#btn-ol-start').innerText(), '| B:', await B.page.locator('#ol-members').innerText());
+  throw e;
+});
 await clic(A.page, '#btn-ol-start');
 for (const { page } of [A, B]) await page.waitForFunction(() => window.__deadzone.state === 'play', null, { timeout: 40000 });
 // sonda de correcciones: cuenta cada reconciliación con error > 0,5 px (sirve para cualquier predictor)
@@ -46,17 +55,28 @@ const probe = () => {
   const g = window.__deadzone;
   window.__c = { n: 0, sum: 0, max: 0, snaps0: g.remote.net.snaps ?? 0 };
   const o = g.online;
-  const pr = o.pred;
-  const rec = pr.reconcile.bind(pr);
-  pr.reconcile = (...a) => {
-    const e = rec(...a);
+  const count = (e) => {
     if (e > 0.5) {
       window.__c.n++;
       window.__c.sum += e;
       window.__c.max = Math.max(window.__c.max, e);
     }
-    return e;
   };
+  if (o.pred) {
+    const rec = o.pred.reconcile.bind(o.pred);
+    o.pred.reconcile = (...a) => {
+      const e = rec(...a);
+      count(e);
+      return e;
+    };
+  } else {
+    const note = o.noteCorrection.bind(o);
+    o.noteCorrection = () => {
+      window.__c.calls = (window.__c.calls || 0) + 1;
+      count(o.rec ? Math.hypot(o.rec.lastCorrection.x || 0, o.rec.lastCorrection.y || 0) : 0);
+      note();
+    };
+  }
   window.__t0 = { at: performance.now() };
   window.__b = { in: 0, out: 0, path: 0, px: g.player.x, py: g.player.y };
   const conn = o.room.connection;
@@ -106,7 +126,26 @@ for (const { page } of [A, B]) {
     }),
   );
 }
+// comprobación de la sonda: se desvía a propósito la predicción 30 px y debe verse una corrección
+const sanity = [];
+for (const { page } of [A, B]) {
+  await page.bringToFront();
+  await page.keyboard.down('a');
+  await sleep(400);
+  sanity.push(
+    await page.evaluate(async () => {
+      const o = window.__deadzone.online;
+      if (!o.rec) return null;
+      const n0 = window.__c.n;
+      const calls0 = window.__c.calls;
+      o.rec.state.x += 30;
+      await new Promise((r) => setTimeout(r, 1500));
+      return { reconciliaciones: window.__c.calls, antes: calls0, correccionesNuevas: window.__c.n - n0, maxNuevo: window.__c.max };
+    }),
+  );
+  await page.keyboard.up('a');
+}
 const health = await (await fetch(`http://127.0.0.1:${SERVER}/health`)).json();
-console.log(JSON.stringify({ label, res, errores: [...A.errs, ...B.errs].slice(0, 5), health }, null, 1));
+console.log(JSON.stringify({ label, res, sanity, errores: [...A.errs, ...B.errs].slice(0, 5), health }, null, 1));
 await browser.close();
 process.exit(0);
