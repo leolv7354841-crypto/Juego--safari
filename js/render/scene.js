@@ -1,5 +1,5 @@
 // Escena: dibujo de cada fotograma (mundo, zombis, luces, marcadores) y ajuste del lienzo y la calidad.
-import { clamp, makeCanvas, TAU } from '../core/util.js';
+import { clamp, makeCanvas, TAU } from '../core/util.ts';
 import { drawRobot } from './robot.js';
 import { drawSurvivor } from './sprites.js';
 import {

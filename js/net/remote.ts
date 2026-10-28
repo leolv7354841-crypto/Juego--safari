@@ -5,15 +5,49 @@
 // efectos que ocurrieron donde manda el mundo (partículas, sonidos, manchas) se repiten aquí. Las balas
 // que se ven son de adorno: el daño lo calcula quien manda.
 // `game.remote` es la única instancia; se dibuja desde js/render/remote.js.
-import { NET, PLAYER_BASE, ROBOT, SHOP, WEAPON_ORDER, WEAPONS, ZOMBIES } from '../core/config.js';
-import { angleTo, rand, TAU } from '../core/util.js';
-import { turretBullet } from '../sim/build.js';
-import { Player } from '../sim/player.js';
-import { Robot } from '../sim/robot.js';
+import { NET, PLAYER_BASE, ROBOT, SHOP, WEAPON_ORDER, WEAPONS, ZOMBIES } from '../core/config.ts';
+import { angleTo, rand, TAU } from '../core/util.ts';
+import { turretBullet } from '../sim/build.ts';
+import { Player } from '../sim/player.ts';
+import { Robot } from '../sim/robot.ts';
 import { lookFromCode, zombieSprites } from '../render/sprites.js';
-import { Interp } from './netcode.js';
-import { DECAL_SYNC, PARTICLE_SKIP, PICKS, SFX_SYNC, TYPES } from './protocol.js';
-import { PEER_N, ROBOT_N, ZOMBIE_N } from './snapshot.js';
+import { Interp } from './netcode.ts';
+import { DECAL_SYNC, PARTICLE_SKIP, PICKS, SFX_SYNC, TYPES } from './protocol.ts';
+import type { WorldSnap, Zombie, ZombieDef } from '../core/types.d.ts';
+import { PEER_N, ROBOT_N, ZOMBIE_N } from './snapshot.ts';
+
+/** Nombre y aspecto de un jugador: `look` ya listo (cooperativo) o `code` (en línea, se convierte al cambiar). */
+export type Identity = { name?: string; look?: unknown; code?: string };
+export type Identify = (idx: number) => Identity | null;
+/** Jugador remoto: un Player con lo que le añade este módulo. */
+export type Peer = Player & { it?: Interp; away?: boolean; lookCode?: string; manned?: unknown };
+/** Zombi remoto: lo que se dibuja a partir de la foto. */
+export type RemoteZombie = Pick<
+  Zombie,
+  'id' | 'type' | 'def' | 'x' | 'y' | 'r' | 'mass' | 'angle' | 'si' | 'flash' | 'dead' | 'hitT' | 'hitJolt'
+> & {
+  it: Interp;
+  spr: unknown;
+  wounded?: boolean;
+  hp?: number;
+  maxHp?: number;
+  burn: number;
+  air: number;
+  life: number;
+  anim: number;
+  lunge: number;
+  tilt: number;
+  swell: number;
+  bs: string;
+  wob: number;
+  fireFx: number;
+  spawnT: number;
+};
+type Row = [string, number, number, number, number, number, number];
+/** Parte de una foto que usa applyStructures: las listas de barricadas y trampas llevan el tipo delante. */
+type StructSnap = Partial<Omit<WorldSnap, 'blk' | 'wir' | 'sc'>> & { blk?: Row[]; wir?: Row[]; sc?: number[][] };
+type ShopDef = { hp: number; ground?: boolean; consumable?: boolean };
+const shopDef = (k: string): ShopDef | undefined => (SHOP as unknown as Record<string, ShopDef>)[k];
 
 /** Índice de jugador en el cooperativo (en línea lo da el servidor): el anfitrión es 0 y el invitado 1. */
 export const HOST_IDX = 0;
@@ -21,6 +55,9 @@ export const GUEST_IDX = 1;
 
 /** Contador del indicador de conexión: fotos y fotogramas por segundo (una lectura cada segundo). */
 export class NetStats {
+  declare secs: number;
+  declare frames: number;
+  declare snaps: number;
   constructor() {
     this.secs = 0;
     this.frames = 0;
@@ -33,7 +70,7 @@ export class NetStats {
   }
 
   /** Cada fotograma. Pasado un segundo devuelve {secs, fps, per} (fotos por segundo) y empieza de nuevo; si no, null. */
-  tick(dt) {
+  tick(dt: number) {
     this.secs += dt;
     this.frames++;
     if (this.secs < 1) return null;
@@ -46,11 +83,23 @@ export class NetStats {
 }
 
 export class Remote {
+  declare game: any;
+  declare sprites: () => any;
+  declare active: boolean;
+  declare extrapolate: number;
+  declare zs: Map<number, RemoteZombie>;
+  declare peers: Map<number, Peer>;
+  declare robots: Map<number, Robot>;
+  declare fireMap: Map<number, any>;
+  declare bullets: any[];
+  declare blkGeo: string;
+  declare danger: number;
+  declare nearCount: number;
+  declare net: NetStats;
   /**
-   * @param {any} game
    * @param {{ zombieSprites?: () => any }} [deps]  para probar sin lienzo
    */
-  constructor(game, deps = {}) {
+  constructor(game: any, deps: { zombieSprites?: () => any } = {}) {
     this.game = game;
     this.sprites = deps.zombieSprites || zombieSprites;
     /** ¿Se está jugando como espectador del mundo de otro? (lo ponen coop.js y online.js) */
@@ -94,12 +143,18 @@ export class Remote {
   /**
    * Aplica la parte del mundo de una foto. t: instante de la foto en el reloj que luego se pasa a place*.
    * @param {any} s  foto (ver snapshot.js)
-   * @param {number} t
-   * @param {{ myIdx?: number, identify?: (idx: number) => { name?: string, look?: any, code?: string } | null, collide?: boolean }} [opts]
    *   myIdx: el robot de este jugador va en game.robot; identify: nombre y aspecto; collide: las barricadas también
    *   chocan en el mapa local (para predecir igual que el servidor).
    */
-  applyWorld(s, t, opts = {}) {
+  applyWorld(
+    s: any,
+    t: number,
+    opts: {
+      myIdx?: number;
+      identify?: Identify;
+      collide?: boolean;
+    } = {},
+  ) {
     this.applyPeers(s.pl || [], t, opts.identify);
     this.applyRobots(s.rb || [], opts.myIdx ?? -1);
     this.applyZombies(s.z || [], s.o || [0, 0], s.zx || [], s.zh || [], t);
@@ -110,13 +165,13 @@ export class Remote {
 
   /* ---------- zombis ---------- */
 
-  applyZombies(z, org, zx, zh, t) {
+  applyZombies(z: number[], org: number[], zx: number[], zh: number[], t: number) {
     const g = this.game;
-    const seen = new Set();
-    const extra = new Map();
+    const seen = new Set<number>();
+    const extra = new Map<number, [number, number]>();
     for (let i = 0; i + 2 < zx.length; i += 3) extra.set(zx[i], [zx[i + 1], zx[i + 2] / 100]);
     // vida en % de los heridos (la barra usa hp / maxHp)
-    const life = new Map();
+    const life = new Map<number, number>();
     for (let i = 0; i + 1 < zh.length; i += 2) life.set(zh[i], zh[i + 1]);
     for (let i = 0; i + ZOMBIE_N - 1 < z.length; i += ZOMBIE_N) {
       const id = z[i];
@@ -126,8 +181,8 @@ export class Remote {
       seen.add(id);
       let o = this.zs.get(id);
       if (!o) {
-        const type = TYPES[z[i + 1]] || 'normal';
-        const def = ZOMBIES[type];
+        const type = (TYPES[z[i + 1]] || 'normal') as keyof typeof ZOMBIES;
+        const def = ZOMBIES[type] as unknown as ZombieDef;
         const sets = this.sprites()[type];
         o = {
           id,
@@ -186,11 +241,11 @@ export class Remote {
   }
 
   // Coloca a cada zombi donde estaba hace `delay` ms, con su animación, y arma la rejilla de choques.
-  placeZombies(rt, dt, p) {
+  placeZombies(rt: number, dt: number, p: { x: number; y: number }) {
     const g = this.game;
     const grid = g.horde.grid;
     grid.clear();
-    const out = [];
+    const out: number[] = [];
     let danger = 0;
     let nc = 0;
     for (const z of this.zs.values()) {
@@ -229,14 +284,14 @@ export class Remote {
    * Los demás jugadores. identify(idx) da su nombre y su aspecto: `look` ya listo (cooperativo) o `code`
    * (en línea, se convierte al cambiar).
    */
-  applyPeers(pl, t, identify) {
-    const seen = new Set();
+  applyPeers(pl: number[], t: number, identify?: Identify) {
+    const seen = new Set<number>();
     for (let i = 0; i + PEER_N - 1 < pl.length; i += PEER_N) {
       const idx = pl[i];
       seen.add(idx);
       let q = this.peers.get(idx);
       if (!q) {
-        q = new Player(pl[i + 1], pl[i + 2]);
+        q = new Player(pl[i + 1], pl[i + 2]) as Peer;
         q.puppet = true;
         this.peers.set(idx, q);
       }
@@ -251,7 +306,7 @@ export class Remote {
       q.it.push(t, [pl[i + 1], pl[i + 2], pl[i + 3] / 100, pl[i + 4] / 100]);
       q.running = !!pl[i + 5];
       const wid = WEAPON_ORDER[pl[i + 6]];
-      if (wid && WEAPONS[wid] && (!q.weapons[0] || q.weapons[0].id !== wid)) {
+      if (wid && wid in WEAPONS && (!q.weapons[0] || q.weapons[0].id !== wid)) {
         q.weapons = [q.makeWeapon(wid)];
         q.wi = 0;
       }
@@ -278,8 +333,8 @@ export class Remote {
   }
 
   // Los jugadores simulados aquí (el compañero del anfitrión) no tienen `it`: su movimiento lo lleva coop.js.
-  placePeers(rt, dt) {
-    const out = [];
+  placePeers(rt: number, dt: number) {
+    const out: number[] = [];
     for (const q of this.peers.values()) {
       if (!q.it || !q.it.sample(rt, out)) continue;
       const ox = q.x;
@@ -292,12 +347,12 @@ export class Remote {
       q.flashT -= dt;
       q.hurtT -= dt;
       q.recoil = Math.max(0, q.recoil - dt * 8);
-      if (q.inRobot) this.followRobot(this.robots.get(q.idx), q, dt);
+      if (q.inRobot && q.idx !== undefined) this.followRobot(this.robots.get(q.idx), q, dt);
     }
   }
 
   // El robot pilotado va donde va su piloto (el propio, con la posición predicha).
-  followRobot(rb, p, dt) {
+  followRobot(rb: Robot | undefined, p: Player, dt: number) {
     if (!rb) return;
     rb.hitT -= dt;
     if (!rb.owned || !rb.piloted || !p.inRobot) return;
@@ -310,9 +365,9 @@ export class Remote {
   }
 
   // Robots: el propio (idx = myIdx) en game.robot (tienda, barra de vida, dibujo) y los de los demás aparte.
-  applyRobots(rb, myIdx) {
+  applyRobots(rb: number[], myIdx: number) {
     const g = this.game;
-    const seen = new Set();
+    const seen = new Set<number>();
     for (let i = 0; i + ROBOT_N - 1 < rb.length; i += ROBOT_N) {
       const idx = rb[i];
       let r = g.robot;
@@ -344,14 +399,14 @@ export class Remote {
 
   /* ---------- objetos, balas y estructuras ---------- */
 
-  applyPickups(pk) {
+  applyPickups(pk: number[]) {
     const g = this.game;
     g.pickups.list = [];
     for (let i = 0; i + 3 < pk.length; i += 4)
       g.pickups.list.push({ k: PICKS[pk[i]] || 'ammo', x: pk[i + 1], y: pk[i + 2], t: pk[i + 3] / 10, taken: true });
   }
 
-  applyBullets(b) {
+  applyBullets(b: number[]) {
     this.bullets = [];
     for (let i = 0; i + 4 < b.length; i += 5)
       this.bullets.push({
@@ -366,7 +421,7 @@ export class Remote {
   }
 
   // Granadas en el aire, fuego, cohetes clavados, explosiones; barricadas y trampas cuando cambian.
-  applyStructures(s, collide = true) {
+  applyStructures(s: StructSnap, collide = true) {
     const g = this.game;
     const st = g.structures;
     const gr = Array.isArray(s.gr) ? s.gr : [];
@@ -425,7 +480,10 @@ export class Remote {
     st.blasts = [];
     for (let i = 0; i + 2 < bl.length; i += 3) st.blasts.push({ x: bl[i], y: bl[i + 1], t: bl[i + 2] / 100 });
     if (Array.isArray(s.blk)) {
-      const list = s.blk.filter((q) => Array.isArray(q) && SHOP[q[0]] && !SHOP[q[0]].ground && !SHOP[q[0]].consumable);
+      const list = s.blk.filter((q) => {
+        const d = Array.isArray(q) && shopDef(q[0]);
+        return d && !d.ground && !d.consumable;
+      });
       const geo = list.map((q) => q.slice(0, 5).join()).join('|');
       if (geo !== this.blkGeo) {
         // se puso o se rompió alguna: con collide, el mapa local también choca con ellas (para predecir igual)
@@ -439,7 +497,7 @@ export class Remote {
           w: q[3],
           h: q[4],
           hp: q[5],
-          max: SHOP[q[0]].hp,
+          max: shopDef(q[0])?.hp ?? 0,
           ang: q[6] / 100,
           low: true,
           block: true,
@@ -460,8 +518,17 @@ export class Remote {
     }
     if (Array.isArray(s.wir))
       st.wires = s.wir
-        .filter((q) => Array.isArray(q) && SHOP[q[0]] && SHOP[q[0]].ground)
-        .map((q) => ({ kind: q[0], x: q[1], y: q[2], w: q[3], h: q[4], hp: q[5], max: SHOP[q[0]].hp, hitT: 0 }));
+        .filter((q) => Array.isArray(q) && shopDef(q[0])?.ground)
+        .map((q) => ({
+          kind: q[0],
+          x: q[1],
+          y: q[2],
+          w: q[3],
+          h: q[4],
+          hp: q[5],
+          max: shopDef(q[0])?.hp ?? 0,
+          hitT: 0,
+        }));
     if (Array.isArray(s.sc))
       st.scorches = s.sc.filter(Array.isArray).map((q) => ({ x: q[0], y: q[1], a: q[2] / 100, t: q[3], life: q[4] }));
   }
@@ -469,7 +536,7 @@ export class Remote {
   /* ---------- cada fotograma ---------- */
 
   // Las balas de adorno vuelan, y avanzan los relojes de lo que se dibuja (fuego, misiles, explosiones, golpes).
-  advance(dt) {
+  advance(dt: number) {
     const g = this.game;
     for (const b of this.bullets) {
       b.x += b.dx * (b.rocket ? 640 : 1000) * dt;
@@ -500,7 +567,7 @@ export class Remote {
   }
 
   // Gemidos y pasos según los zombis cercanos, y la música según el peligro.
-  ambience(dt, p) {
+  ambience(dt: number, p: { alive: boolean }) {
     const g = this.game;
     const nc = this.nearCount;
     if (g.horde.list.length && Math.random() < dt * (0.35 + Math.min(1.5, nc * 0.05)))
@@ -516,7 +583,7 @@ export class Remote {
   /* ---------- efectos ---------- */
 
   // Repite un efecto que ocurrió donde manda el mundo (partículas, sonidos, manchas, sacudidas).
-  replay(e) {
+  replay(e: unknown) {
     const g = this.game;
     if (!Array.isArray(e)) return;
     const [tag, n, args] = e;
@@ -547,7 +614,7 @@ export class Remote {
 
   // Disparo de una torreta: bala de adorno local (choca con los zombis y paredes que se ven) y
   // el cañón gira hacia donde disparó, con su fogonazo.
-  turretShot(x, y, a) {
+  turretShot(x: number, y: number, a: number) {
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(a)) return;
     const g = this.game;
     g.bullets.spawn(turretBullet(x, y, a));

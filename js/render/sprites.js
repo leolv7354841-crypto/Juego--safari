@@ -1,12 +1,32 @@
 // Todo el arte se genera por código: texturas del suelo, zombis, árboles,
 // vehículos y el superviviente. Nada de recursos externos.
-import { ZOMBIE_VARIANTS } from '../core/config.js';
-import { TAU, makeCanvas, mulberry32, rrange, rpick, roundRect, shade } from '../core/util.js';
+import { ZOMBIE_VARIANTS } from '../core/config.ts';
+import { TAU, makeCanvas, mulberry32, rrange, rpick, roundRect, shade } from '../core/util.ts';
 
 export const OUT = '#141612';
 
+/** @typedef {CanvasRenderingContext2D} Ctx */
+/** @typedef {keyof typeof ZOMBIE_VARIANTS} ZType */
+/** @typedef {{ skin: string, pants: string, hair: string, seed: number }} PalBase */
+/** @typedef {PalBase & { shirt: string }} PalShirt */
+/** @typedef {{ normal: PalShirt, golden: PalShirt, sprinter: PalShirt, fat: PalShirt, swat: PalShirt & { vest: string, shield: string }, heavy: PalShirt & { plate: string, dark: string, camo: string }, bull: PalBase & { bone: string, vein: string }, giant: PalShirt & { metal: string } }} PalOf paleta de cada tipo de zombi */
+/** @typedef {{ [K in ZType]: (g: Ctx, r: number, p: PalOf[K], ph: number) => void }} Drawers */
+/** @typedef {{ frames: HTMLCanvasElement[], flash: HTMLCanvasElement[], dead: HTMLCanvasElement, burnt: HTMLCanvasElement, size: number, half: number }} ZSet */
+/** @typedef {{ id: string, name: string, colors: string[] }} LookPart */
+/** @typedef {{ [part: string]: string, skin: string, hair: string, scarf: string, jacket: string, pants: string, pack: string, hat: string }} Look */
+/** @typedef {import('../sim/player.ts').Player} Player */
+/** @typedef {(g: Ctx, r: number, p?: Player) => void} GunDraw */
+
+/** Contexto 2D de un canvas recién creado (siempre existe; si no, el navegador no sirve para jugar). @param {HTMLCanvasElement} c @returns {Ctx} */
+function ctx2d(c) {
+  const g = c.getContext('2d');
+  if (!g) throw new Error('canvas 2D no disponible');
+  return g;
+}
+
 /* ---------- Primitivas ---------- */
 
+/** @param {Ctx} g @param {number} x @param {number} y @param {number} rx @param {number} ry @param {number} rot @param {string} fill @param {string | null} [stroke] @param {number} [lw] */
 function ell(g, x, y, rx, ry, rot, fill, stroke = OUT, lw = 1.4) {
   g.beginPath();
   g.ellipse(x, y, rx, ry, rot || 0, 0, TAU);
@@ -18,9 +38,11 @@ function ell(g, x, y, rx, ry, rot, fill, stroke = OUT, lw = 1.4) {
     g.stroke();
   }
 }
+/** @param {Ctx} g @param {number} x @param {number} y @param {number} r @param {string} fill @param {string | null} [stroke] @param {number} [lw] */
 function circ(g, x, y, r, fill, stroke = OUT, lw = 1.4) {
   ell(g, x, y, r, r, 0, fill, stroke, lw);
 }
+/** @param {Ctx} g @param {number} x1 @param {number} y1 @param {number} x2 @param {number} y2 @param {number} w @param {string} fill */
 function limb(g, x1, y1, x2, y2, w, fill) {
   g.lineCap = 'round';
   g.beginPath();
@@ -33,6 +55,7 @@ function limb(g, x1, y1, x2, y2, w, fill) {
   g.lineWidth = w;
   g.stroke();
 }
+/** @param {Ctx} g @param {number} r @param {number} [a] */
 function softShadow(g, r, a = 0.38) {
   const gr = g.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
   gr.addColorStop(0, `rgba(0,0,0,${a})`);
@@ -45,11 +68,13 @@ function softShadow(g, r, a = 0.38) {
 
 /* ---------- Texturas del suelo ---------- */
 
+/** @param {number} size @param {number} seed @param {(g: Ctx, s: number, r: () => number) => void} paint */
 function tile(size, seed, paint) {
   const c = makeCanvas(size, size);
-  paint(c.getContext('2d'), size, mulberry32(seed));
+  paint(ctx2d(c), size, mulberry32(seed));
   return c;
 }
+/** @param {Ctx} g @param {number} s @param {() => number} rng @param {number} n @param {string[]} colors @param {number} rmin @param {number} rmax */
 function speckle(g, s, rng, n, colors, rmin, rmax) {
   for (let i = 0; i < n; i++) {
     g.fillStyle = rpick(rng, colors);
@@ -58,6 +83,7 @@ function speckle(g, s, rng, n, colors, rmin, rmax) {
   }
 }
 
+/** @type {Record<string, HTMLCanvasElement> | null} */
 let TILES = null;
 function buildTiles() {
   TILES = {
@@ -144,15 +170,22 @@ function buildTiles() {
   };
 }
 
+/** @type {WeakMap<Ctx, Record<string, CanvasPattern>>} */
 const patCache = new WeakMap();
+/** @param {Ctx} g @param {string} name */
 export function pat(g, name) {
   if (!TILES) buildTiles();
+  const tiles = /** @type {Record<string, HTMLCanvasElement>} */ (TILES); // buildTiles la acaba de llenar
   let m = patCache.get(g);
   if (!m) {
     m = {};
     patCache.set(g, m);
   }
-  if (!m[name]) m[name] = g.createPattern(TILES[name], 'repeat');
+  if (!m[name]) {
+    const p = g.createPattern(tiles[name], 'repeat');
+    if (!p) throw new Error(`textura ${name} no disponible`);
+    m[name] = p;
+  }
   return m[name];
 }
 
@@ -218,6 +251,7 @@ const GIANT_PALETTES = [
   { skin: '#6c7a5e', shirt: '#4a3a2c', pants: '#2b2622', hair: '#151311', metal: '#77736b' },
 ];
 
+/** @param {Ctx} g @param {() => number} rng @param {number} x @param {number} y @param {number} rx @param {number} ry @param {string} color @param {number} n */
 function rips(g, rng, x, y, rx, ry, color, n) {
   g.fillStyle = color;
   for (let i = 0; i < n; i++) {
@@ -237,6 +271,7 @@ function rips(g, rng, x, y, rx, ry, color, n) {
   }
 }
 
+/** @param {Ctx} g @param {number} r @param {PalOf["normal"]} p @param {number} ph */
 function drawNormal(g, r, p, ph) {
   softShadow(g, r * 1.25);
   const s = Math.sin(ph);
@@ -268,6 +303,7 @@ function drawNormal(g, r, p, ph) {
 
 // Policía SWAT zombi: uniforme táctico, chaleco, casco con visor y un escudo
 // antidisturbios amarrado al antebrazo izquierdo.
+/** @param {Ctx} g @param {number} r @param {PalOf["swat"]} p @param {number} ph */
 function drawSwat(g, r, p, ph) {
   softShadow(g, r * 1.3);
   const s = Math.sin(ph);
@@ -335,6 +371,7 @@ function drawSwat(g, r, p, ph) {
 }
 
 // Velocista: flaco, inclinado hacia delante, zancada larga y brazos hacia atrás.
+/** @param {Ctx} g @param {number} r @param {PalOf["sprinter"]} p @param {number} ph */
 function drawSprinter(g, r, p, ph) {
   softShadow(g, r * 1.3);
   const s = Math.sin(ph);
@@ -360,6 +397,7 @@ function drawSprinter(g, r, p, ph) {
 
 // Super blindado: cuerpo de gordo cubierto con armadura militar (arena y verde),
 // casco con gafas, hombreras y placas sobre el pecho y la barriga.
+/** @param {Ctx} g @param {number} r @param {PalOf["heavy"]} p @param {number} ph */
 function drawHeavy(g, r, p, ph) {
   softShadow(g, r * 1.25, 0.45);
   const s = Math.sin(ph);
@@ -428,6 +466,7 @@ function drawHeavy(g, r, p, ph) {
   g.fillRect(r * 0.24, r * 0.04, r * 0.06, r * 0.12);
 }
 
+/** @param {Ctx} g @param {number} r @param {PalOf["fat"]} p @param {number} ph */
 function drawFat(g, r, p, ph) {
   softShadow(g, r * 1.2);
   const s = Math.sin(ph);
@@ -456,6 +495,7 @@ function drawFat(g, r, p, ph) {
 
 // Toro: zombi mamado y bronceado, hombros enormes, brazos con bíceps marcados y una
 // deformación ósea en la cabeza (bultos y dos cuernos de hueso que le salen del cráneo).
+/** @param {Ctx} g @param {number} r @param {PalOf["bull"]} p @param {number} ph */
 function drawBull(g, r, p, ph) {
   softShadow(g, r * 1.35, 0.42);
   const s = Math.sin(ph);
@@ -520,6 +560,7 @@ function drawBull(g, r, p, ph) {
   g.fillRect(hx + r * 0.26, hy + r * 0.08, r * 0.09, r * 0.07);
 }
 
+/** @param {Ctx} g @param {number} r @param {PalOf["giant"]} p @param {number} ph */
 function drawGiant(g, r, p, ph) {
   softShadow(g, r * 1.3, 0.5);
   const s = Math.sin(ph);
@@ -590,6 +631,7 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
+/** @type {Drawers} */
 const DRAWERS = {
   normal: drawNormal,
   golden: drawNormal,
@@ -600,6 +642,7 @@ const DRAWERS = {
   bull: drawBull,
   giant: drawGiant,
 };
+/** @type {{ [K in ZType]: Omit<PalOf[K], 'seed'>[] }} */
 const PALETTES = {
   normal: NORMAL_PALETTES,
   golden: GOLDEN_PALETTES,
@@ -611,36 +654,39 @@ const PALETTES = {
   giant: GIANT_PALETTES,
 };
 
+/** @template {ZType} T @param {T} type @param {number} r @param {number} frames @param {PalOf[T]} pal @param {number} scale @param {number} pad @returns {ZSet} */
 function buildSet(type, r, frames, pal, scale, pad) {
   const half = r * pad;
   const size = half * 2;
   const px = size * scale;
-  const out = { frames: [], flash: [], dead: null, size, half };
+  /** @type {HTMLCanvasElement[]} */
+  const frameList = [];
+  /** @type {HTMLCanvasElement[]} */
+  const flashList = [];
   for (let f = 0; f < frames; f++) {
     const c = makeCanvas(px, px);
-    const g = c.getContext('2d');
+    const g = ctx2d(c);
     g.setTransform(scale, 0, 0, scale, half * scale, half * scale);
     DRAWERS[type](g, r, pal, (f / frames) * TAU);
-    out.frames.push(c);
+    frameList.push(c);
     const fl = makeCanvas(px, px);
-    const fg = fl.getContext('2d');
+    const fg = ctx2d(fl);
     fg.drawImage(c, 0, 0);
     fg.globalCompositeOperation = 'source-atop';
     fg.fillStyle = 'rgba(255,236,220,0.78)';
     fg.fillRect(0, 0, px, px);
-    out.flash.push(fl);
+    flashList.push(fl);
   }
   const d = makeCanvas(px, px);
-  const dg = d.getContext('2d');
-  dg.drawImage(out.frames[0], 0, 0);
+  const dg = ctx2d(d);
+  dg.drawImage(frameList[0], 0, 0);
   dg.globalCompositeOperation = 'source-atop';
   dg.fillStyle = 'rgba(18,17,13,0.5)';
   dg.fillRect(0, 0, px, px);
-  out.dead = d;
   // cadáver calcinado (muerto por fuego)
   const b = makeCanvas(px, px);
-  const bg = b.getContext('2d');
-  bg.drawImage(out.frames[0], 0, 0);
+  const bg = ctx2d(b);
+  bg.drawImage(frameList[0], 0, 0);
   bg.globalCompositeOperation = 'source-atop';
   bg.fillStyle = 'rgba(20,13,8,0.86)';
   bg.fillRect(0, 0, px, px);
@@ -657,16 +703,16 @@ function buildSet(type, r, frames, pal, scale, pad) {
     );
     bg.fill();
   }
-  out.burnt = b;
-  return out;
+  return { frames: frameList, flash: flashList, dead: d, burnt: b, size, half };
 }
 
 // Llama para los zombis en llamas y el fuego del molotov (se dibuja en modo aditivo).
+/** @type {HTMLCanvasElement | null} */
 let FLAME = null;
 export function flameSprite() {
   if (FLAME) return FLAME;
   const c = makeCanvas(32, 48);
-  const g = c.getContext('2d');
+  const g = ctx2d(c);
   const grd = g.createRadialGradient(16, 34, 2, 16, 30, 22);
   grd.addColorStop(0, 'rgba(255,245,200,1)');
   grd.addColorStop(0.3, 'rgba(255,190,70,0.95)');
@@ -683,10 +729,13 @@ export function flameSprite() {
   return c;
 }
 
+/** @type {Record<ZType, ZSet[]> | null} */
 let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
-  ZSPRITES = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], bull: [], giant: [] };
+  /** @type {Record<ZType, ZSet[]>} */
+  const sets = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], bull: [], giant: [] };
+  /** @type {Record<ZType, { r: number, frames: number, scale: number, pad: number }>} */
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
     fat: { r: 21, frames: 6, scale: 2.4, pad: 1.45 },
@@ -697,26 +746,28 @@ export function zombieSprites() {
     heavy: { r: 22, frames: 6, scale: 2.4, pad: 1.45 },
     bull: { r: 17, frames: 6, scale: 2.5, pad: 1.65 },
   };
-  for (const type of Object.keys(conf)) {
+  for (const type of /** @type {ZType[]} */ (Object.keys(conf))) {
     const k = conf[type];
     PALETTES[type].forEach((pal, i) => {
-      pal.seed = 100 + i * 31 + type.length * 7;
-      ZSPRITES[type].push(buildSet(type, k.r, k.frames, pal, k.scale, k.pad));
+      const seed = 100 + i * 31 + type.length * 7;
+      sets[type].push(buildSet(type, k.r, k.frames, { ...pal, seed }, k.scale, k.pad));
     });
-    if (ZSPRITES[type].length !== ZOMBIE_VARIANTS[type])
+    if (sets[type].length !== ZOMBIE_VARIANTS[type])
       throw new Error(`ZOMBIE_VARIANTS.${type} no coincide con las paletas`);
   }
-  return ZSPRITES;
+  ZSPRITES = sets;
+  return sets;
 }
 
 /* ---------- Árboles ---------- */
 
+/** @param {number} seed @param {number} r @param {boolean} dead */
 export function makeTree(seed, r, dead) {
   const rng = mulberry32(seed);
   const pad = r * 1.3;
   const scale = 1.6;
   const c = makeCanvas(pad * 2 * scale, pad * 2 * scale);
-  const g = c.getContext('2d');
+  const g = ctx2d(c);
   g.setTransform(scale, 0, 0, scale, pad * scale, pad * scale);
   if (dead) {
     g.lineCap = 'round';
@@ -773,6 +824,7 @@ export function makeTree(seed, r, dead) {
 
 /* ---------- Vehículos ---------- */
 
+/** @param {Ctx} g @param {number} x @param {number} y @param {number} ang @param {number} len @param {number} wid @param {{ seed: number, kind: string, burnt: boolean, color: string }} opt */
 export function drawCar(g, x, y, ang, len, wid, opt) {
   const rng = mulberry32(opt.seed);
   const kind = opt.kind;
@@ -933,7 +985,7 @@ export function drawCar(g, x, y, ang, len, wid, opt) {
 
 export function lightSprite(color = '255,255,255', size = 256) {
   const c = makeCanvas(size, size);
-  const g = c.getContext('2d');
+  const g = ctx2d(c);
   const gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gr.addColorStop(0, `rgba(${color},1)`);
   gr.addColorStop(0.35, `rgba(${color},0.6)`);
@@ -948,7 +1000,7 @@ export function coneSprite() {
   const w = 512;
   const h = 300;
   const c = makeCanvas(w, h);
-  const g = c.getContext('2d');
+  const g = ctx2d(c);
   const gr = g.createLinearGradient(0, 0, w, 0);
   gr.addColorStop(0, 'rgba(255,255,255,0.9)');
   gr.addColorStop(0.5, 'rgba(255,255,255,0.5)');
@@ -975,6 +1027,7 @@ export function coneSprite() {
 
 /* ---------- Superviviente ---------- */
 
+/** @type {Record<string, number>} */
 const GUN_LEN = {
   pistol: 23,
   smg: 30,
@@ -987,6 +1040,7 @@ const GUN_LEN = {
   bazooka: 48,
 };
 
+/** @type {Record<string, GunDraw>} */
 const GUNS = {
   pistol: (g, r) => {
     g.fillStyle = '#26282b';
@@ -1085,6 +1139,7 @@ const GUNS = {
 };
 
 // El arma del jugador, más grande, empezando en el origen (brazo del robot).
+/** @param {Ctx} g @param {Player} p @param {number} scale */
 export function drawGunScaled(g, p, scale) {
   g.save();
   g.scale(scale, scale);
@@ -1093,6 +1148,7 @@ export function drawGunScaled(g, p, scale) {
 }
 
 // Silueta del arma para la tienda (mira hacia la derecha).
+/** @param {Ctx} g @param {string} id */
 export function drawGunIcon(g, id) {
   g.save();
   // la culata de cada arma empieza en un punto distinto: la centramos según su largo
@@ -1106,6 +1162,7 @@ export function drawGunIcon(g, id) {
 /* ---------- Aspecto del superviviente (personalización) ---------- */
 
 // Partes que el jugador puede recolorear; el primer color de cada lista es el original.
+/** @type {LookPart[]} */
 export const LOOK_PARTS = [
   { id: 'skin', name: 'Piel', colors: ['#c7a184', '#e8c4a2', '#a87b5a', '#8a5a3c', '#5e3b26', '#3f281b'] },
   {
@@ -1135,32 +1192,45 @@ export const HATS = [
   { id: 'helmet', name: 'Casco' },
 ];
 const HAT_IDS = HATS.map((h) => h.id);
-export const DEFAULT_LOOK = { ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[0]])), hat: 'none' };
+/** @type {Look} */
+export const DEFAULT_LOOK = /** @type {Look} */ ({
+  ...Object.fromEntries(LOOK_PARTS.map((q) => [q.id, q.colors[0]])),
+  hat: 'none',
+});
 
 // Acepta sólo colores y sombreros de las listas (llega también de la red en cooperativo).
+/** @param {Partial<Look> | null | undefined} o @returns {Look} */
 export function cleanLook(o) {
-  const out = {};
-  for (const q of LOOK_PARTS) out[q.id] = o && q.colors.includes(o[q.id]) ? o[q.id] : q.colors[0];
-  out.hat = o && HAT_IDS.includes(o.hat) ? o.hat : 'none';
-  return out;
+  const out = /** @type {Record<string, string>} */ ({});
+  for (const q of LOOK_PARTS) {
+    const c = o?.[q.id];
+    out[q.id] = c !== undefined && q.colors.includes(c) ? c : q.colors[0];
+  }
+  out.hat = o?.hat !== undefined && HAT_IDS.includes(o.hat) ? o.hat : 'none';
+  return /** @type {Look} */ (out);
 }
 
 // En línea viaja como código corto: un dígito por parte (índice del color en su lista)
 // y al final el del sombrero (los códigos viejos sin él quedan sin sombrero).
+/** @param {Partial<Look> | null | undefined} look */
 export function lookCode(look) {
   return (
-    LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf(look && look[q.id]))).join('') +
-    Math.max(0, HAT_IDS.indexOf(look && look.hat))
+    LOOK_PARTS.map((q) => Math.max(0, q.colors.indexOf((look && look[q.id]) ?? ''))).join('') +
+    Math.max(0, HAT_IDS.indexOf((look && look.hat) ?? ''))
   );
 }
+/** @param {string} code @returns {Look} */
 export function lookFromCode(code) {
   const s = typeof code === 'string' ? code : '';
-  const out = Object.fromEntries(LOOK_PARTS.map((q, i) => [q.id, q.colors[Number(s[i])] || q.colors[0]]));
+  const out = /** @type {Look} */ (
+    Object.fromEntries(LOOK_PARTS.map((q, i) => [q.id, q.colors[Number(s[i])] || q.colors[0]]))
+  );
   out.hat = HAT_IDS[Number(s[LOOK_PARTS.length])] || 'none';
   return out;
 }
 
 // Vista cenital: la cabeza mira hacia +x, centrada en (r*0.02, 0) con radio r*0.44.
+/** @param {Ctx} g @param {string} id @param {number} r */
 function drawHat(g, id, r) {
   const x = r * 0.02;
   if (id === 'cap') {
@@ -1234,6 +1304,7 @@ function drawHat(g, id, r) {
   }
 }
 
+/** @param {Ctx} g @param {Player} p @param {number} time */
 export function drawSurvivor(g, p, time) {
   const r = p.r;
   const L = p.look || DEFAULT_LOOK;
@@ -1361,6 +1432,7 @@ export function drawSurvivor(g, p, time) {
 
 /* ---------- Objetos recogibles ---------- */
 
+/** @param {Ctx} g @param {string} k @param {number} x @param {number} y @param {number} t */
 export function drawPickup(g, k, x, y, t) {
   const bob = Math.sin(t * 4) * 1.5;
   g.save();

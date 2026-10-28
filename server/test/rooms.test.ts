@@ -3,8 +3,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { boot, client, sleep, waitFor, serverRoom, cut, inbox } from './helpers.ts';
 import { CONFIG } from '../src/config.ts';
-import { WEAPONS } from '../../js/core/config.js';
-import { PEER_N } from '../../js/net/snapshot.js';
+import { WEAPONS } from '../../js/core/config.ts';
+import { PEER_N } from '../../js/net/snapshot.ts';
 import { STATS } from '../src/stats.ts';
 import { IDLE } from '../src/rooms/DeadZoneRoom.ts';
 

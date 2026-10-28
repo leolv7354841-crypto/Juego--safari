@@ -1,7 +1,7 @@
 // Elegir clase antes de una partida en solitario, y el selector compacto de las salas.
-import { CLASS_ORDER } from '../core/config.js';
-import { storage } from '../core/util.js';
-import { CLASSES, isClass, cooldownOf } from '../sim/abilities.js';
+import { CLASS_ORDER } from '../core/config.ts';
+import { storage } from '../core/util.ts';
+import { CLASSES, isClass, cooldownOf } from '../sim/abilities.ts';
 import { on } from './dom.js';
 
 // Pantalla de elegir clase antes de una partida en solitario.

@@ -1,7 +1,7 @@
 // Acciones del jugador local (teclas y botones): habilidad, robot, torreta pesada, construir y lanzar.
 // En línea varias se piden al servidor (game.online.act) en vez de aplicarse aquí.
-import { BUILD_ORDER, SHOP } from './core/config.js';
-import { Abilities, abilityTarget } from './sim/abilities.js';
+import { BUILD_ORDER, SHOP } from './core/config.ts';
+import { Abilities, abilityTarget } from './sim/abilities.ts';
 
 // X o el botón: misil donde apuntas, megarráfaga o impulso.
 export function useAbility(game) {

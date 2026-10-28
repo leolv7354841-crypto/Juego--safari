@@ -2,13 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
-import { IN_FIRE } from '../../js/net/protocol.js';
-import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.js';
-import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.js';
-import { UPGRADES } from '../../js/sim/upgrades.js';
-import { cooldownOf } from '../../js/sim/abilities.js';
-import { comboBreak, comboMult } from '../../js/sim/combo.js';
-import { WALK } from '../../js/sim/player.js';
+import { IN_FIRE } from '../../js/net/protocol.ts';
+import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.ts';
+import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import { UPGRADES } from '../../js/sim/upgrades.ts';
+import { cooldownOf } from '../../js/sim/abilities.ts';
+import { comboBreak, comboMult } from '../../js/sim/combo.ts';
+import { WALK } from '../../js/sim/player.ts';
 import { cleanAct, cleanClass } from '../src/validate.ts';
 
 const aimAt = (sim: ServerSim, id: string) => {
@@ -121,13 +121,13 @@ test('cada jugador elige sus mejoras (también a mitad de oleada) y compra con s
   sim.director.state = 'active';
   sim.offerUpgrades();
   assert.ok(a.choices.length > 0, 'hay mejoras para elegir');
-  assert.ok(sim.snapshot('a', 0).up, 'llegan en la foto');
+  assert.ok(sim.snapshot('a', 0)!.up, 'llegan en la foto');
   assert.equal(sim.pick('a', 0, a.choiceN + 1), false, 'una tanda vieja o falsa no vale');
   const before = JSON.stringify(a.p.stats) + a.p.weapons.length + a.p.hp;
   assert.ok(sim.pick('a', 0, a.choiceN));
   assert.equal(a.pending, 0);
   assert.notEqual(JSON.stringify(a.p.stats) + a.p.weapons.length + a.p.hp, before, 'la mejora se aplicó');
-  assert.ok(!sim.snapshot('a', 0).up, 'sin más mejoras pendientes');
+  assert.ok(!sim.snapshot('a', 0)!.up, 'sin más mejoras pendientes');
   // tienda: sin dinero no compra; con dinero sí, y sólo entre oleadas
   assert.equal(sim.shop('b', 'gun', 'smg', 0), false);
   b.money = 10000;
@@ -145,7 +145,7 @@ test('cada jugador elige sus mejoras (también a mitad de oleada) y compra con s
   assert.ok(!b.p.has('shotgun'));
   assert.equal(sim.shop('b', 'sell', 'smg', 0), false, 'el arma inicial no se vende');
   assert.equal(sim.shop('b', 'gun', '__proto__', 0), false);
-  assert.equal(sim.snapshot('b', 0).st[7], b.money, 'el dinero va en la foto');
+  assert.equal(sim.snapshot('b', 0)!.st[7], b.money, 'el dinero va en la foto');
 });
 
 // Avanza la simulación con el jugador quieto mirando a "a" (la entrada lleva el ángulo).

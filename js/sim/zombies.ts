@@ -8,24 +8,33 @@ import {
   MOLOTOV,
   WAVES,
   ZOMBIE_VARIANTS,
-} from '../core/config.js';
-import { clamp, rand, angleTo, TAU } from '../core/util.js';
+} from '../core/config.ts';
+import { clamp, rand, angleTo, TAU } from '../core/util.ts';
+import type { Zombie, ZombieDef } from '../core/types.d.ts';
+import type { GameHost } from '../core/types.d.ts';
+import type { Block } from './build.ts';
+import type { Player } from './player.ts';
+import type { World } from './world.ts';
 
 const CELL = 64;
 
 // Rejilla espacial: cada zombi se guarda en la celda de su centro.
 export class Grid {
-  constructor(size, cell) {
+  declare cell: number;
+  declare n: number;
+  declare cells: Zombie[][];
+  declare used: number[];
+  constructor(size: number, cell: number) {
     this.cell = cell;
     this.n = Math.ceil(size / cell);
-    this.cells = Array.from({ length: this.n * this.n }, () => []);
+    this.cells = Array.from({ length: this.n * this.n }, (): Zombie[] => []);
     this.used = [];
   }
   clear() {
     for (const i of this.used) this.cells[i].length = 0;
     this.used.length = 0;
   }
-  insert(o) {
+  insert(o: Zombie) {
     const n = this.n;
     const i = clamp((o.x / this.cell) | 0, 0, n - 1);
     const j = clamp((o.y / this.cell) | 0, 0, n - 1);
@@ -34,7 +43,7 @@ export class Grid {
     if (c.length === 0) this.used.push(idx);
     c.push(o);
   }
-  query(x0, y0, x1, y1, out) {
+  query(x0: number, y0: number, x1: number, y1: number, out: Zombie[]) {
     out.length = 0;
     const n = this.n;
     const i0 = clamp((x0 / this.cell) | 0, 0, n - 1);
@@ -72,7 +81,7 @@ const ENCIRCLE_MIN = 18;
 const OCT = TAU / 8;
 // a avanza hacia b (n = dirección de a hacia b). Si a es más rápido y b le tapa el
 // camino, a se desliza de lado para adelantarlo en lugar de quedarse atascado detrás.
-function overtake(a, b, nx, ny, dt) {
+function overtake(a: Zombie, b: Zombie, nx: number, ny: number, dt: number) {
   if (a.dead || a.inRange || a.speed < b.speed * 1.12) return;
   const ahead = (a.mx || 0) * nx + (a.my || 0) * ny;
   if (ahead < 0.25) return;
@@ -89,14 +98,14 @@ function overtake(a, b, nx, ny, dt) {
   a.y += ty * k;
 }
 const tmpDir = { x: 0, y: 0 };
-const near = [];
-const near3 = [];
+const near: Zombie[] = [];
+const near3: Zombie[] = [];
 
 // Radio a partir del cual un zombi no cabe en el barrido por celdas (ver Horde.separate).
 const BIG_R = 24;
 
 // Separación de un par de zombis: el más rápido rodea al lento y se empujan si se enciman.
-function pairUp(z, o, dt) {
+function pairUp(z: Zombie, o: Zombie, dt: number) {
   const dx = o.x - z.x;
   const dy = o.y - z.y;
   const rr = z.r + o.r;
@@ -142,7 +151,7 @@ function pairUp(z, o, dt) {
 }
 
 // ¿Hay vista directa entre dos puntos? (los muros y edificios tapan; coches y barricadas no)
-function clearLine(world, x0, y0, x1, y1) {
+function clearLine(world: World, x0: number, y0: number, x1: number, y1: number) {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const n = Math.ceil(Math.hypot(dx, dy) / 24);
@@ -153,10 +162,18 @@ function clearLine(world, x0, y0, x1, y1) {
 }
 
 // Objetivo vacío (en línea, cuando no queda nadie vivo).
-const IDLE = { x: 0, y: 0, r: 14, alive: false };
+const IDLE = { x: 0, y: 0, r: 14, mass: 0, alive: false };
 
-function nearestAlive(list, z) {
-  let best = IDLE;
+// Objetivo de los zombis: jugador, compañero remoto o el IDLE sin jugadores.
+interface Target {
+  x: number;
+  y: number;
+  r: number;
+  alive: boolean;
+}
+
+function nearestAlive(list: Target[], z: Zombie): Target {
+  let best: Target = IDLE;
   let bd = Infinity;
   for (const pl of list) {
     if (!pl.alive) continue;
@@ -170,6 +187,11 @@ function nearestAlive(list, z) {
 }
 
 export class Horde {
+  declare list: Zombie[];
+  declare grid: Grid;
+  declare frame: number;
+  declare danger: number;
+  declare nearCount: number;
   constructor() {
     this.list = [];
     this.grid = new Grid(WORLD_SIZE, CELL);
@@ -180,7 +202,7 @@ export class Horde {
 
   // Elige (una sola vez) el punto de flanqueo al que irá este zombi: a tu costado o a tu
   // espalda respecto a por dónde llega, con algo de azar para que no formen un círculo perfecto.
-  planRoute(z, p, world) {
+  planRoute(z: Zombie, p: Target, world: World) {
     z.planned = true;
     if (z.tactic === 'direct' || this.list.length < ENCIRCLE_MIN) return;
     const b = Math.atan2(z.y - p.y, z.x - p.x);
@@ -189,13 +211,12 @@ export class Horde {
     if (world.anchors[k].ok) z.anchor = k;
   }
 
-  spawn(type, x, y, hpMult = 1, speedMult = 1) {
-    const def = ZOMBIES[type];
-    /** @type {import('../core/types.js').Zombie} */
-    const z = {
+  spawn(type: string, x: number, y: number, hpMult = 1, speedMult = 1) {
+    const def = ZOMBIES[type as keyof typeof ZOMBIES];
+    const z: Zombie = {
       id: nextId++,
       type,
-      def,
+      def: def as unknown as ZombieDef,
       x,
       y,
       r: def.radius,
@@ -206,7 +227,7 @@ export class Horde {
       angle: rand(0, TAU),
       anim: rand(0, def.frames),
       // variante de dibujo según el id (así el cooperativo no necesita mandarla)
-      si: nextId % ZOMBIE_VARIANTS[type],
+      si: nextId % (ZOMBIE_VARIANTS as Record<string, number>)[type],
       flash: 0,
       slow: 0,
       atk: 0,
@@ -254,8 +275,8 @@ export class Horde {
     return z;
   }
 
-  findTarget(x, y, range, current) {
-    let best = null;
+  findTarget(x: number, y: number, range: number, current: Zombie | null) {
+    let best: Zombie | null = null;
     let bd = range * range;
     for (const z of this.list) {
       if (z.dead) continue;
@@ -273,20 +294,15 @@ export class Horde {
     return best;
   }
 
-  /**
-   * @param {number} dt
-   * @param {import('../core/types.js').GameHost} game
-   */
-  update(dt, game) {
+  update(dt: number, game: GameHost) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
     const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)
-    const p0 = targets ? IDLE : game.player;
+    const p0 = targets ? IDLE : (game.player ?? IDLE);
     const hosted = targets ? null : game.mode.hostedPeer();
     const peer = hosted && hosted.alive ? hosted : null;
     // objetivo actual: Player, compañero remoto o el IDLE sin jugadores (por eso any)
-    /** @type {any} */
-    let p = p0;
+    let p: any = p0;
     const world = game.world;
     const time = game.time;
     const list = this.list;
@@ -553,7 +569,7 @@ export class Horde {
       // atravesar muros (ox/oy los borra quien lo recoloca, como el director con los rezagados)
       const bumped = world.collide(z, z.r, false, z.ox ?? NaN, z.oy ?? NaN);
       if (bumped) z.touchT = 0.5;
-      if (z.type === 'bull' && !z.dead) this.bullImpact(z, bumped, world.lastBlock, game);
+      if (z.type === 'bull' && !z.dead) this.bullImpact(z, bumped, world.lastBlock as Block | null, game);
       // detector de atasco: si en 1,2 s casi no avanzó y no está pegado al jugador
       z.chkT = (z.chkT || 0) + dt;
       if (z.chkT > 1.2) {
@@ -577,7 +593,7 @@ export class Horde {
         if (z.chew <= 0) {
           z.chew = 1 / z.def.attackRate;
           z.lunge = 1;
-          const blk = world.lastBlock;
+          const blk = world.lastBlock as Block;
           game.structures.damageBlock(game, blk, z.def.blockDmg || z.def.damage * 1.6);
           if (z.def.punch) game.onSuperPunch(z, blk.x + blk.w / 2, blk.y + blk.h / 2);
         }
@@ -597,7 +613,7 @@ export class Horde {
   // Separa cada par de zombis una sola vez: dentro de cada celda y con sus vecinas de
   // adelante (este, sureste, sur, suroeste). Cubre todo par a menos de CELL px, que basta
   // para radios hasta BIG_R; los más grandes (gigante) consultan su propio vecindario.
-  separate(dt) {
+  separate(dt: number) {
     const grid = this.grid;
     const n = grid.n;
     const cells = grid.cells;
@@ -634,14 +650,14 @@ export class Horde {
     }
   }
 
-  pairCell(z, c, dt) {
+  pairCell(z: Zombie, c: Zombie[], dt: number) {
     for (let k = 0; k < c.length; k++) if (c[k].r <= BIG_R) pairUp(z, c[k], dt);
   }
 
   /* ---------- toro ---------- */
 
   // Devuelve true si el toro controla su propio movimiento este fotograma.
-  bullThink(z, p, dx, dy, d, dt, game, world) {
+  bullThink(z: Zombie, p: Player, dx: number, dy: number, d: number, dt: number, game: GameHost, world: World) {
     z.bt -= dt;
     if (z.bs === 'walk') {
       z.cd -= dt;
@@ -753,7 +769,7 @@ export class Horde {
   }
 
   // Choque del toro contra estructuras o muros.
-  bullImpact(z, bumped, block, game) {
+  bullImpact(z: Zombie, bumped: boolean, block: Block | null, game: GameHost) {
     if (z.bs === 'walk' && block && !z.inRange) {
       // caminando se topó con una barricada: empieza a embestirla
       z.ramBlock = block;

@@ -1,10 +1,10 @@
 // Reglas de combate compartidas (js/sim/rules.js): las usan el juego local y el servidor.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOUNTY, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.js';
-import { ACID } from '../js/sim/build.js';
-import { CoopGuest, CoopHost, Solo } from '../js/net/mode.js';
-import * as Rules from '../js/sim/rules.js';
+import { BOUNTY, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.ts';
+import { ACID } from '../js/sim/build.ts';
+import { CoopGuest, CoopHost, Solo } from '../js/net/mode.ts';
+import * as Rules from '../js/sim/rules.ts';
 import { bullet, fakeGame, silent, zombie } from './helpers.js';
 
 // Un juego mínimo con lo que toca la baja de un zombi, y ganchos que anotan lo que pasa.

@@ -1,8 +1,8 @@
 // Eventos de combate del jugador local: bajas, botín, ácido, cohetes, golpes y muerte. Las reglas en sí
 // (iguales en el servidor) viven en sim/rules.js; aquí se decide qué pasa con el dinero y los avisos.
-import { clamp, storage } from './core/util.js';
-import * as Rules from './sim/rules.js';
-import { comboBreak, comboKill, comboTick } from './sim/combo.js';
+import { clamp, storage } from './core/util.ts';
+import * as Rules from './sim/rules.ts';
+import { comboBreak, comboKill, comboTick } from './sim/combo.ts';
 
 export function hitZombie(game, z, b, hx, hy) {
   // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión

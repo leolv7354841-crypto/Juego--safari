@@ -1,26 +1,26 @@
 // DEAD ZONE — punto de entrada. Crea `Game`, que sólo coordina: guarda el estado de la partida, conecta
 // los módulos (js/ui, js/render, js/sim, js/net) y corre el bucle. Cada pantalla conecta sus propios
 // botones, y los estados del juego están en la tabla de js/states.js.
-import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.js';
-import { isClass } from './sim/abilities.js';
+import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core/config.ts';
+import { isClass } from './sim/abilities.ts';
 import { Music } from './ui/music.js';
-import { Robot } from './sim/robot.js';
-import { Coop } from './net/coop.js';
-import { Online } from './net/online.js';
-import { Solo } from './net/mode.js';
-import { Remote } from './net/remote.js';
-import { VERSION, hayVersionNueva } from './core/version.js';
+import { Robot } from './sim/robot.ts';
+import { Coop } from './net/coop.ts';
+import { Online } from './net/online.ts';
+import { Solo } from './net/mode.ts';
+import { Remote } from './net/remote.ts';
+import { VERSION, hayVersionNueva } from './core/version.ts';
 import { Accounts } from './ui/accounts.js';
-import { Structures } from './sim/build.js';
-import { rand, storage, TAU } from './core/util.js';
-import { World } from './sim/world.js';
-import { Player } from './sim/player.js';
-import { Horde } from './sim/zombies.js';
-import { Bullets } from './sim/bullets.js';
+import { Structures } from './sim/build.ts';
+import { rand, storage, TAU } from './core/util.ts';
+import { World } from './sim/world.ts';
+import { Player } from './sim/player.ts';
+import { Horde } from './sim/zombies.ts';
+import { Bullets } from './sim/bullets.ts';
 import { Particles, Decals } from './render/particles.js';
-import { Pickups } from './sim/pickups.js';
+import { Pickups } from './sim/pickups.ts';
 import { setChunkView } from './render/world.js';
-import { Director } from './sim/director.js';
+import { Director } from './sim/director.ts';
 import { Lighting } from './render/lighting.js';
 import { Camera } from './render/camera.js';
 import { render, resize, adaptQuality } from './render/scene.js';

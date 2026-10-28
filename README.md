@@ -35,7 +35,7 @@ con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (
 El **Salón de la fama** del menú principal (podio con los 3 mejores) y la insignia **Top #N** junto a tu nombre muestran los récords de las cuentas de ese dispositivo. Abierto como Artifact
 de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
 Para la **clasificación mundial** (todos los celulares en la misma lista) crea una Realtime Database
-gratuita en Firebase y pega su URL en `ONLINE.url` de `js/core/config.js` (ver «Clasificación mundial» abajo).
+gratuita en Firebase y pega su URL en `ONLINE.url` de `js/core/config.ts` (ver «Clasificación mundial» abajo).
 
 ### Progreso guardado
 
@@ -163,7 +163,7 @@ Flujo actual:
 1. **Push a `main`** (la rama principal) → el proyecto `deadzone` de Vercel publica en producción
    (`deadzone-five-red.vercel.app`). Las demás ramas del repositorio generan una vista previa.
 2. Vercel no publica la carpeta tal cual: ejecuta `npm run build` (Vite, lo pide `vercel.json`) y publica `dist/`. El servidor, la documentación y los scripts no quedan públicos.
-3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request Biome, los tipos (`checkJs`), las pruebas del núcleo, los tipos y pruebas del servidor, y Playwright (Chromium y WebKit).
+3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request Biome, los tipos (`checkJs` y TypeScript estricto en el núcleo), las pruebas del núcleo, los tipos y pruebas del servidor, y Playwright (Chromium y WebKit).
 4. Si cambió código que usa el servidor (`server/`, `js/`, `deploy/`),
    `.github/workflows/servidor.yml` actualiza la máquina de Vultr en cuanto no hay salas
    abiertas (ver «Publicación automática» en [`deploy/README.md`](deploy/README.md)).
@@ -216,7 +216,7 @@ celular para conectarlos). La partida en sí va directo entre los dos celulares 
 redes móviles bloquean la conexión directa y en ellas el cooperativo no conecta.
 
 4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
-   `js/core/config.js`. El juego usa la API REST: no hace falta ninguna librería ni clave.
+   `js/core/config.ts`. El juego usa la API REST: no hace falta ninguna librería ni clave.
 
 Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
 no a prueba de trampas.
@@ -230,15 +230,15 @@ publicarlo en una máquina virtual y qué comprar: [`deploy/README.md`](deploy/R
 (también donde la conexión directa entre celulares falla).
 
 **Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
-partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/sim/world.js`,
-`js/sim/zombies.js`, `js/sim/player.js`, `js/sim/bullets.js`, `js/sim/director.js`): decide movimiento, choques,
+partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/sim/world.ts`,
+`js/sim/zombies.ts`, `js/sim/player.ts`, `js/sim/bullets.ts`, `js/sim/director.ts`): decide movimiento, choques,
 disparos, impactos, vida, muertes, oleadas y bajas. El navegador sólo manda lo que quiere hacer
 (dirección, correr, disparar, ángulo de la mira, recargar, arma) con un número de secuencia, y
 recibe 20 fotos por segundo de lo que tiene cerca.
 
 - **Tu personaje** responde al instante: el movimiento se predice en el navegador con las mismas
   reglas (`Player.move`) y, al llegar el estado confirmado, se restaura y se vuelven a aplicar las
-  entradas pendientes (`js/net/netcode.js`). Las correcciones pequeñas se borran suavemente; las grandes
+  entradas pendientes (`js/net/netcode.ts`). Las correcciones pequeñas se borran suavemente; las grandes
   (más de 150 px) se aplican de golpe.
 - **Los demás y los zombis** se dibujan 110 ms en diferido, interpolando entre fotos con el reloj
   del servidor; como mucho se adelantan 100 ms si falta una foto, y una foto vieja nunca los hace
@@ -358,7 +358,7 @@ jugadores antes de cerrar.
 
 Están todas, con su explicación, en [`server/.env.example`](server/.env.example) (no hay secretos:
 el servidor no usa claves). La frecuencia de simulación no es una variable: es `NET.tickHz` en
-`js/core/config.js`, porque el navegador la necesita igual para predecir.
+`js/core/config.ts`, porque el navegador la necesita igual para predecir.
 
 ### Seguridad básica
 
@@ -382,7 +382,7 @@ conectarse. Los tokens no se registran.
 
 ## Versiones y caché
 
-Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siempre) y `index.html` va con `no-cache` (ver `vercel.json`), así que ya no hay que sellar nada. `js/core/version.js` lleva la versión del build; si una pestaña vieja sigue abierta cuando se publica otra, el juego avisa con un mensaje (compara con `version.json`). La versión aparece en el menú.
+Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siempre) y `index.html` va con `no-cache` (ver `vercel.json`), así que ya no hay que sellar nada. `js/core/version.ts` lleva la versión del build; si una pestaña vieja sigue abierta cuando se publica otra, el juego avisa con un mensaje (compara con `version.json`). La versión aparece en el menú.
 
 ## Estructura
 
@@ -394,9 +394,9 @@ js/states.js          Máquina de estados como tabla (menú, partida, pausa, tie
 js/events.js          Eventos de combate del jugador local
 js/actions.js         Acciones de tecla y botón (habilidad, robot, construir, lanzar)
 js/save.js            Guardado y carga del progreso
-js/core/config.js     Equilibrio: armas, zombis, tienda, experiencia, red
-js/core/util.js       Utilidades (azar, geometría, almacenamiento)
-js/core/version.js    Versión del código (la inyecta Vite al compilar)
+js/core/config.ts     Equilibrio: armas, zombis, tienda, experiencia, red
+js/core/util.ts       Utilidades (azar, geometría, almacenamiento)
+js/core/version.ts    Versión del código (la inyecta Vite al compilar)
 js/core/types.d.ts    Tipos compartidos (GameHost, Cmd…)
 js/sim/               Lógica del juego; también la ejecuta el servidor (sin document)
   world.js            Ciudad procedural (sólo datos), colisiones y campo de flujo

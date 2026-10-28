@@ -11,16 +11,65 @@ import {
   HEAVY,
   GUN_REACH,
   RELOAD_STEPS,
-} from '../core/config.js';
-import { clamp, rand, angleTo } from '../core/util.js';
-import { newCombo } from './combo.js';
+} from '../core/config.ts';
+import { clamp, rand, angleTo } from '../core/util.ts';
+import { newCombo } from './combo.ts';
+import type { GameHost, Vec, Weapon, Zombie } from '../core/types.d.ts';
+import type { Block } from './build.ts';
+import type { Combo } from './combo.ts';
+import type { FlowField } from './world.ts';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
 export const WALK = PLAYER_BASE.walk * ((ZOMBIE_SPEED[0] + ZOMBIE_SPEED[1]) / 2) * WAVES.speed;
 // El que maneja la torreta pesada se para detrás del cañón, a esta distancia del centro.
 export const HEAVY_BACK = 30;
-const GUN_TIP = {
+
+/** Estadísticas del jugador que cambian las mejoras (ver upgrades.ts). */
+export interface Stats {
+  maxHp: number;
+  armor: number;
+  dmgMult: number;
+  rateMult: number;
+  maxStamina: number;
+  staminaRegenMult: number;
+  speedMult: number;
+  ammoMult: number;
+  pierce: number;
+  reloadMult: number;
+  cdMult: number;
+}
+
+/** Ficha de un arma de config.ts (WEAPONS). */
+export interface WeaponDef extends Weapon {
+  rate: number;
+  spread: number;
+  bloom: number;
+  pellets: number;
+  speed: number;
+  range: number;
+  knock: number;
+  shake: number;
+  pierce: number;
+  len: number;
+  rocket?: boolean;
+  blast?: boolean;
+}
+
+/** Torreta pesada montada: la pieza de build.ts con el retroceso y el cañón que alterna. */
+export type Turret = Block & { recoil?: number; side?: number };
+
+/** Arma que lleva el jugador: su ficha, balas en el cargador y de reserva. */
+export interface WeaponSlot {
+  id: string;
+  def: WeaponDef;
+  mag: number;
+  reserve: number;
+}
+
+const weaponDef = (id: string): WeaponDef => (WEAPONS as Record<string, WeaponDef>)[id];
+
+const GUN_TIP: Record<string, number> = {
   pistol: 22.5,
   smg: 29.7,
   shotgun: 32.8,
@@ -33,7 +82,74 @@ const GUN_TIP = {
 };
 
 export class Player {
-  constructor(x, y) {
+  declare x: number;
+  declare y: number;
+  declare vx: number;
+  declare vy: number;
+  declare kx: number;
+  declare ky: number;
+  declare r: number;
+  declare mass: number;
+  declare angle: number;
+  declare legAngle: number;
+  declare walkPhase: number;
+  declare speedNow: number;
+  declare stats: Stats;
+  declare hp: number;
+  declare stamina: number;
+  declare combo: Combo;
+  declare exhausted: boolean;
+  declare running: boolean;
+  declare sinceRun: number;
+  declare weapons: WeaponSlot[];
+  declare wi: number;
+  declare fireCd: number;
+  declare reloadT: number;
+  declare reloadDur: number;
+  declare bloom: number;
+  declare recoil: number;
+  declare flashT: number;
+  declare hurtT: number;
+  declare alive: boolean;
+  declare target: Zombie | null;
+  declare shotsFired: number;
+  declare shotsHit: number;
+  declare damageTaken: number;
+  declare cls: string | null;
+  declare abCd: number;
+  declare boostT: number;
+  declare rageT: number;
+  declare rageAcc: number;
+  declare rageGun?: number;
+  declare rageShots?: number;
+  declare manned: Turret | null;
+  declare heavyAmmo: number;
+  /** aspecto del personaje (lo pone Game; ver cleanLook) */
+  declare look: any;
+  /** compañero de cooperativo (lo pone coop.js) */
+  declare remote?: boolean;
+  /** dentro del robot (lo pone main.js / el servidor) */
+  declare inRobot?: boolean;
+  declare reloadProg: number;
+  declare reloadStep: number;
+  // Campos de un compañero remoto (marioneta en el cooperativo, js/net/coop.js); el jugador local no los usa.
+  declare tx?: number;
+  declare ty?: number;
+  declare ta?: number;
+  declare tla?: number;
+  declare vw?: number;
+  declare vh?: number;
+  declare idx?: number;
+  declare name?: string;
+  declare puppet?: boolean;
+  declare needAmmo?: boolean;
+  declare st?: number;
+  /** campo de rutas propio del jugador (servidor en línea) */
+  declare field?: FlowField;
+  /** radio y masa de a pie, mientras va en el robot (robot.ts) */
+  declare baseR?: number;
+  declare baseMass?: number;
+  constructor(x: number, y: number) {
     this.x = x;
     this.y = y;
     this.vx = 0;
@@ -89,36 +205,30 @@ export class Player {
     // torreta pesada que maneja (estructura de build.js) y sus balas compradas
     this.manned = null;
     this.heavyAmmo = 0;
-    /** @type {any} aspecto del personaje (lo pone Game; ver cleanLook) */
-    this.look;
-    /** @type {boolean | undefined} compañero de cooperativo (lo pone coop.js) */
-    this.remote;
-    /** @type {boolean | undefined} dentro del robot (lo pone main.js / el servidor) */
-    this.inRobot;
   }
 
-  get weapon() {
+  get weapon(): WeaponSlot {
     return this.weapons[this.wi];
   }
   get gunTip() {
     return GUN_TIP[this.weapon.id] || 30;
   }
 
-  makeWeapon(id) {
-    const def = WEAPONS[id];
+  makeWeapon(id: string): WeaponSlot {
+    const def = weaponDef(id);
     return { id, def, mag: this.magSize(def), reserve: def.reserve };
   }
-  magSize(def) {
+  magSize(def: WeaponDef) {
     return Math.round(def.mag * this.stats.ammoMult);
   }
-  reserveMax(def) {
+  reserveMax(def: WeaponDef) {
     return def.reserveMax === Infinity ? Infinity : Math.round(def.reserveMax * this.stats.ammoMult);
   }
-  has(id) {
+  has(id: string) {
     return this.weapons.some((w) => w.id === id);
   }
 
-  unlock(id) {
+  unlock(id: string) {
     if (this.has(id)) return false;
     this.weapons.push(this.makeWeapon(id));
     this.weapons.sort((a, b) => WEAPON_ORDER.indexOf(a.id) - WEAPON_ORDER.indexOf(b.id));
@@ -127,7 +237,7 @@ export class Player {
   }
 
   // Quita un arma (vender). El arma inicial no se puede quitar.
-  removeWeapon(id) {
+  removeWeapon(id: string) {
     const i = this.weapons.findIndex((w) => w.id === id);
     if (i < 0 || id === START_WEAPON) return false;
     this.weapons.splice(i, 1);
@@ -137,7 +247,7 @@ export class Player {
     return true;
   }
 
-  select(i) {
+  select(i: number) {
     if (i < 0 || i >= this.weapons.length || i === this.wi) return;
     this.wi = i;
     this.reloadT = 0;
@@ -156,7 +266,7 @@ export class Player {
   }
 
   /** @param {unknown} [_game] lo pasan algunos llamadores; no se usa */
-  startReload(_game) {
+  startReload(_game?: unknown) {
     const w = this.weapon;
     if (this.reloadT > 0 || w.mag >= this.magSize(w.def) || w.reserve <= 0) return;
     this.reloadDur = w.def.reload / this.stats.reloadMult;
@@ -166,7 +276,7 @@ export class Player {
     this.reloadProg = 0;
   }
 
-  hurt(dmg, game) {
+  hurt(dmg: number, game: GameHost) {
     // Booster: inmune mientras dura el impulso
     if (!this.alive || this.boostT > 0) return;
     // compañero en cooperativo: su vida la lleva su propio celular
@@ -197,7 +307,7 @@ export class Player {
     }
   }
 
-  update(dt, game) {
+  update(dt: number, game: GameHost) {
     const input = game.input;
     const mv = input.move();
     this.move(dt, mv.x, mv.y, input.run, game);
@@ -206,14 +316,7 @@ export class Player {
 
   // Estamina y movimiento con choques. Sólo depende de la entrada y del mundo, así que el
   // servidor y la predicción del cliente en línea dan exactamente el mismo resultado.
-  /**
-   * @param {number} dt
-   * @param {number} mx
-   * @param {number} my
-   * @param {boolean} run
-   * @param {import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
-   */
-  move(dt, mx, my, run, game) {
+  move(dt: number, mx: number, my: number, run: boolean, game: GameHost | Pick<GameHost, 'world' | 'sfx'>) {
     const st = this.stats;
     const mv = { x: mx, y: my };
     const mag = Math.hypot(mv.x, mv.y);
@@ -286,7 +389,7 @@ export class Player {
   }
 
   // Apuntado, recarga y disparo (mv = dirección de movimiento de este fotograma).
-  act(dt, game, mv) {
+  act(dt: number, game: GameHost, mv: Vec) {
     if (this.manned) return this.actMounted(dt, game, mv);
     const input = game.input;
     const mag = Math.hypot(mv.x, mv.y);
@@ -317,8 +420,9 @@ export class Player {
     if (this.reloadT > 0) {
       this.reloadT -= dt;
       this.reloadProg = Math.min(1, 1 - this.reloadT / this.reloadDur);
-      const steps = RELOAD_STEPS[this.weapon.id] || RELOAD_STEPS.pistol;
-      while (this.reloadStep < steps.length && steps[this.reloadStep][0] <= this.reloadProg) {
+      const stepsOf = RELOAD_STEPS as Record<string, (string | number)[][]>;
+      const steps = stepsOf[this.weapon.id] || stepsOf.pistol;
+      while (this.reloadStep < steps.length && (steps[this.reloadStep][0] as number) <= this.reloadProg) {
         game.sfx.reloadStep(steps[this.reloadStep][1]);
         this.reloadStep++;
       }
@@ -341,15 +445,16 @@ export class Player {
   }
 
   // Montado en la torreta pesada: el cañón gira despacio hacia la mira y dispara sus balas.
-  actMounted(dt, game, mv) {
+  actMounted(dt: number, game: GameHost, mv: Vec) {
     const b = this.manned;
+    if (!b) return;
     // la torreta reventó: quedas de pie donde estabas
     if (b.hp <= 0) {
       b.manned = null;
       this.manned = null;
       return;
     }
-    const d = WEAPONS.heavy;
+    const d = weaponDef('heavy');
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;
     let want = b.ang;
@@ -422,7 +527,7 @@ export class Player {
     game.sfx.shot('heavy');
   }
 
-  tryFire(game) {
+  tryFire(game: GameHost) {
     if (this.reloadT > 0 || this.fireCd > 0) return;
     const w = this.weapon;
     const d = w.def;
@@ -448,7 +553,7 @@ export class Player {
     if (this.inRobot) {
       // el arma va en el brazo derecho del robot: dispara desde ahí hacia donde apuntas
       const R = ROBOT.radius;
-      const lx = R * 0.35 + (GUN_REACH[d.id] || 30) * ROBOT.gunScale;
+      const lx = R * 0.35 + ((GUN_REACH as Record<string, number>)[d.id] || 30) * ROBOT.gunScale;
       const ly = R * 0.94;
       sx = this.x + ca * lx - sa * ly;
       sy = this.y + sa * lx + ca * ly;
@@ -462,7 +567,7 @@ export class Player {
     const ox = blocked ? this.x : sx;
     const oy = blocked ? this.y : sy;
     const shot = { hit: false };
-    const fired = [];
+    const fired: number[] = [];
     for (let i = 0; i < d.pellets; i++) {
       const off = d.pellets > 1 ? (i / (d.pellets - 1) - 0.5) * 2 * spread + rand(-0.04, 0.04) : rand(-spread, spread);
       const a = aim + off;

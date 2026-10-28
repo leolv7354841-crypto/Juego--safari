@@ -1,6 +1,6 @@
 // Dibujo de los objetos del suelo (munición, botiquines, cajas). La lógica vive en sim/pickups.js.
 import { drawPickup } from './sprites.js';
-import { LIFE } from '../sim/pickups.js';
+import { LIFE } from '../sim/pickups.ts';
 
 export function drawPickups(ctx, list, view, time) {
   for (const it of list) {

@@ -1,6 +1,6 @@
 // Entrada unificada: teclado + ratón en computadora, joystick virtual y
 // botones en pantalla para móviles (Pointer Events: Safari y Chrome).
-import { clamp } from '../core/util.js';
+import { clamp } from '../core/util.ts';
 
 const JOY_RADIUS = 56;
 

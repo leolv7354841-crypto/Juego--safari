@@ -4,18 +4,18 @@
 // el movimiento del jugador). Este archivo hace de "juego" para ellos: les da los
 // jugadores como objetivos, aplica las entradas de cada uno y graba los efectos visuales y
 // sonidos que ocurren para mandárselos sólo a quien los puede ver.
-import { World } from '../../../js/sim/world.js';
-import { Horde } from '../../../js/sim/zombies.js';
-import { Bullets } from '../../../js/sim/bullets.js';
-import { Director } from '../../../js/sim/director.js';
-import { Pickups } from '../../../js/sim/pickups.js';
-import { Player } from '../../../js/sim/player.js';
-import { Structures } from '../../../js/sim/build.js';
-import { Robot } from '../../../js/sim/robot.js';
-import { applyMove, packBody, TICK } from '../../../js/net/netcode.js';
-import { ServerMode } from '../../../js/net/mode.js';
-import { encodeWorld } from '../../../js/net/snapshot.js';
-import { IN_RELOAD, IN_FIRE, IN_RUN, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/net/protocol.js';
+import { World } from '../../../js/sim/world.ts';
+import { Horde } from '../../../js/sim/zombies.ts';
+import { Bullets } from '../../../js/sim/bullets.ts';
+import { Director } from '../../../js/sim/director.ts';
+import { Pickups } from '../../../js/sim/pickups.ts';
+import { Player } from '../../../js/sim/player.ts';
+import { Structures } from '../../../js/sim/build.ts';
+import { Robot } from '../../../js/sim/robot.ts';
+import { applyMove, packBody, TICK } from '../../../js/net/netcode.ts';
+import { ServerMode } from '../../../js/net/mode.ts';
+import { encodeWorld } from '../../../js/net/snapshot.ts';
+import { IN_RELOAD, IN_FIRE, IN_RUN, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/net/protocol.ts';
 import {
   GOLDEN,
   NET,
@@ -29,13 +29,14 @@ import {
   CLASS_ORDER,
   HEAVY,
   xpForLevel,
-} from '../../../js/core/config.js';
-import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.js';
-import { Abilities, isClass } from '../../../js/sim/abilities.js';
-import * as Rules from '../../../js/sim/rules.js';
-import { comboBreak, comboKill, comboTick, packCombo } from '../../../js/sim/combo.js';
-import { TAU } from '../../../js/core/util.js';
+} from '../../../js/core/config.ts';
+import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.ts';
+import { Abilities, isClass } from '../../../js/sim/abilities.ts';
+import * as Rules from '../../../js/sim/rules.ts';
+import { comboBreak, comboKill, comboTick, packCombo } from '../../../js/sim/combo.ts';
+import { TAU } from '../../../js/core/util.ts';
 import type { Cmd, Act } from '../validate.ts';
+import type { Snapshot } from '../../../js/core/types.d.ts';
 
 const FX_MAX = 300;
 // entradas que se guardan como mucho por jugador (las más viejas se tiran)
@@ -149,7 +150,7 @@ export class ServerSim {
       this.world.collide(p, p.r, true);
       p.field = this.newField();
       // clase elegida en el lobby (si no eligió, bomber)
-      p.cls = isClass(pl.cls) ? pl.cls : CLASS_ORDER[0];
+      p.cls = isClass(pl.cls ?? '') ? pl.cls : CLASS_ORDER[0];
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
       this.slots.set(pl.id, {
         id: pl.id,
@@ -238,7 +239,7 @@ export class ServerSim {
       decals: recorder('d', (n) => DECAL_SYNC.includes(n)),
       sfx: recorder('s', (n) => SFX_SYNC.includes(n)),
       camera: { viewW: 1280, viewH: 760, shake: rec('c', 'shake'), kick: noop },
-      mode: new ServerMode(null),
+      mode: new ServerMode(),
       structures: this.structures,
       // el punto al que apunta el jugador que se está moviendo (sale del ángulo que mandó)
       mouseWorld: () => {
@@ -774,7 +775,7 @@ export class ServerSim {
   }
 
   // Lo que ve un jugador: su estado confirmado, los demás, los zombis y objetos cercanos.
-  snapshot(id: string, now: number) {
+  snapshot(id: string, now: number): Snapshot | null {
     const s = this.slots.get(id);
     if (!s) return null;
     const me = s.p;

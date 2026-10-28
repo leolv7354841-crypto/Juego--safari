@@ -1,6 +1,7 @@
 // Estado de la sala que Colyseus sincroniza solo con todos (lista de jugadores y fase).
 // Lo que cambia muchas veces por segundo (posiciones, zombis) va aparte, en mensajes 'snap'.
 import { schema, t } from '@colyseus/schema';
+import type { LobbyMember } from '../../../js/core/types.d.ts';
 
 export const Member = schema(
   {
@@ -31,5 +32,8 @@ export const LobbyState = schema(
   'LobbyState',
 );
 
-export type MemberT = InstanceType<typeof Member>;
+// La forma que ve el cliente (LobbyMember) vive en js/core/types.d.ts; el esquema es la
+// fuente de verdad en el servidor. Si dejan de coincidir, estos tipos pasan a `never` y no compila.
+type MemberSchema = InstanceType<typeof Member>;
+export type MemberT = MemberSchema extends LobbyMember ? MemberSchema : never;
 export type LobbyStateT = InstanceType<typeof LobbyState>;

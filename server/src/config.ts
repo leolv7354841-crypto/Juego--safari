@@ -1,5 +1,5 @@
 // Ajustes del servidor. Todo se puede cambiar con variables de entorno (ver .env.example).
-import { NET } from '../../js/core/config.js';
+import { NET } from '../../js/core/config.ts';
 
 const num = (name: string, def: number) => {
   const v = Number(process.env[name]);

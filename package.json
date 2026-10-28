@@ -12,7 +12,7 @@
     "server:load": "npm run load --prefix server",
     "test": "node --test test/*.test.js",
     "lint": "biome check .",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.strict.json",
     "format": "biome format --write .",
     "e2e": "vite build && playwright test",
     "build": "vite build",

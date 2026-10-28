@@ -1,5 +1,5 @@
 // Clasificación: pantalla de récords y salón de la fama del menú (podio y lista, mundial o de este dispositivo).
-import { fmtTime } from '../core/util.js';
+import { fmtTime } from '../core/util.ts';
 import { CROWN_SVG } from './icons.js';
 import { on } from './dom.js';
 

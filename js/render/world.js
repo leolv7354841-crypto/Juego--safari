@@ -1,7 +1,7 @@
 // Dibujo de la ciudad: convierte los datos que genera sim/world.js (ops, árboles, fuegos, postes) en imágenes.
 // El suelo se pinta en trozos con caché LRU; cada op de la lista se pinta con el pintor de su tipo.
-import { CHUNK, ROAD_HALF } from '../core/config.js';
-import { mulberry32, rrange, rpick, makeCanvas, roundRect, clamp, TAU, shade } from '../core/util.js';
+import { CHUNK, ROAD_HALF } from '../core/config.ts';
+import { mulberry32, rrange, rpick, makeCanvas, roundRect, clamp, TAU, shade } from '../core/util.ts';
 import { pat, drawCar, makeTree, OUT } from './sprites.js';
 
 const ROAD_W = ROAD_HALF * 2;

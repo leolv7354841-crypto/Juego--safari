@@ -1,28 +1,26 @@
-import { segCircleT } from '../core/util.js';
+import { segCircleT } from '../core/util.ts';
+import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
 
-const near = [];
+const near: Zombie[] = [];
 // Parte de las balas rebota en la armadura del super blindado (sin hacer daño).
 const RICOCHET = 0.45;
 
 export class Bullets {
+  declare list: Bullet[];
   constructor() {
     this.list = [];
   }
 
-  spawn(b) {
+  spawn(b: Omit<Bullet, 'trail'> & { trail?: number }) {
     b.trail = 0;
-    this.list.push(b);
+    this.list.push(b as Bullet);
   }
 
   clear() {
     this.list.length = 0;
   }
 
-  /**
-   * @param {number} dt
-   * @param {import('../core/types.js').GameHost} game
-   */
-  update(dt, game) {
+  update(dt: number, game: GameHost) {
     const list = this.list;
     const world = game.world;
     const grid = game.horde.grid;

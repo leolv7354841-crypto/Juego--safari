@@ -42,7 +42,7 @@ Piezas del sistema:
 | Juego (HTML, CSS, JS) | **Vercel**, proyecto `deadzone` (`deadzone-five-red.vercel.app`) | [`vercel.json`](../vercel.json) | Un push a `main` ejecuta `npm run build` y publica `dist/`. `index.html` y `version.json` van con `no-cache`; `/assets/*` (archivos con hash) con `immutable`. Reescribe `/deadzone/` a `index.html` y `/deadzone/:path+` a la raíz. |
 | Hub `yeyo.games/deadzone/` | **Vercel**, proyecto `yeyo-games` (Astro, publicado con la CLI; no está en este repo) | — | Su `vercel.json` pasa `/deadzone/` al proyecto `deadzone`, así que siempre muestra la última versión publicada. |
 | Servidor en línea | **Vultr**, High Performance AMD 2 vCPU / 2 GB, Ciudad de México (18 USD/mes), DNS en Hostinger | [`deploy/`](../deploy/README.md) | Docker + Caddy (HTTPS). `NET.server` apunta a `wss://servidor.yeyo.games`. Se actualiza solo con [`servidor.yml`](../.github/workflows/servidor.yml) al hacer push a `main`. |
-| Clasificación y señalización | **Firebase Realtime Database** (proyecto `dead-zone-73dcc`) | `ONLINE.url` en [`js/core/config.js`](../js/core/config.js) | Reglas en la sección "Clasificación mundial" del README. |
+| Clasificación y señalización | **Firebase Realtime Database** (proyecto `dead-zone-73dcc`) | `ONLINE.url` en [`js/core/config.ts`](../js/core/config.ts) | Reglas en la sección "Clasificación mundial" del README. |
 | Código fuente | **GitHub** (`origin`: `leolv7354841-crypto/Juego--safari`; `fork`: `GrowPals/Juego--safari`) | — | Vercel y GitHub Actions trabajan sobre `origin`. |
 
 Orígenes que aceptan conexiones al servidor (`ALLOWED_ORIGINS` en `deploy/.env` de la máquina):
@@ -77,7 +77,7 @@ docs/refactor/        Plan de refactorización por etapas, pruebas manuales y me
 
 vite.config.js        Vite: base relativa, build a dist/, dev en 8080, preview en 4173, version.json.
 vercel.json           Build, reescrituras y cabeceras del hosting del juego.
-biome.json            Formato y reglas (Biome). tsconfig.json: checkJs sobre js/.
+biome.json            Formato y reglas (Biome). tsconfig.json: checkJs sobre js/ (`.ts` incluidos); tsconfig.strict.json: `noImplicitAny` y `strictNullChecks` sobre core/, sim/ y net/.
 playwright.config.js  Pruebas e2e contra `vite preview` (4173) y el servidor local (2599).
 .github/workflows/    ci.yml (comprobación) y servidor.yml (publicación del servidor).
 .claude/launch.json   Configuraciones de arranque (dev en 8080, server en 2567, dist en 4173).
@@ -240,7 +240,7 @@ Mensajes del cliente al servidor: `ready`, `cls`, `start`, `lobby`, `loaded`, `n
 
 ## 5. Configuración del cliente
 
-Todo el ajuste está en [`js/core/config.js`](../js/core/config.js):
+Todo el ajuste está en [`js/core/config.ts`](../js/core/config.ts):
 
 | Objeto | Campo | Valor actual | Qué controla |
 |---|---|---|---|
@@ -292,7 +292,7 @@ son `SERVER_HOST` y `SERVER_SSH_KEY` en GitHub Actions, para la publicación aut
 - `vite.config.js` calcula la versión como hash de `js/**/*.js` y `css/style.css`, la inyecta como
   `__DZ_VERSION__` y escribe `dist/version.json`.
 - `vercel.json` manda `no-cache` para `index.html` y `version.json`, e `immutable` para `/assets/*`.
-- `js/core/version.js` compara su versión con `version.json` y avisa si hay una nueva.
+- `js/core/version.ts` compara su versión con `version.json` y avisa si hay una nueva.
 
 ---
 
@@ -315,7 +315,7 @@ Comandos de verificación (los mismos que corre CI):
 
 ```bash
 npm run lint                # Biome: formato y reglas (npm run format arregla el formato)
-npm run typecheck           # tsc con checkJs sobre js/
+npm run typecheck           # tsc (checkJs sobre js/) y tsc estricto sobre core/, sim/ y net/
 npm test                    # pruebas del núcleo (node:test)
 npm run server:test         # pruebas de salas, simulación y netcode
 npm run build --prefix server   # sólo comprobación de tipos del servidor (tsc --noEmit)
@@ -334,10 +334,10 @@ trabajo con LF.
   (`test/carga.test.js` lo comprueba). El dibujo va en `js/render/<x>.js`, junto a `js/sim/<x>.js`.
 - El servidor ejecuta `.ts` directamente. Sólo se permite TypeScript borrable: sin `enum`, sin
   decoradores y sin propiedades de parámetro. Los módulos de `js/` no pueden depender de nada
-  exclusivo de Vite (`version.js` protege `__DZ_VERSION__` con `typeof`).
+  exclusivo de Vite (`version.ts` protege `__DZ_VERSION__` con `typeof`).
 - `Player.update` se divide en `move` (lo comparten servidor y cliente: sólo entradas,
   determinista) y `act` (apuntado y armas). No mezclar.
-- Las reglas de combate compartidas van en `js/sim/rules.js` y `js/sim/combat.js`, nunca
+- Las reglas de combate compartidas van en `js/sim/rules.ts` y `js/sim/combat.ts`, nunca
   duplicadas en `main.js` y `ServerSim.ts`.
 - Preguntar el modo por `game.mode` (`authority()`, `canBuild()`…), nunca por `coop.isHost`
   (`test/llamadas.test.js` falla si aparece).
@@ -371,7 +371,7 @@ dormirse se pierden las partidas. Si se usa, apunta `NET.server` a su URL.
 1. Crea un proyecto en la consola de Firebase (sin Analytics).
 2. Crea una Realtime Database.
 3. Publica las reglas de la sección "Clasificación mundial" del README.
-4. Copia la URL en `ONLINE.url` de `js/core/config.js`.
+4. Copia la URL en `ONLINE.url` de `js/core/config.ts`.
 
 Si cambias la forma de `scores` o `rooms`, actualiza las reglas en el README
 (ver también [CLAUDE.md](../CLAUDE.md)).
@@ -433,8 +433,12 @@ Lo que no está medido: redes móviles, celulares y FPS en un celular de gama me
   espera a que no haya salas).
 
 **Código**
-- Etapa 7 del plan pendiente: `core/`, `sim/` y `net/` siguen en `.js` con `checkJs`; seis archivos
-  llevan `// @ts-nocheck` (coop, online, particles, upgrades, accounts, audio).
+- Etapa 7 hecha: `core/`, `sim/` y `net/` son `.ts` (Node los ejecuta con type stripping, Vite los
+  compila) y ningún archivo lleva `// @ts-nocheck`. `tsconfig.strict.json` activa `noImplicitAny` y
+  `strictNullChecks` en esos tres directorios (y en `render/sprites.js`, que arrastra `online.ts`);
+  `server/tsconfig.json` es `strict` completo. `Cmd`, `Act`, `Snapshot` y `LobbyMember` viven en
+  `js/core/types.d.ts` y los comparten cliente y servidor. Quedó fuera: `strict` en `render/`, `ui/`
+  y `main.js` (siguen con `checkJs` laxo) y algunos `any` heredados en `types.d.ts` (`GameHost`).
 
 ---
 
@@ -443,7 +447,7 @@ Lo que no está medido: redes móviles, celulares y FPS en un celular de gama me
 | Si cambias... | Haz también... |
 |---|---|
 | Cualquier archivo de `js/` o `css/` | Nada especial: Vite lo recompila y cambia la versión. Un push a `main` también actualiza el servidor. |
-| Equilibrio (armas, zombis, precios) | Cambia sólo `js/core/config.js`. |
+| Equilibrio (armas, zombis, precios) | Cambia sólo `js/core/config.ts`. |
 | `NET.tickHz` | Cámbialo en `config.js`; el servidor lo toma de ahí. Ambos lados deben coincidir. |
 | Lógica compartida (`player.js` `move`, `combat.js`, `rules.js`, `netcode.js`, `snapshot.js`) | Corre `npm test` y `npm run server:test`. |
 | Un método nuevo de `Game` que use sim o net | Agrega el campo flecha en `main.js` y el tipo en `core/types.d.ts` (`test/estados.test.js` los compara). |

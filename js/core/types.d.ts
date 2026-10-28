@@ -1,15 +1,15 @@
 // Tipos compartidos del juego (solo para la verificación con checkJs; no se carga en el navegador).
 // Uso en JSDoc: /** @param {import('../types').GameHost} game */
-import type { World } from '../sim/world.js';
-import type { Horde } from '../sim/zombies.js';
-import type { Bullets } from '../sim/bullets.js';
-import type { Director } from '../sim/director.js';
-import type { Pickups } from '../sim/pickups.js';
-import type { Player } from '../sim/player.js';
-import type { Structures } from '../sim/build.js';
-import type { Robot } from '../sim/robot.js';
-import type { Mode } from '../net/mode.js';
-import type { Remote } from '../net/remote.js';
+import type { World } from '../sim/world.ts';
+import type { Horde } from '../sim/zombies.ts';
+import type { Bullets } from '../sim/bullets.ts';
+import type { Director } from '../sim/director.ts';
+import type { Pickups } from '../sim/pickups.ts';
+import type { Player } from '../sim/player.ts';
+import type { Structures } from '../sim/build.ts';
+import type { Robot } from '../sim/robot.ts';
+import type { Mode } from '../net/mode.ts';
+import type { Remote } from '../net/remote.ts';
 
 export type Vec = { x: number; y: number };
 
@@ -84,8 +84,28 @@ export interface Weapon {
   [k: string]: any;
 }
 
-// Entrada de un jugador en un paso fijo (ver server/src/validate.ts).
+// Entrada de un jugador en un paso fijo. La fabrica el cliente (netcode.ts) y la valida el servidor
+// (server/src/validate.ts, cleanCmd): un solo tipo para los dos lados.
 export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
+
+// Acción de un jugador ligada a su última entrada (s): construir, lanzar, subir al robot o usar la
+// habilidad de su clase (ab, hacia tx/ty). La valida server/src/validate.ts (cleanAct).
+export type Act = { s: number; k: 'build' | 'throw' | 'robot' | 'ab'; kind: string; tx: number; ty: number };
+
+// Un jugador de la sala tal como lo ve el cliente en el estado de Colyseus. server/src/rooms/state.ts
+// comprueba en compilación que el esquema `Member` cumple esta forma.
+export interface LobbyMember {
+  name: string;
+  look: string;
+  cls: string;
+  idx: number;
+  ready: boolean;
+  connected: boolean;
+  inGame: boolean;
+  alive: boolean;
+  kills: number;
+  joinedAt: number;
+}
 
 // Foto que el servidor manda a cada cliente (campos cortos; ver ServerSim.snapshot).
 export interface Snapshot {
@@ -147,7 +167,7 @@ export interface GameHost {
   killZombie(z: Zombie, ...a: any[]): void;
   collectFor?(p: Player, it: any): boolean;
   onPlayerDeath(...a: any[]): void;
-  onZombieHit(z: Zombie, p: any): void;
+  onZombieHit(z: Zombie | null, p: any): void;
   onRobotHit(dmg: number, p: any): void;
   applyAcid(p: any): void;
   rocketHit(z: Zombie, x: number, y: number, b: Bullet): void;
@@ -167,6 +187,10 @@ declare global {
   interface Window {
     __deadzone?: unknown;
     DZ_VERSION?: string;
+    /** Safari antiguo: el contexto de audio con prefijo (js/ui/audio.js). */
+    webkitAudioContext?: typeof AudioContext;
+    /** Sólo existe cuando el juego corre como Artifact de Claude (nube de accounts.js). */
+    claude?: { use?: (name: string) => Promise<any> };
   }
 }
 
@@ -220,5 +244,5 @@ export interface CoopSnap extends WorldSnap {
   xn: number;
   /** Racha del invitado: bajas seguidas y décimas que le quedan (sim/combo.js). */
   cb: number[];
-  kl?: Record<string, number>;
+  kl?: number;
 }

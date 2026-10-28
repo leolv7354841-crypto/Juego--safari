@@ -10,8 +10,8 @@ import {
   SELL_RATE,
   HEAVY,
   ROBOT,
-} from '../core/config.js';
-import { Robot } from '../sim/robot.js';
+} from '../core/config.ts';
+import { Robot } from '../sim/robot.ts';
 import { drawRobot } from '../render/robot.js';
 import { drawGunIcon } from '../render/sprites.js';
 import { drawBottle, drawGrenades, drawBlocks, drawGround } from '../render/build.js';

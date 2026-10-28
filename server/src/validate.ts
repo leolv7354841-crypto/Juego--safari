@@ -1,4 +1,7 @@
 // Validación de todo lo que llega de los clientes: nunca se confía en su contenido.
+import type { Act, Cmd } from '../../js/core/types.d.ts';
+
+export type { Act, Cmd };
 
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
 
@@ -30,8 +33,6 @@ export function cleanView(raw: unknown): [number, number] | null {
   return [Math.min(1600, Math.max(100, Math.round(w))), Math.min(1600, Math.max(100, Math.round(h)))];
 }
 
-export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
-
 // Una entrada: [secuencia, mx, my, bits, ángulo, arma]. null si está mal formada.
 export function cleanCmd(raw: unknown): Cmd | null {
   if (!Array.isArray(raw) || raw.length !== 6) return null;
@@ -52,10 +53,6 @@ export function cleanCmd(raw: unknown): Cmd | null {
   const a = Math.atan2(Math.sin(a0), Math.cos(a0));
   return { s, mx, my, f, a, w };
 }
-
-// Acción de un jugador ligada a su última entrada (s): construir, lanzar, subir al robot o
-// usar la habilidad de su clase (ab, hacia tx/ty).
-export type Act = { s: number; k: 'build' | 'throw' | 'robot' | 'ab'; kind: string; tx: number; ty: number };
 
 const KIND_RE = /^[a-z]{1,12}$/;
 

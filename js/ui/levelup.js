@@ -1,5 +1,5 @@
 // Mejoras al subir de nivel: las tarjetas y la elección (en línea las ofrece y aplica el servidor).
-import { rollUpgrades, ICONS } from '../sim/upgrades.js';
+import { rollUpgrades, ICONS } from '../sim/upgrades.ts';
 
 export function openLevelUp(game) {
   game.setState('levelup');

@@ -1,7 +1,7 @@
 // Progreso guardado de la partida en solitario: guardar, cargar y reanudar una ronda a medias.
-import { xpForLevel, SHOP, WEAPONS, WEAPON_ORDER, START_WEAPON, WAVES, ZOMBIE_VARIANTS } from './core/config.js';
-import { storage } from './core/util.js';
-import { isClass } from './sim/abilities.js';
+import { xpForLevel, SHOP, WEAPONS, WEAPON_ORDER, START_WEAPON, WAVES, ZOMBIE_VARIANTS } from './core/config.ts';
+import { storage } from './core/util.ts';
+import { isClass } from './sim/abilities.ts';
 
 // Cada cuenta tiene dos guardados: el automático (también a mitad de ronda) y el punto
 // de control al terminar cada ronda, para continuar tras morir (ver accounts.js).

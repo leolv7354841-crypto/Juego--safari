@@ -2,18 +2,102 @@
 // - obstáculos (rectángulos y círculos) con rejilla espacial
 // - campo de flujo (BFS) para que los zombis rodeen edificios y coches
 // - lista de ops de dibujo (datos: render/world.js las pinta en trozos con caché LRU)
-import { WORLD_SIZE, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL, CAR_COLORS } from '../core/config.js';
-import { mulberry32, rrange, rpick, clamp, TAU } from '../core/util.js';
+import { WORLD_SIZE, ROAD_CENTERS, ROAD_HALF, SIDEWALK, NAV_CELL, CAR_COLORS } from '../core/config.ts';
+import type { Block } from './build.ts';
+import { mulberry32, rrange, rpick, clamp, TAU } from '../core/util.ts';
 
 const OBS_CELL = 128;
 const ROAD_W = ROAD_HALF * 2;
 const SPAWN_CLEAR = 215;
 
+// Obstáculo: k 0 rectángulo (x, y, w, h), k 1 círculo (x, y, r). Lo demás lo añaden quienes lo registran.
+export interface Obstacle {
+  k: number;
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  r?: number;
+  low?: boolean;
+  prop?: boolean;
+  block?: boolean;
+  id?: number;
+  stamp?: number;
+  cells?: number[];
+}
+
+export interface WorldOp {
+  layer: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind: string;
+  p: Record<string, unknown>;
+  i: number;
+}
+
+export interface WorldLight {
+  x: number;
+  y: number;
+  r: number;
+  i: number;
+  flicker: number;
+  warm: boolean;
+  ph: number;
+}
+
+export interface WorldTree {
+  x: number;
+  y: number;
+  r: number;
+  dead: boolean;
+  seed: number;
+  ang: number;
+  size: number;
+}
+
+export interface WorldFire {
+  x: number;
+  y: number;
+  s: number;
+}
+
+export interface Overhead {
+  k: string;
+  x: number;
+  y: number;
+  hx: number;
+  hy: number;
+  lit?: boolean;
+}
+
+// Campo de flujo (BFS): dist por celda de navegación; los anclajes de flanqueo añaden k, x, y.
+export interface FlowField {
+  dist: Uint16Array;
+  cell: number;
+  ok: boolean;
+  k?: number;
+  x?: number;
+  y?: number;
+}
+
+type Pt = { x: number; y: number };
+
+// Campo de flanqueo: siempre con su índice k y su punto de anclaje
+export type Anchor = FlowField & { k: number; x: number; y: number };
+
+// k 0 es rectángulo (w, h presentes) y el resto círculo (r presente)
+type RectObs = Obstacle & { w: number; h: number };
+type CircObs = Obstacle & { r: number };
+const isRect = (o: Obstacle): o is RectObs => o.k === 0;
+const isCirc = (o: Obstacle): o is CircObs => o.k !== 0;
+
 // Por qué cara entra en el rectángulo `o` el segmento (x0, y0) → (x1, y1): 0 izquierda, 1 derecha,
 // 2 arriba, 3 abajo; -1 si no entra o si ya empezaba dentro. En entryT queda la fracción del
 // segmento donde toca la cara.
 let entryT = 0;
-function entryFace(x0, y0, x1, y1, o) {
+function entryFace(x0: number, y0: number, x1: number, y1: number, o: RectObs): number {
   const dx = x1 - x0;
   const dy = y1 - y0;
   let t0 = 0;
@@ -46,6 +130,29 @@ function entryFace(x0, y0, x1, y1, o) {
 }
 
 export class World {
+  declare size: number;
+  declare rng: () => number;
+  declare seedBase: number;
+  declare obstacles: Obstacle[];
+  declare ops: WorldOp[];
+  declare trees: WorldTree[];
+  declare overhead: Overhead[];
+  declare lights: WorldLight[];
+  declare fires: WorldFire[];
+  declare spawn: Pt;
+  declare bands: number[][];
+  declare obsN: number;
+  declare obsGrid: Obstacle[][];
+  declare stamp: number;
+  declare lastBlock: Block | null;
+  declare navN: number;
+  declare blocked: Uint8Array;
+  declare queue: Int32Array;
+  declare main: FlowField;
+  declare dist: Uint16Array;
+  declare anchors: Anchor[];
+  declare main2: FlowField;
+  declare anchorTurn: number;
   constructor(seed = (Math.random() * 1e9) | 0) {
     this.size = WORLD_SIZE;
     this.rng = mulberry32(seed);
@@ -69,24 +176,24 @@ export class World {
   /* ---------- utilidades de generación ---------- */
 
   // Una op es un dato: el tipo de pintor (render/world.js) y lo que necesita para pintarse.
-  op(layer, x, y, w, h, kind, p = {}) {
+  op(layer: number, x: number, y: number, w: number, h: number, kind: string, p: Record<string, unknown> = {}) {
     this.ops.push({ layer, x, y, w, h, kind, p, i: this.ops.length });
   }
 
-  addRect(x, y, w, h, low = false) {
-    const o = { k: 0, x, y, w, h, low };
+  addRect(x: number, y: number, w: number, h: number, low = false): Obstacle {
+    const o: Obstacle = { k: 0, x, y, w, h, low };
     this.obstacles.push(o);
     return o;
   }
 
   // prop: objeto pequeño (farola, barril, bote…) que ocupa su sitio al generar el mapa pero no choca
-  addCircle(x, y, r, low = false, prop = false) {
-    const o = { k: 1, x, y, r, low, prop };
+  addCircle(x: number, y: number, r: number, low = false, prop = false): Obstacle {
+    const o: Obstacle = { k: 1, x, y, r, low, prop };
     this.obstacles.push(o);
     return o;
   }
 
-  free(x, y, w, h, pad = 8) {
+  free(x: number, y: number, w: number, h: number, pad = 8): boolean {
     if (x < 30 || y < 30 || x + w > this.size - 30 || y + h > this.size - 30) return false;
     const sx = this.spawn.x;
     const sy = this.spawn.y;
@@ -95,26 +202,26 @@ export class World {
     if ((sx - cx) ** 2 + (sy - cy) ** 2 < SPAWN_CLEAR * SPAWN_CLEAR) return false;
     for (const o of this.obstacles) {
       let ox, oy, ow, oh;
-      if (o.k === 0) {
+      if (isRect(o)) {
         ox = o.x;
         oy = o.y;
         ow = o.w;
         oh = o.h;
-      } else {
+      } else if (isCirc(o)) {
         ox = o.x - o.r;
         oy = o.y - o.r;
         ow = oh = o.r * 2;
-      }
+      } else continue;
       if (x < ox + ow + pad && x + w + pad > ox && y < oy + oh + pad && y + h + pad > oy) return false;
     }
     return true;
   }
 
-  addLight(x, y, r, intensity, flicker = 0, warm = true) {
+  addLight(x: number, y: number, r: number, intensity: number, flicker = 0, warm = true) {
     this.lights.push({ x, y, r, i: intensity, flicker, warm, ph: this.rng() * 100 });
   }
 
-  addTree(x, y, r, dead = false) {
+  addTree(x: number, y: number, r: number, dead = false): boolean {
     if (!this.free(x - 12, y - 12, 24, 24, 6)) return false;
     this.addCircle(x, y, 11);
     const seed = this.nextSeed();
@@ -123,7 +230,7 @@ export class World {
     return true;
   }
 
-  addBarrel(x, y, burning) {
+  addBarrel(x: number, y: number, burning: boolean): boolean {
     if (!this.free(x - 13, y - 13, 26, 26, 4)) return false;
     this.addCircle(x, y, 12, false, true);
     this.op(3, x - 16, y - 16, 34, 34, 'addBarrel', { x, y, burning });
@@ -134,7 +241,12 @@ export class World {
     return true;
   }
 
-  addCar(x, y, horizontal, opts = {}) {
+  addCar(
+    x: number,
+    y: number,
+    horizontal: boolean,
+    opts: { kind?: string; pad?: number; burnt?: boolean; burning?: boolean } = {},
+  ) {
     const rng = this.rng;
     const kind = opts.kind || rpick(rng, ['sedan', 'sedan', 'sedan', 'hatch', 'taxi', 'pickup', 'van', 'police']);
     let len =
@@ -219,7 +331,8 @@ export class World {
     this.addRect(0, S - T, S, T);
     this.addRect(0, 0, T, S);
     this.addRect(S - T, 0, T, S);
-    const wall = (x, y, w, h) => this.op(3, x, y, w + 12, h + 12, 'border', { x, y, w, h });
+    const wall = (x: number, y: number, w: number, h: number) =>
+      this.op(3, x, y, w + 12, h + 12, 'border', { x, y, w, h });
     wall(0, 0, S, T);
     wall(0, S - T, S, T);
     wall(0, 0, T, S);
@@ -236,7 +349,7 @@ export class World {
     // camión militar abandonado al sur del cruce
     this.addCar(x + 55, y + 330, false, { kind: 'truck', burnt: false });
     // sacos terreros (obstáculos bajos: las balas pasan por encima)
-    const bags = (bx, by, w, h) => {
+    const bags = (bx: number, by: number, w: number, h: number) => {
       if (!this.free(bx, by, w, h, 4)) return;
       this.addRect(bx, by, w, h, true);
       this.op(3, bx - 2, by - 2, w + 12, h + 12, 'spawnProps', { bx, by, w, h });
@@ -246,7 +359,7 @@ export class World {
     bags(x - 60, y - 330, 88, 22);
   }
 
-  block(x, y, w, h, edge, nearSpawn) {
+  block(x: number, y: number, w: number, h: number, edge: boolean, nearSpawn: boolean) {
     this.op(0, x, y, w, h, 'block', { x, y, w, h });
     const ix = x + SIDEWALK;
     const iy = y + SIDEWALK;
@@ -255,13 +368,13 @@ export class World {
     if (iw < 40 || ih < 40) return;
     if (edge) return this.wasteland(ix, iy, iw, ih);
     const r = this.rng();
-    let type;
+    let type: 'building' | 'park' | 'parking' | 'plaza';
     if (nearSpawn) type = r < 0.5 ? 'plaza' : 'park';
     else type = r < 0.42 ? 'building' : r < 0.6 ? 'park' : r < 0.8 ? 'parking' : 'plaza';
     this[type](ix, iy, iw, ih);
   }
 
-  wasteland(x, y, w, h) {
+  wasteland(x: number, y: number, w: number, h: number) {
     const rng = this.rng;
     this.op(0, x, y, w, h, 'wasteland', { x, y, w, h });
     const n = Math.floor((w * h) / 9000);
@@ -275,18 +388,18 @@ export class World {
     }
   }
 
-  debris(x, y, s) {
+  debris(x: number, y: number, s: number) {
     if (!this.free(x - s, y - s, s * 2, s * 2, 4)) return;
     this.addCircle(x, y, s * 0.8, false, true);
     const seed = this.nextSeed();
     this.op(3, x - s - 4, y - s - 4, s * 2 + 14, s * 2 + 14, 'debris', { seed, x, y, s });
   }
 
-  building(x, y, w, h) {
+  building(x: number, y: number, w: number, h: number) {
     const rng = this.rng;
     const m = 10;
     this.op(0, x, y, w, h, 'building', { x, y, w, h });
-    const rects = [];
+    const rects: number[][] = [];
     if (rng() < 0.5) {
       const alley = 60;
       const horizSplit = w >= h;
@@ -307,7 +420,7 @@ export class World {
     for (const [bx, by, bw, bh] of rects) this.roof(bx, by, bw, bh);
   }
 
-  alley(x, y, w, h, horiz) {
+  alley(x: number, y: number, w: number, h: number, horiz: boolean) {
     const rng = this.rng;
     const cx = x + w / 2;
     const cy = y + h / 2;
@@ -325,7 +438,7 @@ export class World {
     }
   }
 
-  roof(x, y, w, h) {
+  roof(x: number, y: number, w: number, h: number) {
     this.addRect(x, y, w, h);
     const seed = this.nextSeed();
     const base = rpick(this.rng, ['#4d4a45', '#56514a', '#4a4f4c', '#5a4b44', '#46443f']);
@@ -335,7 +448,7 @@ export class World {
     this.op(3, x, y, w, h, 'roof2', { seed, base, x, y, w, h, hole, sos });
   }
 
-  park(x, y, w, h) {
+  park(x: number, y: number, w: number, h: number) {
     const rng = this.rng;
     const seed = this.nextSeed();
     const diag = rng() < 0.5;
@@ -358,7 +471,7 @@ export class World {
     }
   }
 
-  bench(x, y, vertical) {
+  bench(x: number, y: number, vertical: boolean) {
     const w = vertical ? 14 : 42;
     const h = vertical ? 42 : 14;
     if (!this.free(x, y, w, h, 10)) return;
@@ -366,10 +479,10 @@ export class World {
     this.op(3, x, y, w + 8, h + 8, 'bench', { x, y, w, h, vertical });
   }
 
-  camp(x, y) {
+  camp(x: number, y: number) {
     const rng = this.rng;
     if (!this.free(x - 70, y - 60, 140, 120, 6)) return;
-    const tent = (tx, ty, color, ang) => {
+    const tent = (tx: number, ty: number, color: string, ang: number) => {
       this.addRect(tx - 26, ty - 22, 52, 44);
       this.op(3, tx - 40, ty - 40, 84, 84, 'camp1', { tx, ty, ang, color });
     };
@@ -381,7 +494,7 @@ export class World {
     this.fires.push({ x, y: y + 30, s: 0.9 });
   }
 
-  plaza(x, y, w, h) {
+  plaza(x: number, y: number, w: number, h: number) {
     const rng = this.rng;
     const seed = this.nextSeed();
     this.op(0, x, y, w, h, 'plaza1', { seed, x, y, w, h });
@@ -413,7 +526,7 @@ export class World {
     if (rng() < 0.5) this.addBarrel(rrange(rng, x + 40, x + w - 40), rrange(rng, y + 40, y + h - 40), rng() < 0.6);
   }
 
-  parking(x, y, w, h) {
+  parking(x: number, y: number, w: number, h: number) {
     const rng = this.rng;
     const horiz = w > h ? rng() < 0.7 : rng() < 0.3;
     this.op(0, x, y, w, h, 'parking', { x, y, w, h, horiz });
@@ -433,11 +546,12 @@ export class World {
     if (rng() < 0.4) this.addCar(x + w / 2, y + h / 2, rng() < 0.5, { burnt: true, burning: true });
   }
 
-  roadSegment(c, a, b, vertical) {
+  roadSegment(c: number, a: number, b: number, vertical: boolean) {
     const rng = this.rng;
     const L = b - a;
-    const R = (u0, v0, lu, lv) => (vertical ? [c + v0, u0, lv, lu] : [u0, c + v0, lu, lv]);
-    const P = (u, v) => (vertical ? [c + v, u] : [u, c + v]);
+    const R = (u0: number, v0: number, lu: number, lv: number): number[] =>
+      vertical ? [c + v0, u0, lv, lu] : [u0, c + v0, lu, lv];
+    const P = (u: number, v: number): number[] => (vertical ? [c + v, u] : [u, c + v]);
     const [bx, by, bw, bh] = R(a, -ROAD_HALF, L, ROAD_W);
     const seed = this.nextSeed();
     // marcas viales gastadas, grietas, baches
@@ -489,7 +603,7 @@ export class World {
     }
   }
 
-  intersection(cx, cy) {
+  intersection(cx: number, cy: number) {
     const seed = this.nextSeed();
     const S = this.size;
     this.op(1, cx - ROAD_HALF - 60, cy - ROAD_HALF - 60, ROAD_W + 120, ROAD_W + 120, 'intersection', {
@@ -510,12 +624,16 @@ export class World {
   buildObstacleGrid() {
     const n = Math.ceil(this.size / OBS_CELL);
     this.obsN = n;
-    this.obsGrid = Array.from({ length: n * n }, () => []);
+    this.obsGrid = Array.from({ length: n * n }, (): Obstacle[] => []);
     this.obstacles.forEach((o, idx) => {
       o.id = idx;
       o.stamp = 0;
       if (o.prop) return;
-      const [x, y, w, h] = o.k === 0 ? [o.x, o.y, o.w, o.h] : [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2];
+      const [x, y, w, h] = isRect(o)
+        ? [o.x, o.y, o.w, o.h]
+        : isCirc(o)
+          ? [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2]
+          : [o.x, o.y, 0, 0];
       const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
       const y0 = clamp(Math.floor(y / OBS_CELL), 0, n - 1);
       const x1 = clamp(Math.floor((x + w) / OBS_CELL), 0, n - 1);
@@ -530,7 +648,7 @@ export class World {
   // (ox, oy): dónde estaba al terminar el fotograma anterior. Si un empujón grande (la horda
   // apretando) le metió el centro en un muro o se lo hizo cruzar, vuelve al lado por el que
   // entró en vez de salir por el más cercano, que en un muro delgado puede ser el de enfrente.
-  collide(e, r, passBlocks = false, ox = NaN, oy = NaN) {
+  collide(e: Pt, r: number, passBlocks = false, ox = NaN, oy = NaN) {
     const n = this.obsN;
     const swept = ox === ox && oy === oy;
     const x0 = clamp(Math.floor(((swept ? Math.min(e.x, ox) : e.x) - r) / OBS_CELL), 0, n - 1);
@@ -547,7 +665,7 @@ export class World {
           if (o.stamp === stamp) continue;
           o.stamp = stamp;
           if (passBlocks && o.block) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             const face = swept ? entryFace(ox, oy, e.x, e.y, o) : -1;
             if (face >= 0) {
               // vuelve a donde tocó la cara, apoyado por fuera
@@ -556,7 +674,7 @@ export class World {
               e.x = face === 0 ? o.x - r : face === 1 ? o.x + o.w + r : tx;
               e.y = face === 2 ? o.y - r : face === 3 ? o.y + o.h + r : ty;
               hit = true;
-              if (o.block) this.lastBlock = o;
+              if (o.block) this.lastBlock = o as Block;
               continue;
             }
             const px = e.x < o.x ? o.x : e.x > o.x + o.w ? o.x + o.w : e.x;
@@ -566,7 +684,7 @@ export class World {
             const d2 = dx * dx + dy * dy;
             if (d2 >= r * r) continue;
             hit = true;
-            if (o.block) this.lastBlock = o;
+            if (o.block) this.lastBlock = o as Block;
             if (d2 > 1e-6) {
               const d = Math.sqrt(d2);
               e.x += (dx / d) * (r - d);
@@ -582,7 +700,7 @@ export class World {
               else if (m === t) e.y = o.y - r;
               else e.y = o.y + o.h + r;
             }
-          } else {
+          } else if (isCirc(o)) {
             const dx = e.x - o.x;
             const dy = e.y - o.y;
             const rr = r + o.r;
@@ -601,7 +719,7 @@ export class World {
 
   /* ---------- barricadas del jugador ---------- */
 
-  addDynamic(o) {
+  addDynamic(o: RectObs) {
     const n = this.obsN;
     o.stamp = 0;
     o.cells = [];
@@ -618,8 +736,8 @@ export class World {
     this.refreshNav(o.x, o.y, o.w, o.h);
   }
 
-  removeDynamic(o) {
-    for (const idx of o.cells) {
+  removeDynamic(o: RectObs) {
+    for (const idx of o.cells ?? []) {
       const arr = this.obsGrid[idx];
       const i = arr.indexOf(o);
       if (i >= 0) arr.splice(i, 1);
@@ -628,7 +746,7 @@ export class World {
     this.refreshNav(o.x, o.y, o.w, o.h);
   }
 
-  refreshNav(x, y, w, h) {
+  refreshNav(x: number, y: number, w: number, h: number) {
     const n = this.navN;
     const pad = 24;
     const i0 = clamp(Math.floor((x - pad) / NAV_CELL), 0, n - 1);
@@ -645,7 +763,7 @@ export class World {
   }
 
   // ¿Cabe un rectángulo sin tocar ningún obstáculo? (ignoreBlocks: las barricadas del jugador no cuentan)
-  rectFree(x, y, w, h, ignoreBlocks = false) {
+  rectFree(x: number, y: number, w: number, h: number, ignoreBlocks = false) {
     if (x < 30 || y < 30 || x + w > this.size - 30 || y + h > this.size - 30) return false;
     const n = this.obsN;
     const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
@@ -656,9 +774,9 @@ export class World {
       for (let i = x0; i <= x1; i++) {
         for (const o of this.obsGrid[j * n + i]) {
           if (ignoreBlocks && o.block) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return false;
-          } else {
+          } else if (isCirc(o)) {
             const px = clamp(o.x, x, x + w);
             const py = clamp(o.y, y, y + h);
             if ((px - o.x) ** 2 + (py - o.y) ** 2 < o.r * o.r) return false;
@@ -669,7 +787,7 @@ export class World {
     return true;
   }
 
-  pointBlocked(x, y, pad = 0, bulletsOnly = false) {
+  pointBlocked(x: number, y: number, pad = 0, bulletsOnly = false): Obstacle | boolean | null {
     if (x < 0 || y < 0 || x >= this.size || y >= this.size) return true;
     const n = this.obsN;
     const cx = Math.floor(x / OBS_CELL);
@@ -681,9 +799,9 @@ export class World {
         if (i < 0 || i >= n) continue;
         for (const o of this.obsGrid[j * n + i]) {
           if (bulletsOnly && o.low) continue;
-          if (o.k === 0) {
+          if (isRect(o)) {
             if (x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad) return o;
-          } else {
+          } else if (isCirc(o)) {
             const dx = x - o.x;
             const dy = y - o.y;
             const rr = o.r + pad;
@@ -726,7 +844,7 @@ export class World {
     this.anchorTurn = 0;
   }
 
-  set flowCell(v) {
+  set flowCell(v: number) {
     // al cambiar barricadas se fuerza el recálculo de todos los campos
     if (v === -1 && this.main) {
       this.main.cell = -1;
@@ -736,7 +854,7 @@ export class World {
   }
 
   // Celda libre más cercana a (px, py), o -1.
-  freeCell(px, py) {
+  freeCell(px: number, py: number): number {
     const n = this.navN;
     const ci = clamp(Math.floor(px / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(py / NAV_CELL), 0, n - 1);
@@ -755,7 +873,7 @@ export class World {
   }
 
   // BFS desde la celda objetivo: dist[c] = pasos hasta el objetivo rodeando obstáculos.
-  computeField(field, px, py) {
+  computeField(field: FlowField, px: number, py: number) {
     const start = this.freeCell(px, py);
     if (start < 0) {
       field.ok = false;
@@ -790,12 +908,12 @@ export class World {
     }
   }
 
-  updateFlow(px, py) {
+  updateFlow(px: number, py: number) {
     this.computeField(this.main, px, py);
   }
 
   // Recalcula UN campo de flanqueo por llamada (repartido entre fotogramas).
-  updateAnchors(px, py, radius = 230) {
+  updateAnchors(px: number, py: number, radius = 230) {
     const a = this.anchors[this.anchorTurn];
     this.anchorTurn = (this.anchorTurn + 1) % this.anchors.length;
     const ang = (a.k / this.anchors.length) * TAU;
@@ -812,7 +930,7 @@ export class World {
   }
 
   // Dirección por el campo indicado (por defecto, hacia el jugador) o null si no hay ruta.
-  flowDir(x, y, out, field = this.main) {
+  flowDir(x: number, y: number, out: Pt, field: FlowField = this.main): Pt | null {
     const n = this.navN;
     const ci = clamp(Math.floor(x / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(y / NAV_CELL), 0, n - 1);
@@ -865,7 +983,7 @@ export class World {
     return out;
   }
 
-  reachable(x, y, field = this.main) {
+  reachable(x: number, y: number, field: FlowField = this.main): boolean {
     const n = this.navN;
     const ci = clamp(Math.floor(x / NAV_CELL), 0, n - 1);
     const cj = clamp(Math.floor(y / NAV_CELL), 0, n - 1);

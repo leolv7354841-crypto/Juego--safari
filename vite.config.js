@@ -8,7 +8,7 @@ const hashCodigo = () => {
   const texto = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
   for (const f of readdirSync('js', { recursive: true })
     .map((n) => n.split('\\').join('/'))
-    .filter((n) => n.endsWith('.js'))
+    .filter((n) => /\.(js|ts)$/.test(n) && !n.endsWith('.d.ts'))
     .sort())
     h.update(texto(`js/${f}`));
   h.update(texto('css/style.css'));

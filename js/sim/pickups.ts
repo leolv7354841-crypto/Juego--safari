@@ -1,24 +1,32 @@
-import { rand, pick } from '../core/util.js';
-import { CRATE_WEAPONS, WEAPONS } from '../core/config.js';
+import { rand, pick } from '../core/util.ts';
+import { CRATE_WEAPONS, WEAPONS } from '../core/config.ts';
+import type { GameHost } from '../core/types.d.ts';
+import type { Player } from './player.ts';
+
+/** Objeto en el suelo: k = 'ammo' | 'med' | caja de armas. */
+export interface Pickup {
+  k: string;
+  x: number;
+  y: number;
+  t: number;
+  taken?: boolean;
+}
 
 export const LIFE = 22;
 
 export class Pickups {
+  declare list: Pickup[];
   constructor() {
     this.list = [];
   }
   clear() {
     this.list.length = 0;
   }
-  drop(k, x, y) {
+  drop(k: string, x: number, y: number) {
     this.list.push({ k, x: x + rand(-6, 6), y: y + rand(-6, 6), t: 0 });
   }
 
-  /**
-   * @param {number} dt
-   * @param {import('../core/types.js').GameHost} game
-   */
-  update(dt, game) {
+  update(dt: number, game: GameHost) {
     // cooperativo: el compañero también recoge (el anfitrión decide y le avisa)
     // en línea (servidor): recoge el jugador vivo más cercano de game.targets
     const targets = game.targets || null;
@@ -38,15 +46,16 @@ export class Pickups {
             p = q;
           }
         }
-        if (!p) {
-          if (it.t > LIFE) this.list.splice(i, 1);
-          continue;
-        }
       } else if (
         peer &&
+        p &&
         (!p.alive || (peer.x - it.x) ** 2 + (peer.y - it.y) ** 2 < (p.x - it.x) ** 2 + (p.y - it.y) ** 2)
       )
         p = peer;
+      if (!p) {
+        if (it.t > LIFE) this.list.splice(i, 1);
+        continue;
+      }
       const dx = p.x - it.x;
       const dy = p.y - it.y;
       const d = Math.hypot(dx, dy);
@@ -63,7 +72,7 @@ export class Pickups {
       if (
         Math.hypot(p.x - it.x, p.y - it.y) < reach &&
         usable &&
-        (targets ? game.collectFor(p, it) : p === peer ? game.coop.peerPickup(it) : this.collect(it, game))
+        (targets ? game.collectFor?.(p, it) : p === peer ? game.coop.peerPickup(it) : this.collect(it, game))
       ) {
         it.taken = true;
         this.list.splice(i, 1);
@@ -73,15 +82,16 @@ export class Pickups {
     }
   }
 
-  canCollect(it, p) {
+  canCollect(it: Pick<Pickup, 'k'>, p: Player) {
     if (p.remote) return it.k === 'med' ? p.hp < p.stats.maxHp : it.k === 'ammo' ? !!p.needAmmo : true;
     if (it.k === 'med') return p.hp < p.stats.maxHp;
     if (it.k === 'ammo') return p.weapons.some((w) => w.reserve !== Infinity && w.reserve < p.reserveMax(w.def));
     return true;
   }
 
-  collect(it, game) {
+  collect(it: Pick<Pickup, 'k' | 'x' | 'y'>, game: GameHost) {
     const p = game.player;
+    if (!p) return false;
     if (it.k === 'ammo') {
       if (!p.addAmmo(1)) return false;
       game.toast('+ Munición');
@@ -97,7 +107,7 @@ export class Pickups {
       if (locked.length) {
         const id = pick(locked);
         p.unlock(id);
-        game.toast(`Nueva arma: ${WEAPONS[id].name}`);
+        game.toast(`Nueva arma: ${(WEAPONS as Record<string, { name: string }>)[id].name}`);
       } else {
         p.addAmmo(3);
         game.toast('+ Munición extra');

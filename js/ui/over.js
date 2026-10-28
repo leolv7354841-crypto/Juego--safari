@@ -1,8 +1,8 @@
 // Pantalla de fin de partida (resultados y récord personal) y sus botones.
-import { fmtTime, storage } from '../core/util.js';
+import { fmtTime, storage } from '../core/util.ts';
 import { on } from './dom.js';
 import { showClass } from './class.js';
-import { comboMult, multText } from '../sim/combo.js';
+import { comboMult, multText } from '../sim/combo.ts';
 
 export function gameOver(game) {
   game.mode.onGameOver();

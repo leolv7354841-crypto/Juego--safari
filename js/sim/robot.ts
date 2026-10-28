@@ -1,10 +1,32 @@
 // Robot de combate: se compra en la tienda, te subes con E (o el botón ROBOT) y caminas
 // entre la horda apartando zombis. Lleva tu arma en el brazo derecho y puedes cambiarla.
 // Tiene 10 000 de vida que no se recupera sola: se repara en la tienda entre oleadas.
-import { ROBOT, WORLD_SIZE } from '../core/config.js';
-import { clamp, angleTo } from '../core/util.js';
+import { ROBOT, WORLD_SIZE } from '../core/config.ts';
+import { clamp, angleTo } from '../core/util.ts';
+import type { GameHost } from '../core/types.d.ts';
+import type { Player } from './player.ts';
+import type { World } from './world.ts';
+
+/** Estado guardado del robot (serialize/restore). */
+export interface RobotSave {
+  owned: boolean;
+  hp: number;
+  x: number;
+  y: number;
+  angle: number;
+}
 
 export class Robot {
+  declare owned: boolean;
+  declare piloted: boolean;
+  declare hp: number;
+  declare x: number;
+  declare y: number;
+  declare angle: number;
+  declare legAngle: number;
+  declare walk: number;
+  declare hitT: number;
+  declare stepSide: number;
   constructor() {
     this.reset();
   }
@@ -31,7 +53,7 @@ export class Robot {
   }
 
   // Lo deja estacionado junto al jugador.
-  deploy(p, world) {
+  deploy(p: Player, world: World) {
     this.owned = true;
     this.hp = ROBOT.hp;
     for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
@@ -47,11 +69,11 @@ export class Robot {
     this.y = p.y;
   }
 
-  near(p) {
+  near(p: Player) {
     return Math.hypot(p.x - this.x, p.y - this.y) < ROBOT.radius + p.r + 50;
   }
 
-  board(p) {
+  board(p: Player) {
     this.piloted = true;
     p.inRobot = true;
     p.baseR = p.r;
@@ -62,7 +84,7 @@ export class Robot {
     p.mass = ROBOT.mass;
   }
 
-  leave(p, world) {
+  leave(p: Player, world: World) {
     this.piloted = false;
     p.inRobot = false;
     p.r = p.baseR || p.r;
@@ -80,13 +102,13 @@ export class Robot {
   }
 
   // Daño recibido mientras lo pilotas. Devuelve true si quedó destruido.
-  damage(dmg) {
+  damage(dmg: number) {
     this.hp -= dmg;
     this.hitT = 0.2;
     return this.hp <= 0;
   }
 
-  update(dt, p, game) {
+  update(dt: number, p: Player, game: GameHost) {
     this.hitT -= dt;
     if (!this.piloted) return;
     const moved = Math.hypot(p.x - this.x, p.y - this.y);
@@ -109,7 +131,7 @@ export class Robot {
     if (this.hp < ROBOT.hp * 0.35 && Math.random() < dt * 6) game.particles.burning(this.x, this.y, ROBOT.radius * 0.5);
   }
 
-  serialize() {
+  serialize(): RobotSave {
     return {
       owned: this.owned,
       hp: Math.round(this.hp),
@@ -119,7 +141,7 @@ export class Robot {
     };
   }
 
-  restore(d) {
+  restore(d?: RobotSave | null) {
     this.reset();
     if (!d || !d.owned) return;
     this.owned = true;

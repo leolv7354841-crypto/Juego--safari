@@ -8,7 +8,6 @@
     "verbatimModuleSyntax": false,
     "noEmit": true,
     "strict": true,
-    "noImplicitAny": false,
     "allowJs": true,
     "checkJs": false,
     "skipLibCheck": true,
