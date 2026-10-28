@@ -383,7 +383,9 @@ Si cambias la forma de `scores` o `rooms`, actualiza las reglas en el README
 [`ci.yml`](../.github/workflows/ci.yml) corre en cada push y pull request tres trabajos en
 paralelo: `check` (tipos y pruebas del servidor), `nucleo` (Biome, `typecheck` y pruebas del
 núcleo) y `e2e` (Playwright en Chromium y WebKit, con una sala en línea contra el servidor local;
-límite de 20 minutos, sube el informe si falla). [`servidor.yml`](../.github/workflows/servidor.yml)
+límite de 20 minutos, sube el informe si falla). El trabajo `e2e` corre en la imagen oficial de
+Playwright (`mcr.microsoft.com/playwright:v<versión>-noble`), que trae los navegadores y sus
+bibliotecas: instalarlas con apt en el runner tardaba de 30 s a más de 20 min según el espejo. [`servidor.yml`](../.github/workflows/servidor.yml)
 publica el servidor (sección 9.2) y no hace nada si faltan los secretos.
 
 ---
@@ -449,6 +451,7 @@ Lo que no está medido: redes móviles, celulares y FPS en un celular de gama me
 | La URL del servidor | Actualiza `NET.server`. |
 | Forma de `scores` o `rooms` | Actualiza las reglas de Firebase en el README. |
 | Variables del servidor | Actualiza `server/.env.example`, `deploy/.env.example` y la sección 6 de este documento. |
+| Versión de `@playwright/test` | Cambia también la etiqueta de la imagen del trabajo `e2e` en `ci.yml` (misma versión). |
 | Versión de Node | Actualiza `engines` en `server/package.json`, `node-version` en los workflows y `deploy/Dockerfile`. |
 
 ---

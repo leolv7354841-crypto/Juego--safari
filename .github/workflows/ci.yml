@@ -48,9 +48,16 @@ jobs:
         run: npm test
 
   # Navegador real: Chromium y WebKit (Safari), incluida una sala en línea contra el servidor local.
+  # Corre en la imagen oficial de Playwright, que ya trae los navegadores y sus bibliotecas del
+  # sistema: instalarlas con apt en el runner tardaba de 30 s a más de 20 min según el espejo.
+  # La etiqueta de la imagen debe ser la misma versión que @playwright/test en package.json.
+  # Node 24 se instala aparte porque el servidor ejecuta .ts directamente (Node 22.18 o más nuevo).
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,8 +65,6 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm ci --prefix server
-      - name: Navegadores de Playwright
-        run: npx playwright install --with-deps chromium webkit
       - name: Pruebas de extremo a extremo
         run: npm run e2e
       - uses: actions/upload-artifact@v4
