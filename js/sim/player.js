@@ -33,6 +33,18 @@ const GUN_TIP = {
 };
 
 export class Player {
+  // Campos de un compañero remoto (marioneta en el cooperativo, js/net/coop.js); el jugador local no los usa.
+  /** @type {number | undefined} */ tx;
+  /** @type {number | undefined} */ ty;
+  /** @type {number | undefined} */ ta;
+  /** @type {number | undefined} */ tla;
+  /** @type {number | undefined} */ vw;
+  /** @type {number | undefined} */ vh;
+  /** @type {number | undefined} */ idx;
+  /** @type {string | undefined} */ name;
+  /** @type {boolean | undefined} */ puppet;
+  /** @type {boolean | undefined} */ needAmmo;
+  /** @type {number | undefined} */ st;
   constructor(x, y) {
     this.x = x;
     this.y = y;

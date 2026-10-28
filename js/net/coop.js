@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Modo cooperativo para 2 jugadores (sin competitivo), con la mitad de zombis.
 //
 // El anfitrión simula todo el mundo (zombis, oleadas, estructuras, explosiones) y le manda
@@ -14,7 +13,7 @@ import { cleanLook } from '../render/sprites.js';
 import { Abilities } from '../sim/abilities.js';
 import { applyCombo, packCombo } from '../sim/combo.js';
 import { rand, angleTo } from '../core/util.js';
-import { PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from './protocol.js';
+import { PARTICLE_SKIP, PICKS, SFX_SYNC, DECAL_SYNC } from './protocol.js';
 import { encodeStatic, encodeWorld } from './snapshot.js';
 import { GUEST_IDX, HOST_IDX } from './remote.js';
 import { CoopHost, CoopGuest, Solo } from './mode.js';
@@ -251,7 +250,11 @@ export class Coop {
         this.orig.push([obj, n]);
         obj[n] = function (...args) {
           if (self.rec && self.depth === 0 && self.fx.length < FX_MAX && self.nearPeer(tag, n, args)) {
-            self.fx.push([tag, n, tag === 'd' && n === 'corpse' ? self.packCorpse(args) : args]);
+            self.fx.push([
+              tag,
+              n,
+              tag === 'd' && n === 'corpse' ? self.packCorpse(/** @type {[any, any, any]} */ (args)) : args,
+            ]);
           }
           self.depth++;
           try {
@@ -378,6 +381,7 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     // la parte del mundo es la misma que arma el servidor en línea (js/net/snapshot.js)
+    /** @type {Record<string, any>} */
     const s = {
       t: 's',
       q: ++this.snapSeq,
