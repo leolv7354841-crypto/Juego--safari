@@ -45,7 +45,13 @@ export interface RoomLike {
   onLeave(cb: (code: number) => void): void;
   onError(cb: (code: number, msg?: string) => void): void;
   send(type: string, m?: unknown): void;
+  input(opts?: { mode?: 'reliable' | 'unreliable' }): InputLike;
   leave(consented?: boolean): Promise<void>;
+}
+// Canal de entradas del SDK (room.input()): se rellena `data` y send() manda una entrada y devuelve su secuencia.
+export interface InputLike {
+  data: { mx: number; my: number; f: number; a: number; w: number };
+  send(): number;
 }
 interface ClientLike {
   create(name: string, opts: object): Promise<RoomLike>;
@@ -89,7 +95,6 @@ const STAT_KEYS = [
   'reloadMult',
   'cdMult',
 ];
-const r3 = (v: number) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
 const IDLE = 4101;
@@ -115,7 +120,7 @@ export class Online {
   declare reconnecting: boolean;
   declare seed: number;
   declare clock: ServerClock;
-  declare batch: number[][];
+  declare inp: InputLike | null;
   declare rtt: number;
   declare jitter: number;
   declare diag: Diag | null;
@@ -146,7 +151,7 @@ export class Online {
     this.reconnecting = false;
     this.seed = 0;
     this.clock = new ServerClock();
-    this.batch = [];
+    this.inp = null;
     this.rtt = 0;
     this.jitter = 0;
     this.diag = null;
@@ -252,6 +257,7 @@ export class Online {
   attach(room: RoomLike) {
     const g = this.game;
     this.room = room;
+    this.inp = null;
     this.leaving = false;
     this.shutdown = false;
     this.results = null;
@@ -406,7 +412,7 @@ export class Online {
     this.phys = { x: p.x, y: p.y };
     this.fresh = true;
     this.acc = 0;
-    this.batch = [];
+    this.inp = null;
     this.lastQ = 0;
     // los demás jugadores, zombis y robots se dibujan interpolando (js/net/remote.js)
     g.remote.start();
@@ -457,7 +463,6 @@ export class Online {
     }
     // tras una pausa larga (pestaña oculta) no se intenta recuperar todo de golpe
     if (this.acc > TICK * 5) this.acc = 0;
-    while (this.batch.length) this.send('in', { i: this.batch.splice(0, 10) });
   }
 
   stepInput() {
@@ -474,20 +479,29 @@ export class Online {
       f |= IN_RELOAD;
       this.wantReload = false;
     }
+    // lo que viaja es float32: se predice con el mismo valor que decodifica el servidor
     const cmd: Cmd = {
-      s: 0, // lo pone pred.step
-      mx: r3(mv.x),
-      my: r3(mv.y),
+      s: 0, // la secuencia la da el SDK al enviar
+      mx: Math.fround(mv.x),
+      my: Math.fround(mv.y),
       f,
-      a: r3(p.angle),
+      a: Math.fround(p.angle),
       w: p.wi,
     };
+    if (this.room) {
+      const d = (this.inp ||= this.room.input({ mode: 'reliable' })).data;
+      d.mx = cmd.mx;
+      d.my = cmd.my;
+      d.f = cmd.f;
+      d.a = cmd.a;
+      d.w = cmd.w;
+      cmd.s = this.inp.send();
+    }
     p.x = this.phys.x;
     p.y = this.phys.y;
     this.pred.step(cmd, g);
     this.phys.x = p.x;
     this.phys.y = p.y;
-    this.batch.push([cmd.s, cmd.mx, cmd.my, cmd.f, cmd.a, cmd.w]);
   }
 
   // ¿Hay una tanda de mejoras del servidor sin elegir?
