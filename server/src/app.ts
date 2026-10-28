@@ -27,6 +27,7 @@ export const health = () => ({
   skippedTicks: STATS.skipped,
   cpuPercent: STATS.cpu,
   rssMb: STATS.rssMb,
+  txBytes: STATS.tx,
   uptime: Math.round((Date.now() - STATS.startedAt) / 1000),
 });
 

@@ -77,15 +77,27 @@ async function bot(room: any, name: string): Promise<Bot> {
     b.me = s.me;
     b.alive = !!s.st[2];
     b.kills = s.st[6];
-    // zombi más cercano (las posiciones vienen relativas a uno mismo)
+    // zombi más cercano: en la foto (relativo a uno mismo) o, si viajan en el Schema de la sala, en room.state
     let best = Infinity;
     b.target = null;
-    for (let i = 0; i + 5 < s.z.length; i += 6) {
-      const d = s.z[i + 2] ** 2 + s.z[i + 3] ** 2;
-      if (d < best) {
-        best = d;
-        b.target = Math.atan2(s.z[i + 3], s.z[i + 2]);
+    if (s.z) {
+      for (let i = 0; i + 5 < s.z.length; i += 6) {
+        const d = s.z[i + 2] ** 2 + s.z[i + 3] ** 2;
+        if (d < best) {
+          best = d;
+          b.target = Math.atan2(s.z[i + 3], s.z[i + 2]);
+        }
       }
+    } else {
+      const me = room.state.bodies?.get(room.sessionId);
+      if (me)
+        room.state.zombies?.forEach((e: any) => {
+          const d = (e.x - me.x) ** 2 + (e.y - me.y) ** 2;
+          if (d < best) {
+            best = d;
+            b.target = Math.atan2(e.y - me.y, e.x - me.x);
+          }
+        });
     }
   });
   room.onMessage('p', (m: any) => {
@@ -154,6 +166,12 @@ async function scenario(rooms: number, per: number) {
   }
   const stop = drive(bots);
   const ticks: any[] = [];
+  const tx0 =
+    (
+      await fetch(`${HTTP}/health`)
+        .then((r) => r.json())
+        .catch(() => null)
+    )?.txBytes ?? 0;
   for (let s = 0; s < SECS; s++) {
     await sleep(1000);
     ticks.push(
@@ -163,6 +181,12 @@ async function scenario(rooms: number, per: number) {
     );
   }
   stop();
+  const tx1 =
+    (
+      await fetch(`${HTTP}/health`)
+        .then((r) => r.json())
+        .catch(() => null)
+    )?.txBytes ?? 0;
   const secs = (Date.now() - bots[0].t0) / 1000;
   const snapsPer = bots.map((b) => b.snaps / secs);
   const kbPer = bots.map((b) => b.bytes / 1024 / secs);
@@ -174,6 +198,9 @@ async function scenario(rooms: number, per: number) {
   console.log(`fotos/s por cliente: media ${avg(snapsPer).toFixed(1)} · mín ${Math.min(...snapsPer).toFixed(1)}`);
   console.log(
     `recibido por cliente: media ${avg(kbPer).toFixed(1)} KB/s · máx ${Math.max(...kbPer).toFixed(1)} KB/s · total ${(avg(kbPer) * bots.length).toFixed(0)} KB/s`,
+  );
+  console.log(
+    `enviado por el servidor (medido en el servidor): ${((tx1 - tx0) / 1024 / secs / bots.length).toFixed(1)} KB/s por jugador`,
   );
   console.log(`enviado por cliente: media ${avg(upPer).toFixed(2)} KB/s · máx ${Math.max(...upPer).toFixed(2)} KB/s`);
   console.log(

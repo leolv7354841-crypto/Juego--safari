@@ -3,7 +3,11 @@
 // reconectar con su token recupera el mismo sitio y el mismo personaje.
 import { randomInt } from 'node:crypto';
 import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core';
-import { LobbyState, Member, Body, type MemberT, type LobbyStateT } from './state.ts';
+import { StateView } from '@colyseus/schema';
+import { zombieNear, zombieFlags } from '../../../js/net/snapshot.ts';
+import { TYPES } from '../../../js/net/protocol.ts';
+import { TAU } from '../../../js/core/util.ts';
+import { LobbyState, Member, Body, ZombieS, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
 import { cleanName, cleanLookCode, cleanClass, cleanAct, cleanView, Bucket } from '../validate.ts';
@@ -51,6 +55,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
   next: ServerSim | null = null;
   nextIdx = 1;
   limits = new Map<string, Limits>();
+  // zombis que cada jugador tiene ahora en su StateView (clave del mapa)
+  zseen = new Map<string, Set<string>>();
   loaded = new Set<string>();
   loadUntil = 0;
   acc = 0;
@@ -176,6 +182,17 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
   }
 
   onJoin(client: Client, _options: any, auth: { name: string; look?: string; cls?: string }) {
+    // medición: bytes que el servidor manda por este WebSocket
+    const ws = client.ref as unknown as {
+      send: (d: { byteLength?: number; length?: number }, ...r: unknown[]) => unknown;
+    };
+    const send0 = ws.send.bind(ws);
+    ws.send = (d, ...r) => {
+      STATS.tx += d.byteLength ?? d.length ?? 0;
+      return send0(d, ...r);
+    };
+    client.view = new StateView();
+    this.zseen.set(client.sessionId, new Set());
     const m = new Member({
       name: auth.name,
       look: auth.look || '',
@@ -227,6 +244,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
     const id = client.sessionId;
     this.state.members.delete(id);
     this.state.bodies.delete(id);
+    this.zseen.delete(id);
     this.limits.delete(id);
     this.loaded.delete(id);
     this.sim?.remove(id);
@@ -321,6 +339,59 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
     }
   }
 
+  // Zombis como Schema: una entrada por zombi vivo (se actualiza al ritmo de las fotos) y, por jugador,
+  // una StateView con los que tiene cerca (mismas reglas que encodeZombies). Sólo viajan los campos que cambian.
+  syncZombies(sim: ServerSim) {
+    const map = this.state.zombies;
+    const live = new Set<string>();
+    for (const z of sim.horde.list) {
+      if (z.dead) continue;
+      const key = String(z.id);
+      live.add(key);
+      let e = map.get(key);
+      if (!e) map.set(key, (e = new ZombieS()));
+      e.t = TYPES.indexOf(z.type);
+      e.x = Math.round(z.x);
+      e.y = Math.round(z.y);
+      e.a = Math.round((z.angle / TAU) * 64) & 63;
+      e.fl = zombieFlags(z);
+      e.hp =
+        z.hp < z.maxHp && z.type !== 'normal' && z.type !== 'sprinter'
+          ? Math.max(1, Math.ceil((z.hp / z.maxHp) * 100))
+          : 0;
+      e.air = Math.round(z.air || 0);
+      e.sw = Math.round((z.swell || 0) * 100);
+    }
+    const gone: string[] = [];
+    map.forEach((_e, key) => {
+      if (!live.has(key)) gone.push(key);
+    });
+    for (const key of gone) map.delete(key);
+    for (const c of this.clients) {
+      const slot = sim.slots.get(c.sessionId);
+      const seen = this.zseen.get(c.sessionId);
+      if (!slot || !seen || !c.view) continue;
+      const near = zombieNear({ x: slot.p.x, y: slot.p.y, vw: slot.p.vw, vh: slot.p.vh });
+      const want = new Set<string>();
+      for (const z of sim.horde.list) {
+        if (z.dead || !near(z)) continue;
+        const key = String(z.id);
+        want.add(key);
+        if (!seen.has(key)) {
+          const e = map.get(key);
+          if (e) c.view.add(e);
+          seen.add(key);
+        }
+      }
+      for (const key of [...seen]) {
+        if (want.has(key)) continue;
+        const e = map.get(key);
+        if (e) c.view.remove(e);
+        seen.delete(key);
+      }
+    }
+  }
+
   // Copia el cuerpo de cada jugador al estado sincronizado (sólo viajan los campos que cambian).
   syncBodies(sim: ServerSim) {
     const bodies = this.state.bodies;
@@ -394,6 +465,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
     this.next = null;
     // quien se fue durante la carga no aparece en la partida
     for (const id of [...sim.slots.keys()]) if (!players.some((p) => p.id === id)) sim.remove(id);
+    sim.schemaZombies = CONFIG.schemaZombies;
     this.setSim(sim);
     this.bindInputs(sim);
     for (const [id, m] of this.state.members.entries()) if (!m.connected) sim.setAway(id, true);
@@ -462,7 +534,10 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
       countTick(performance.now() - t0);
       this.acc -= step;
       n++;
-      if (sim.tick % this.snapEvery === 0) this.sendSnaps();
+      if (sim.tick % this.snapEvery === 0) {
+        if (sim.schemaZombies) this.syncZombies(sim);
+        this.sendSnaps();
+      }
       if (sim.over) return this.finish();
     }
     // tras una pausa larga no se intenta recuperar todo: se descarta el atraso

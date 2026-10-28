@@ -129,6 +129,7 @@ export class ServerSim {
   toastTo: string | null = null;
   lastPos = { x: 0, y: 0, ok: false };
   game: any;
+  schemaZombies = false;
   flowT = 0;
   goldenT = GOLDEN.firstAfter;
   waitT = 0;
@@ -798,6 +799,12 @@ export class ServerSim {
         skipBullet: (b: any) => b.owner === id || !!b.turret,
       },
     );
+    // spike: los zombis viajan en el Schema de la sala (ver DeadZoneRoom.syncZombies), no en la foto
+    if (this.schemaZombies) {
+      delete (world as { z?: number[] }).z;
+      delete (world as { zx?: number[] }).zx;
+      delete (world as { zh?: number[] }).zh;
+    }
     const st = this.structures;
     const fx: unknown[] = [];
     for (const f of this.fx) {
@@ -813,6 +820,7 @@ export class ServerSim {
       t: this.tick,
       ts: Math.round(now),
       ack: s.ack,
+      sz: this.schemaZombies ? 1 : 0,
       st: [
         Math.ceil(me.hp),
         me.stats.maxHp,

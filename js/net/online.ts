@@ -36,6 +36,7 @@ export interface RoomLike {
     members: { get(id: string): LobbyMember | undefined; forEach(cb: (m: LobbyMember) => void): void };
     ownerId: string;
     bodies: { get(id: string): object | undefined };
+    zombies: { forEach(cb: (e: ZombieRow, key: string) => void): void };
   };
   reconnection: object;
   connection: ConnLike;
@@ -64,6 +65,17 @@ interface ClientLike {
 interface StepCtx {
   isReplay: boolean;
   dt: number;
+}
+// Zombi del Schema de la sala (sólo llegan los que están en la vista de este jugador).
+interface ZombieRow {
+  t: number;
+  x: number;
+  y: number;
+  a: number;
+  fl: number;
+  hp: number;
+  air: number;
+  sw: number;
 }
 interface RecLike {
   state: Record<string, number | boolean>;
@@ -654,11 +666,29 @@ export class Online {
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
     // jugadores, robots, zombis, objetos, balas y estructuras: lo que arma el servidor para este jugador
+    if (s.sz && this.room) this.zombiesFromState(s);
     g.remote.applyWorld(s, ts, { myIdx: this.me ? this.me.idx : -1, identify: (idx: number) => this.identify(idx) });
     this.applyHeavy(s);
     if (Array.isArray(s.fx)) for (const e of s.fx) g.remote.replay(e);
     if (Array.isArray(s.tt) && s.tt.length) g.toast(String(s.tt[s.tt.length - 1]));
     if (s.dg) this.diag = s.dg;
+  }
+
+  // Con los zombis en el Schema de la sala, la foto ya no trae z/zx/zh: se rearman desde el estado (mismo formato).
+  zombiesFromState(s: Snapshot) {
+    const [ox, oy] = s.o;
+    const z: number[] = [];
+    const zx: number[] = [];
+    const zh: number[] = [];
+    this.room?.state.zombies.forEach((e, key) => {
+      const id = Number(key);
+      z.push(id, e.t, e.x - ox, e.y - oy, e.a, e.fl);
+      if (e.hp) zh.push(id, e.hp);
+      if (e.air || e.sw) zx.push(id, e.air, e.sw);
+    });
+    s.z = z;
+    s.zx = zx;
+    s.zh = zh;
   }
 
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).

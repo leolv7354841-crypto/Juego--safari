@@ -33,6 +33,8 @@ export const CONFIG = {
   // tiempo máximo para que todos carguen el mapa antes de empezar igual
   loadSeconds: num('LOAD_SECONDS', 12),
   view: NET.view,
+  // spike: los zombis van en el Schema de la sala con StateView por jugador (SCHEMA_ZOMBIES=0 los deja en la foto)
+  schemaZombies: process.env.SCHEMA_ZOMBIES !== '0',
 };
 
 // ¿Puede entrar una página con este origen?

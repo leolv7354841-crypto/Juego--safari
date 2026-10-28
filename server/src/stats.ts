@@ -10,6 +10,7 @@ export const STATS = {
   skipped: 0, // pasos descartados por atraso (pausas largas del proceso)
   cpu: 0, // % de un núcleo usado por el proceso en el último segundo
   rssMb: 0,
+  tx: 0, // bytes enviados a los clientes por WebSocket (medición)
   startedAt: Date.now(),
 };
 

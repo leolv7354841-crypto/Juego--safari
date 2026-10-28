@@ -38,6 +38,22 @@ export const Body = schema(
   'Body',
 );
 
+// Un zombi visible (spike): cada jugador sólo recibe los que tiene en su StateView. Los mismos números
+// que viajan en los arreglos z/zx/zh de la foto, pero como campos del Schema (con deltas).
+export const ZombieS = schema(
+  {
+    t: t.uint8(), // tipo (índice en TYPES)
+    x: t.int32(),
+    y: t.int32(),
+    a: t.uint8(), // ángulo en 64 pasos
+    fl: t.uint8(), // banderas (zombieFlags)
+    hp: t.uint8(), // vida en % de los heridos con barra; 0 = sin barra
+    air: t.uint16(),
+    sw: t.uint16(), // hinchazón x100
+  },
+  'ZombieS',
+);
+
 export const LobbyState = schema(
   {
     // waiting = esperando · loading = cargando · playing = jugando · finished = finalizada
@@ -49,6 +65,7 @@ export const LobbyState = schema(
     wave: t.uint16(),
     members: t.map(Member),
     bodies: t.map(Body),
+    zombies: t.map(ZombieS).view(),
   },
   'LobbyState',
 );
