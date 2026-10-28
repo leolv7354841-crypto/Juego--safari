@@ -98,7 +98,8 @@ test('permisos del propietario y paso por las fases', async () => {
   await waitFor(() => owner.state.phase === 'playing', 3000, 'jugando');
   await waitFor(() => (oIn.snap?.length || 0) > 3, 3000, 'fotos');
   const s = oIn.snap[oIn.snap.length - 1];
-  assert.ok(Array.isArray(s.me) && s.me.length === 11);
+  assert.ok(!('me' in s), 'el cuerpo viaja en el estado de la sala (bodies), no en la foto');
+  assert.ok(owner.state.bodies.has(owner.sessionId), 'su cuerpo está en el estado sincronizado');
   assert.equal(s.pl.length, PEER_N, 'el otro jugador aparece en la foto');
   // el invitado no puede devolver la sala al lobby
   guest.send('lobby');
@@ -360,7 +361,7 @@ test('entre oleadas llegan las mejoras y la tienda funciona por la red', async (
   sim.director.state = 'waiting';
   sim.addXp(slot, slot.xpNeed);
   slot.money = 2000;
-  const last = () => got.snap[got.snap.length - 1];
+  const last = () => got.snap?.[got.snap.length - 1];
   await waitFor(() => last()?.up, 3000, 'mejoras en la foto');
   const up = last().up;
   assert.deepEqual([last().st[7], last().ec[0]], [2000, 2]);
