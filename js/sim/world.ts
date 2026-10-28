@@ -151,7 +151,6 @@ export class World {
   declare main: FlowField;
   declare dist: Uint16Array;
   declare anchors: Anchor[];
-  declare main2: FlowField;
   declare anchorTurn: number;
   constructor(seed = (Math.random() * 1e9) | 0) {
     this.size = WORLD_SIZE;
@@ -839,8 +838,6 @@ export class World {
       x: 0,
       y: 0,
     }));
-    // segundo campo: hacia el compañero en el modo cooperativo
-    this.main2 = { dist: new Uint16Array(n * n).fill(65535), cell: -1, ok: false };
     this.anchorTurn = 0;
   }
 
@@ -849,7 +846,6 @@ export class World {
     if (v === -1 && this.main) {
       this.main.cell = -1;
       for (const a of this.anchors) a.cell = -1;
-      if (this.main2) this.main2.cell = -1;
     }
   }
 

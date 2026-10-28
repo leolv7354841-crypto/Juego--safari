@@ -48,7 +48,7 @@ export function updateMenu(game, dt) {
   game.input.consume('pause');
 }
 
-// Un paso de la partida en solitario (también la del anfitrión del cooperativo).
+// Un paso de la partida en solitario.
 export function updatePlay(game, dt) {
   game.time += dt;
   const p = game.player;
@@ -72,8 +72,6 @@ export function updatePlay(game, dt) {
   game.flowT -= dt;
   if (game.flowT <= 0) {
     game.world.updateFlow(p.x, p.y);
-    const peer = game.mode.hostedPeer();
-    if (peer && peer.alive) game.world.computeField(game.world.main2, peer.x, peer.y);
     game.flowT = 0.2;
   }
   // un campo de flanqueo por fotograma (repartido): los zombis rodean por rutas reales
@@ -100,25 +98,19 @@ export function updatePlay(game, dt) {
     game.stepT = Math.max(0.12, 0.7 - nc * 0.03) * rand(0.7, 1.3);
   }
   game.music.setDanger(p.alive ? game.horde.danger : 0, dt);
-  // muerto en cooperativo: la cámara sigue suave a tu compañero hasta que revivas
-  const mate = game.mode.companion();
-  if (!p.alive && mate && mate.alive) game.camera.update(dt, mate.x, mate.y, false);
-  else {
-    const look = game.input.mode === 'mouse' ? 50 : 24;
-    game.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
-  }
+  const look = game.input.mode === 'mouse' ? 50 : 24;
+  game.camera.update(dt, p.x + Math.cos(p.angle) * look, p.y + Math.sin(p.angle) * look, false);
   game.muzzle = Math.max(0, game.muzzle - dt * 14);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt * 1.4);
   updateAcid(game, dt);
   updateCombo(game, dt);
   game.updateHud(false);
   if (!p.alive) {
-    if (mate && mate.alive) return;
     game.deathT -= dt;
     if (game.deathT <= 0) gameOver(game);
     return;
   }
-  // en cooperativo las mejoras se eligen entre oleadas (el juego no se pausa para el otro)
+  // en grupo las mejoras se eligen entre oleadas (el juego no se pausa para el otro)
   if (game.pendingLevels > 0 && (!game.mode.inGroup() || game.director.state === 'waiting')) openLevelUp(game);
   else if (game.shopPending) openShop(game);
   else {
@@ -134,7 +126,7 @@ const quieto = (game) => game.input.reset();
 /** @type {Record<string, StateDef>} */
 export const STATES = {
   menu: { music: true, update: updateMenu },
-  // en línea el mundo lo mueve el servidor (y se actualiza aparte); el invitado sólo predice
+  // en línea el mundo lo mueve el servidor (y se actualiza aparte); el cliente sólo predice
   play: {
     music: true,
     update: (game, dt) => {
@@ -171,7 +163,6 @@ export const STATES = {
       drawLookPreview(game, dt);
     },
   },
-  coop: { screen: 'screen-coop' },
   online: { screen: 'screen-online' },
   class: {
     screen: 'screen-class',

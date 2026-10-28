@@ -5,39 +5,29 @@ import * as Rules from './sim/rules.ts';
 import { comboBreak, comboKill, comboTick } from './sim/combo.ts';
 
 export function hitZombie(game, z, b, hx, hy) {
-  // invitado: sus balas son de adorno, el daño real lo calcula el anfitrión
+  // cliente en línea: sus balas son de adorno, el daño real lo calcula el servidor
   if (z.dead || !game.mode.authority()) return;
-  // quién lo hirió (cooperativo: las bajas del compañero le dan el dinero a él)
   if (Rules.hitZombie(game, z, b, hx, hy, () => game.player.shotsHit++)) killZombie(game, z);
 }
 
 export function killZombie(game, z) {
-  // cooperativo: las bajas del compañero le dan el dinero a él
-  const peer = game.mode.hostedPeer();
-  const byPeer = z.lastOwner === 'peer' && !!peer;
   // la baja alarga la racha de quien la hizo y su multiplicador sube el dinero y la experiencia
-  const mult = z.dead || game.state === 'menu' ? 1 : comboKill((byPeer ? peer : game.player).combo, z.type);
+  const mult = z.dead || game.state === 'menu' ? 1 : comboKill(game.player.combo, z.type);
   Rules.killZombie(game, z, {
     kills: game.kills,
     xp: (zb) => addXp(game, Math.round(zb.def.xp * mult)),
     bounty: (zb) => {
       const n = Math.round(Rules.bountyOf(zb.type) * mult);
-      if (byPeer) game.coop.earn(n);
-      else {
-        game.money += n;
-        game.moneyEarned += n;
-      }
+      game.money += n;
+      game.moneyEarned += n;
     },
     // recompensa única del zombi dorado (para quien lo mató)
     golden: (_zb, reward) => {
-      if (byPeer) game.coop.send({ t: 'earn', n: reward, gold: 1 });
-      else {
-        game.money += reward;
-        game.moneyEarned += reward;
-        game.moneyPop(`+$${reward}`, 'gold');
-        game.sfx.gold();
-        game.toast(`¡Zombi dorado! +$${reward}`);
-      }
+      game.money += reward;
+      game.moneyEarned += reward;
+      game.moneyPop(`+$${reward}`, 'gold');
+      game.sfx.gold();
+      game.toast(`¡Zombi dorado! +$${reward}`);
     },
     toast: game.toast,
   });
@@ -96,15 +86,10 @@ export function onGoldenExpired(game, z) {
 }
 
 // Cada golpe de zombi cuesta dinero (una sola vez por golpe).
-export function onZombieHit(game, z, target) {
-  // el golpe al compañero se lo cobra su propio celular (y aquí se le corta la racha)
-  if (target && target.remote) {
-    if (!target.inRobot && !(target.boostT > 0)) comboBreak(target.combo);
-    return game.coop.send({ t: 'hit' });
-  }
+export function onZombieHit(game) {
   // dentro del robot los golpes no te cuestan dinero: los aguanta el blindaje
   if (game.state === 'menu' || game.player.inRobot || game.player.boostT > 0) return;
-  // el golpe corta la racha (la del invitado la corta el anfitrión)
+  // el golpe corta la racha
   if (game.mode.authority()) comboBreak(game.player.combo);
   const loss = Rules.hitLoss(game.money);
   if (loss <= 0) return;
@@ -127,11 +112,9 @@ export function onGiantStep(game, z) {
   }
 }
 
-// Reloj de las rachas que lleva este equipo: la propia y, de anfitrión, la del compañero.
+// Reloj de la racha propia.
 export function updateCombo(game, dt) {
   comboTick(game.player, dt);
-  const peer = game.mode.hostedPeer();
-  if (peer) comboTick(peer, dt);
 }
 
 export function addXp(game, n) {
@@ -139,8 +122,7 @@ export function addXp(game, n) {
 }
 
 export function onPlayerDeath(game) {
-  if (game.mode.onLocalDeath()) return;
-  // la partida venía del cooperativo (tu compañero se fue): se pierde sólo esa
+  // la partida venía de una sala en línea (te fuiste): se pierde sólo esa
   if (!game.mode.savesProgress()) {
     recordScore(game);
     game.deathT = 1.6;
@@ -159,7 +141,6 @@ export function onPlayerDeath(game) {
 }
 
 export function onWaveCleared(game) {
-  game.coop.onWaveCleared();
   game.shopPending = true;
   game.sfx.level();
   game.saveProgress();
@@ -191,11 +172,7 @@ export function onRobotHit(game, dmg) {
   if (Rules.robotHit(game, game.robot, dmg, game.player)) game.toast('¡Robot destruido! Repáralo en la tienda');
 }
 
-// Alrededor de quién aparecen los zombis (cooperativo: de cualquiera de los dos).
+// Alrededor de quién aparecen los zombis.
 export function spawnFocus(game) {
-  const hosted = game.mode.hostedPeer();
-  const peer = hosted && hosted.alive ? hosted : null;
-  if (!peer) return game.player;
-  if (!game.player.alive) return peer;
-  return Math.random() < 0.5 ? game.player : peer;
+  return game.player;
 }

@@ -5,20 +5,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { pause, resume, setState, STATES, stepState } from '../js/states.js';
 
-const ESTADOS = [
-  'menu',
-  'play',
-  'pause',
-  'levelup',
-  'shop',
-  'over',
-  'account',
-  'board',
-  'look',
-  'coop',
-  'online',
-  'class',
-];
+const ESTADOS = ['menu', 'play', 'pause', 'levelup', 'shop', 'over', 'account', 'board', 'look', 'online', 'class'];
 
 // Un juego mínimo: pantallas falsas, música y entrada que anotan lo que les piden.
 function juego(over = {}) {
@@ -60,7 +47,7 @@ test('cada pantalla pertenece a un solo estado', () => {
     .map((s) => s.screen)
     .filter(Boolean);
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(ids.length, 10);
+  assert.equal(ids.length, 9);
 });
 
 test('setState enseña solo la pantalla del estado y pone su clase', () => {
@@ -157,7 +144,7 @@ test('stepState ejecuta el update del estado actual', () => {
   assert.equal(g.state, 'over');
 });
 
-test('si el modo avanza el fotograma (invitado, en línea) no corre la simulación local', () => {
+test('si el modo avanza el fotograma (en línea) no corre la simulación local', () => {
   let guest = 0;
   const g = juego({ state: 'play', mode: { step: () => ++guest > 0 } });
   stepState(g, 0.016);

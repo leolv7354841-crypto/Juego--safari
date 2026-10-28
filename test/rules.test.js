@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BOUNTY, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.ts';
 import { ACID } from '../js/sim/build.ts';
-import { CoopGuest, CoopHost, Solo } from '../js/net/mode.ts';
+import { OnlineClient, ServerMode, Solo } from '../js/net/mode.ts';
 import * as Rules from '../js/sim/rules.ts';
 import { bullet, fakeGame, silent, zombie } from './helpers.js';
 
@@ -113,7 +113,7 @@ test('el gigante deja caja y botiquín, sacude la cámara y avisa', () => {
   assert.deepEqual(calls.toasts, ['Gigante abatido']);
 });
 
-test('sin armas de repuesto ni cooperativo no cae munición', () => {
+test('sin armas de repuesto ni grupo no cae munición', () => {
   const { game, calls, hooks } = mundo({ player: { weapons: [{}] } });
   const antes = Math.random;
   Math.random = () => 0; // la tirada más baja: caería munición si hubiera con qué usarla
@@ -123,8 +123,8 @@ test('sin armas de repuesto ni cooperativo no cae munición', () => {
     Math.random = antes;
   }
   assert.ok(!calls.drops.includes('ammo'));
-  // con cooperativo sí
-  const w = mundo({ player: { weapons: [{}] }, mode: new CoopHost(null) });
+  // en grupo sí
+  const w = mundo({ player: { weapons: [{}] }, mode: new ServerMode(null) });
   Math.random = () => 0;
   try {
     Rules.killZombie(w.game, muerto('normal'), w.hooks);
@@ -223,8 +223,8 @@ test('el ácido puede matar y entonces avisa una vez y se apaga', () => {
   assert.equal(resto, 0);
 });
 
-test('los cohetes no explotan en quien solo mira (invitado o cliente en línea)', () => {
-  const { game, calls } = mundo({ mode: new CoopGuest(null) });
+test('los cohetes no explotan en quien solo mira (cliente en línea)', () => {
+  const { game, calls } = mundo({ mode: new OnlineClient(null) });
   Rules.rocketBlast(game, 0, 0);
   Rules.rocketHit(game, muerto('fat'), 0, 0, bullet());
   assert.equal(calls.blast, 0);

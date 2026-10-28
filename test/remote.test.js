@@ -1,11 +1,10 @@
 // Formato común de las fotos (net/snapshot.js) y lo que hace con ellas quien solo mira (net/remote.js):
-// el invitado del cooperativo y el cliente en línea.
+// el cliente en línea.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { NET } from '../js/core/config.ts';
-import { Coop } from '../js/net/coop.ts';
 import { Interp } from '../js/net/netcode.ts';
-import { NetStats, Remote, GUEST_IDX, HOST_IDX } from '../js/net/remote.ts';
+import { NetStats, Remote } from '../js/net/remote.ts';
 import { PEER_N, ROBOT_N, ZOMBIE_N, WORLD_KEYS, encodeStatic, encodeWorld } from '../js/net/snapshot.ts';
 import { Bullets } from '../js/sim/bullets.ts';
 import { Director } from '../js/sim/director.ts';
@@ -17,7 +16,11 @@ import { Horde } from '../js/sim/zombies.ts';
 import { World } from '../js/sim/world.ts';
 import { silent } from './helpers.js';
 
-// Un mundo "de verdad" (sin pantalla): lo que arma el anfitrión o el servidor.
+// Índices de jugador que da el servidor: el otro jugador y el propio.
+const OTRO_IDX = 0;
+const MI_IDX = 1;
+
+// Un mundo "de verdad" (sin pantalla): lo que arma el servidor.
 function simulacion() {
   const horde = new Horde();
   const sim = {
@@ -141,8 +144,8 @@ test('ida y vuelta: lo que el anfitrión codifica, el que mira lo reconstruye', 
   rb.hp = 4000;
   const snap = {
     ...encodeWorld(sim, vistaDe({ x: 300, y: 330 }), {
-      players: [{ idx: HOST_IDX, p: host }],
-      robots: [{ idx: HOST_IDX, r: rb }],
+      players: [{ idx: OTRO_IDX, p: host }],
+      robots: [{ idx: OTRO_IDX, r: rb }],
       skipBullet: (b) => b.owner === 'peer',
     }),
     ...encodeStatic(sim.structures),
@@ -153,25 +156,24 @@ test('ida y vuelta: lo que el anfitrión codifica, el que mira lo reconstruye', 
   const { game, remote } = juegoRemoto();
   remote.start();
   remote.applyWorld(rx, 1000, {
-    myIdx: GUEST_IDX,
-    identify: () => ({ name: 'Ana', look: { hat: 'x' } }),
+    myIdx: MI_IDX,
+    identify: () => ({ name: 'Ana', code: '' }),
     collide: false,
   });
   // zombi
   assert.equal(game.horde.list.length, 1);
   assert.equal(game.horde.list[0].type, 'sprinter');
   assert.equal(game.horde.list[0].burn, 1);
-  // anfitrión como otro jugador
-  const q = remote.peers.get(HOST_IDX);
+  // el otro como jugador remoto
+  const q = remote.peers.get(OTRO_IDX);
   assert.equal(q.name, 'Ana');
-  assert.deepEqual(q.look, { hat: 'x' });
   assert.equal(q.weapon.id, 'shotgun');
   assert.equal(q.weapon.mag, 3);
   assert.equal(q.reloadT, 0.4);
   assert.equal(q.hp, 77);
   assert.equal(q.running, true);
-  // el robot del anfitrión es de otro: va aparte y no toca game.robot
-  assert.equal(remote.robots.get(HOST_IDX).hp, 4000);
+  // el robot del otro es de otro: va aparte y no toca game.robot
+  assert.equal(remote.robots.get(OTRO_IDX).hp, 4000);
   assert.equal(game.robot.owned, false);
   // objetos, balas (la del compañero no viaja) y barricadas
   assert.equal(game.pickups.list.length, 1);
@@ -199,19 +201,6 @@ test('los zombis se mueven interpolando entre dos fotos, con retraso, sin saltos
   assert.ok(game.horde.list[0].x > 100);
 });
 
-test('el invitado puede adelantar más que el cliente en línea (extrapolate)', () => {
-  const a = juegoRemoto();
-  const b = juegoRemoto();
-  a.remote.start(); // en línea: NET.maxExtrapolate
-  b.remote.start(250); // cooperativo
-  for (const { remote } of [a, b]) {
-    remote.applyWorld({ o: [0, 0], z: [1, 0, 0, 0, 0, 0] }, 1000);
-    remote.applyWorld({ o: [0, 0], z: [1, 0, 100, 0, 0, 0] }, 1100);
-    remote.placeZombies(2000, 0.016, new Player(0, 0));
-  }
-  assert.ok(b.game.horde.list[0].x > a.game.horde.list[0].x);
-});
-
 test('un zombi que ya no viene en la foto desaparece; los que siguen conservan su sprite y su animación', () => {
   const { game, remote } = juegoRemoto();
   remote.start();
@@ -235,16 +224,6 @@ test('jugadores nuevos se crean con Interp y los que se van se borran', () => {
   assert.equal(remote.peers.get(3).name, 'J3');
   remote.applyWorld({ pl: pl(3) }, 2);
   assert.deepEqual([...remote.peers.keys()], [3]);
-});
-
-test('el compañero que se simula aquí (sin Interp) no lo mueve placePeers', () => {
-  const { remote } = juegoRemoto();
-  remote.start();
-  const peer = new Player(5, 6);
-  remote.peers.set(1, peer);
-  remote.placePeers(1000, 0.016);
-  assert.equal(peer.x, 5);
-  assert.equal(peer.y, 6);
 });
 
 test('las barricadas chocan en el mapa local solo con collide (predicción en línea)', () => {
@@ -293,34 +272,4 @@ test('NetStats da una lectura por segundo con fotos y fotogramas', () => {
   assert.equal(r.fps, 60);
   assert.equal(r.per, 2);
   assert.equal(s.tick(0.1), null);
-});
-
-test('el anfitrión del cooperativo arma su foto con el mismo formato que el servidor', () => {
-  const sim = simulacion();
-  const game = {
-    ...sim,
-    player: new Player(500, 500),
-    robot: new Robot(),
-    level: 4,
-    xp: 10.4,
-    xpNeed: 90,
-    kills: { normal: 3 },
-  };
-  const coop = new Coop(game);
-  coop.peer = new Player(520, 510);
-  coop.snapSeq = 0;
-  coop.snapN = 0;
-  sim.horde.spawn('normal', 530, 520);
-  const s = coop.snapshot();
-  for (const k of WORLD_KEYS) assert.ok(k in s, `falta ${k}`);
-  assert.equal(s.t, 's');
-  assert.equal(s.q, 1);
-  assert.equal(s.pl.length, PEER_N);
-  assert.equal(s.pl[0], HOST_IDX, 'el anfitrión es el jugador 0 para el invitado');
-  assert.equal(s.lv, 4);
-  assert.equal(s.xp, 10);
-  // la primera foto lleva además las estructuras y las bajas; la segunda no
-  assert.ok(Array.isArray(s.blk) && Array.isArray(s.wir) && Array.isArray(s.sc));
-  assert.deepEqual(s.kl, { normal: 3 });
-  assert.equal('blk' in coop.snapshot(), false);
 });

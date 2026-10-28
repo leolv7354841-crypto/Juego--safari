@@ -18,7 +18,7 @@ export class Director {
   declare queue: string[];
   declare spawnT: number;
   declare waveSize: number;
-  /** partida cooperativa o en línea (lo pone quien crea la partida) */
+  /** partida de grupo en línea (lo pone el servidor): menos zombis y más duros */
   declare coop?: boolean;
   /** multiplicador de zombis en línea (NET.crowd) */
   declare crowd?: number;
@@ -34,7 +34,7 @@ export class Director {
   }
 
   get hpMult() {
-    // cooperativo: 1,4 veces la vida, pero la mitad de zombis (ver startWave)
+    // en grupo: 1,4 veces la vida, pero la mitad de zombis (ver startWave)
     return WAVES.hp * (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 1.4 : 1);
   }
   get speedMult() {
@@ -46,7 +46,7 @@ export class Director {
     const w = this.wave;
     // hordas masivas: 5 veces más normales y velocistas que antes
     // el 20% de los normales llega como policía SWAT
-    // cooperativo: la mitad de zombis que en solitario (eran demasiados)
+    // en grupo: la mitad de zombis que en solitario (eran demasiados)
     // en línea: crowd crece con el número de jugadores (ver NET.crowd)
     // WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno
     const m = (this.coop ? this.crowd || 0.5 : 1) * WAVES.count;
@@ -127,7 +127,7 @@ export class Director {
   }
 
   // Lo que ve cada jugador vivo: caja { x, y, hw, hh }. El de este equipo usa su cámara real;
-  // los demás (cooperativo, servidor) mandan su media pantalla (vw, vh) y nunca se toma menos
+  // los demás (servidor) mandan su media pantalla (vw, vh) y nunca se toma menos
   // que WAVES.view, por si aún no llegó o la mandan mal.
   views(game: GameHost): View[] {
     const [vw, vh] = WAVES.view;
@@ -140,9 +140,6 @@ export class Director {
     const cam = game.camera;
     const p = game.player;
     if (p && p.alive) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
-    const peer = game.mode.hostedPeer();
-    if (peer && peer.alive)
-      out.push({ x: peer.x, y: peer.y, hw: Math.max(vw, peer.vw || 0), hh: Math.max(vh, peer.vh || 0) });
     if (!out.length && p) out.push({ x: cam.x, y: cam.y, hw: cam.viewW / 2, hh: cam.viewH / 2 });
     return out;
   }
@@ -161,7 +158,7 @@ export class Director {
       for (const p of game.targets) if (p.alive && p.field && world.reachable(x, y, p.field)) return true;
       return false;
     }
-    return world.reachable(x, y) || (!!game.mode.hostedPeer() && world.reachable(x, y, world.main2));
+    return world.reachable(x, y);
   }
 
   // Durante toda la ronda: el zombi que nadie ve y quedó lejos de todos (WAVES.lost) o atascado

@@ -589,7 +589,7 @@ export class Online {
     if (Number.isFinite(tm) && Math.abs(tm - g.time) > 2) g.time = tm;
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
-    // jugadores, robots, zombis, objetos, balas y estructuras: lo mismo que ve el invitado del cooperativo
+    // jugadores, robots, zombis, objetos, balas y estructuras: lo que arma el servidor para este jugador
     g.remote.applyWorld(s, ts, { myIdx: this.me ? this.me.idx : -1, identify: (idx: number) => this.identify(idx) });
     this.applyHeavy(s);
     if (Array.isArray(s.fx)) for (const e of s.fx) g.remote.replay(e);

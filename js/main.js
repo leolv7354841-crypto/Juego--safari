@@ -5,7 +5,6 @@ import { xpForLevel, BUILD_ORDER, THROWABLES, GOLDEN, CLASS_ORDER } from './core
 import { isClass } from './sim/abilities.ts';
 import { Music } from './ui/music.js';
 import { Robot } from './sim/robot.ts';
-import { Coop } from './net/coop.ts';
 import { Online } from './net/online.ts';
 import { Solo } from './net/mode.ts';
 import { Remote } from './net/remote.ts';
@@ -63,9 +62,8 @@ class Game {
     this.structures = new Structures();
     this.robot = new Robot();
     this.mode = new Solo(this);
-    // lo que llega por la red (jugadores, zombis, balas de adorno) en el cooperativo y en línea
+    // lo que llega por la red (jugadores, zombis, balas de adorno) en línea
     this.remote = new Remote(this);
-    this.coop = new Coop(this);
     this.online = new Online(this);
     this.base = { z: 1, tx: 0, ty: 0 };
     this.view = { x0: 0, y0: 0, x1: 0, y1: 0 };
@@ -136,7 +134,7 @@ class Game {
   onSuperPunch = (z, x, y) => Ev.onSuperPunch(this, z, x, y);
   applyAcid = () => Ev.applyAcid(this);
   onGoldenExpired = (z) => Ev.onGoldenExpired(this, z);
-  onZombieHit = (z, target) => Ev.onZombieHit(this, z, target);
+  onZombieHit = () => Ev.onZombieHit(this);
   onGiantStep = (z) => Ev.onGiantStep(this, z);
   onPlayerDeath = () => Ev.onPlayerDeath(this);
   onWaveCleared = () => Ev.onWaveCleared(this);
@@ -247,7 +245,6 @@ class Game {
     this.last = now;
     try {
       adaptQuality(this, dt);
-      this.coop.tick(dt);
       this.online.tick(dt);
       updateNetStat(this, dt);
       // en línea el mundo sigue aunque haya otra pantalla encima (mejoras, tienda, pausa)

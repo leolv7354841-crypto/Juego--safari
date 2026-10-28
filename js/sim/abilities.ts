@@ -133,7 +133,5 @@ export const Abilities = {
     p.recoil = 1;
     if (p === game.player) game.camera.shake(0.05);
     game.particles.muzzleSmoke(ox, oy, p.angle);
-    // invitado en cooperativo: las balas que de verdad hacen daño las crea el anfitrión
-    game.mode.reportShot(ox, oy, fired, d, p.stats);
   },
 };

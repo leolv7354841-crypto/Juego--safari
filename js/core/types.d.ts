@@ -140,7 +140,7 @@ export interface GameHost {
   robot?: Robot;
   time: number;
   state: string;
-  // En línea (servidor): jugadores en vez de game.player / el compañero del cooperativo.
+  // En línea (servidor): jugadores en vez de game.player.
   targets?: Player[] | null;
   // Quién manda en esta partida (js/net/mode.js)
   mode: Mode;
@@ -155,7 +155,6 @@ export interface GameHost {
     kick(...a: any[]): void;
     [k: string]: any;
   };
-  coop: { peerPickup(it: any): boolean; [k: string]: any };
   // any: lo cumplen las clases Particles/Sfx/Decals y las grabadoras del servidor
   particles: any;
   decals: any;
@@ -199,7 +198,7 @@ declare global {
   var __DZ_VERSION__: string | undefined;
 }
 
-// Foto del mundo (js/net/snapshot.js): la misma en el cooperativo (anfitrión) y en línea (servidor).
+// Foto del mundo (js/net/snapshot.js): la que arma el servidor en línea.
 // Son listas planas de números; los tamaños por elemento están como constantes en snapshot.js.
 export interface WorldSnap {
   /** Origen (x, y) al que son relativas las posiciones de `z`. */
@@ -232,17 +231,4 @@ export interface WorldSnap {
   blk?: number[][];
   wir?: number[][];
   sc?: number[][];
-}
-
-/** Foto del anfitrión del cooperativo: el mundo + la experiencia del equipo (`t: 's'` en el canal rápido). */
-export interface CoopSnap extends WorldSnap {
-  t: 's';
-  q: number;
-  ts: number;
-  lv: number;
-  xp: number;
-  xn: number;
-  /** Racha del invitado: bajas seguidas y décimas que le quedan (sim/combo.js). */
-  cb: number[];
-  kl?: number;
 }
