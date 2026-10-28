@@ -480,7 +480,7 @@ test('la foto del servidor lleva la parte del mundo y el jugador de otro entra c
   assert.equal(snap.pl[0], 2, 'el compañero es Beto (idx 2)');
   assert.ok(snap.z.length % ZOMBIE_N === 0);
   // lo propio de cada jugador sigue ahí
-  for (const k of ['me', 'st', 'wp', 'ec', 'ps', 'iv', 'ab']) assert.ok(k in snap, `falta ${k}`);
+  for (const k of ['st', 'wp', 'ec', 'ps', 'iv', 'ab']) assert.ok(k in snap, `falta ${k}`);
 });
 
 test('la racha es de quien mata: multiplica su dinero, la corta un golpe y va en su foto', () => {

@@ -6,7 +6,7 @@
 // servidor y se corrige al llegar el estado confirmado (js/net/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
 import { NET, WEAPONS, GOLDEN, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE, CLASS_ORDER } from '../core/config.ts';
-import { Predictor, ServerClock, unpackBody, TICK } from './netcode.ts';
+import { ServerClock, applyMove, BODY } from './netcode.ts';
 import { IN_RUN, IN_FIRE, IN_RELOAD } from './protocol.ts';
 import { lookCode } from '../render/sprites.js';
 import { UPGRADES } from '../sim/upgrades.ts';
@@ -35,6 +35,8 @@ export interface RoomLike {
   state: {
     members: { get(id: string): LobbyMember | undefined; forEach(cb: (m: LobbyMember) => void): void };
     ownerId: string;
+    bodies: { get(id: string): object | undefined };
+    zombies?: { forEach(cb: (e: ZombieRow, key: string) => void): void };
   };
   reconnection: object;
   connection: ConnLike;
@@ -45,15 +47,51 @@ export interface RoomLike {
   onLeave(cb: (code: number) => void): void;
   onError(cb: (code: number, msg?: string) => void): void;
   send(type: string, m?: unknown): void;
+  input(opts?: { mode?: 'reliable' | 'unreliable'; renderDelay?: number }): InputLike;
   leave(consented?: boolean): Promise<void>;
+}
+// Canal de entradas del SDK (room.input()): se rellena `data` y send() manda una entrada y devuelve su secuencia.
+export interface InputLike {
+  data: { mx: number; my: number; f: number; a: number; w: number };
+  send(): number;
+  sentCount: number;
 }
 interface ClientLike {
   create(name: string, opts: object): Promise<RoomLike>;
   joinById(id: string, opts: object): Promise<RoomLike>;
   reconnect(token: string): Promise<RoomLike>;
 }
+// Módulo predict del SDK (Reconciler): rebobina al cuerpo confirmado por el servidor y repite las entradas sin confirmar.
+interface StepCtx {
+  isReplay: boolean;
+  dt: number;
+}
+// Zombi del Schema de la sala (sólo llegan los que están en la vista de este jugador).
+interface ZombieRow {
+  t: number;
+  x: number;
+  y: number;
+  a: number;
+  fl: number;
+  hp: number;
+  air: number;
+  sw: number;
+}
+interface RecLike {
+  state: Record<string, number | boolean>;
+  value(field: string): number;
+  lastCorrection: Record<string, number>;
+  lastCorrectionMag: number;
+  pendingCount: number;
+}
+interface PredictLike {
+  reconciler(instance: object, opts: object): RecLike;
+  tick(now?: number): number;
+  dispose(): void;
+}
 interface SdkLike {
   Client: new (url: string) => ClientLike;
+  Predict: { get(room: RoomLike, opts?: object): PredictLike };
 }
 type IdsMsg = { ids?: string[] } | null;
 type LoadMsg = { seed: number; ids?: string[] };
@@ -89,7 +127,6 @@ const STAT_KEYS = [
   'reloadMult',
   'cdMult',
 ];
-const r3 = (v: number) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
 const IDLE = 4101;
@@ -115,7 +152,7 @@ export class Online {
   declare reconnecting: boolean;
   declare seed: number;
   declare clock: ServerClock;
-  declare batch: number[][];
+  declare inp: InputLike | null;
   declare rtt: number;
   declare jitter: number;
   declare diag: Diag | null;
@@ -125,9 +162,11 @@ export class Online {
   declare sdkP: Promise<SdkLike> | null;
   declare shutdown: boolean;
   declare pingT: number;
-  declare pred: Predictor;
-  declare phys: { x: number; y: number };
-  declare fresh: boolean;
+  declare Sdk: SdkLike | null;
+  declare predict: PredictLike | null;
+  declare rec: RecLike | null;
+  // correcciones de posición del último periodo (para el diagnóstico)
+  declare corr: { n: number; sum: number; max: number; snaps: number };
   declare acc: number;
   declare lastQ: number;
   declare wantReload: boolean;
@@ -146,7 +185,11 @@ export class Online {
     this.reconnecting = false;
     this.seed = 0;
     this.clock = new ServerClock();
-    this.batch = [];
+    this.inp = null;
+    this.Sdk = null;
+    this.predict = null;
+    this.rec = null;
+    this.corr = { n: 0, sum: 0, max: 0, snaps: 0 };
     this.rtt = 0;
     this.jitter = 0;
     this.diag = null;
@@ -199,7 +242,7 @@ export class Online {
   async client() {
     const url = this.serverUrl();
     if (!url) throw new Error('sin-servidor');
-    const C = await this.sdk();
+    const C = (this.Sdk = await this.sdk());
     return new C.Client(url);
   }
 
@@ -252,6 +295,7 @@ export class Online {
   attach(room: RoomLike) {
     const g = this.game;
     this.room = room;
+    this.inp = null;
     this.leaving = false;
     this.shutdown = false;
     this.results = null;
@@ -402,11 +446,12 @@ export class Online {
     const p = g.player;
     // la clase la confirma el servidor en cada foto (ab)
     p.cls = g.classPick;
-    this.pred = new Predictor(p, g.world);
-    this.phys = { x: p.x, y: p.y };
-    this.fresh = true;
+    this.rec = null;
+    this.predict?.dispose();
+    this.predict = null;
+    this.corr = { n: 0, sum: 0, max: 0, snaps: 0 };
     this.acc = 0;
-    this.batch = [];
+    this.inp = null;
     this.lastQ = 0;
     // los demás jugadores, zombis y robots se dibujan interpolando (js/net/remote.js)
     g.remote.start();
@@ -448,16 +493,56 @@ export class Online {
     }
     if (!this.playing) return;
     const p = this.game.player;
-    this.acc += dt;
-    let n = 0;
-    while (this.acc >= TICK && n < 5) {
-      this.acc -= TICK;
-      n++;
-      if (p.alive) this.stepInput();
+    if (!this.rec && !this.tryPredict()) return;
+    // el SDK reparte el tiempo en pasos fijos (NET.tickHz) y suaviza las correcciones
+    const n = this.predict ? this.predict.tick(performance.now()) : 0;
+    for (let i = 0; i < n; i++) if (p.alive) this.stepInput();
+  }
+
+  // Crea el reconciliador del SDK cuando ya llegó el cuerpo propio en el estado de la sala.
+  tryPredict() {
+    const g = this.game;
+    const room = this.room;
+    if (!room || !this.Sdk) return false;
+    const body = room.state.bodies?.get(room.sessionId);
+    if (!body) return false;
+    const input = (this.inp ||= room.input({ mode: 'reliable' }));
+    const p = g.player;
+    const quiet = { world: g.world, sfx: new Proxy({}, { get: () => () => {} }) } as unknown as Parameters<
+      typeof applyMove
+    >[2];
+    this.predict = this.Sdk.Predict.get(room);
+    this.rec = this.predict.reconciler(body, {
+      input,
+      snap: NET.snapDist,
+      // activa la telemetría de correcciones (lastCorrectionMag) para el diagnóstico; nunca avisa por consola
+      warnOnDivergence: 1e9,
+      // Player.move sobre el cuerpo del jugador: el mismo código y el mismo paso (1/tickHz) que el servidor
+      step: (ctx: StepCtx, st: Record<string, number | boolean>, cmd: Cmd) => {
+        for (const k of BODY) p[k] = st[k] as number;
+        p.exhausted = !!st.exhausted;
+        applyMove(p, cmd, ctx.isReplay ? quiet : g);
+        for (const k of BODY) st[k] = p[k];
+        st.exhausted = !!p.exhausted;
+      },
+      onReconcile: () => this.noteCorrection(),
+    });
+    for (const k of BODY) p[k] = (this.rec.state[k] as number) ?? p[k];
+    g.camera.x = p.x;
+    g.camera.y = p.y;
+    return true;
+  }
+
+  noteCorrection() {
+    // sólo la posición (lastCorrectionMag mezcla también aguante, velocidad, etc.)
+    const lc = this.rec ? this.rec.lastCorrection : null;
+    const e = lc ? Math.hypot(lc.x || 0, lc.y || 0) : 0;
+    if (e > 0.5) {
+      this.corr.n++;
+      this.corr.sum += e;
+      this.corr.max = Math.max(this.corr.max, e);
+      if (e > NET.snapDist) this.corr.snaps++;
     }
-    // tras una pausa larga (pestaña oculta) no se intenta recuperar todo de golpe
-    if (this.acc > TICK * 5) this.acc = 0;
-    while (this.batch.length) this.send('in', { i: this.batch.splice(0, 10) });
   }
 
   stepInput() {
@@ -474,20 +559,24 @@ export class Online {
       f |= IN_RELOAD;
       this.wantReload = false;
     }
+    // lo que viaja es float32: se predice con el mismo valor que decodifica el servidor
     const cmd: Cmd = {
-      s: 0, // lo pone pred.step
-      mx: r3(mv.x),
-      my: r3(mv.y),
+      s: 0, // la secuencia la da el SDK al enviar
+      mx: Math.fround(mv.x),
+      my: Math.fround(mv.y),
       f,
-      a: r3(p.angle),
+      a: Math.fround(p.angle),
       w: p.wi,
     };
-    p.x = this.phys.x;
-    p.y = this.phys.y;
-    this.pred.step(cmd, g);
-    this.phys.x = p.x;
-    this.phys.y = p.y;
-    this.batch.push([cmd.s, cmd.mx, cmd.my, cmd.f, cmd.a, cmd.w]);
+    if (this.room) {
+      const d = (this.inp ||= this.room.input({ mode: 'reliable', renderDelay: NET.interpDelay })).data;
+      d.mx = cmd.mx;
+      d.my = cmd.my;
+      d.f = cmd.f;
+      d.a = cmd.a;
+      d.w = cmd.w;
+      cmd.s = this.inp.send();
+    }
   }
 
   // ¿Hay una tanda de mejoras del servidor sin elegir?
@@ -522,9 +611,11 @@ export class Online {
     if (live && p.alive) p.act(dt, g, inp.move());
     // espera de la habilidad y megarráfaga propia (de adorno: las balas reales son del servidor)
     Abilities.update(dt, g, p);
-    this.pred.decay(dt);
-    p.x = this.phys.x + this.pred.ox;
-    p.y = this.phys.y + this.pred.oy;
+    if (this.rec) {
+      p.x = this.rec.value('x');
+      p.y = this.rec.value('y');
+      p.legAngle = this.rec.value('legAngle');
+    }
     const R = g.remote;
     R.followRobot(g.robot, p, dt);
     const rt = this.clock.now(performance.now()) - NET.interpDelay;
@@ -563,21 +654,6 @@ export class Online {
     this.clock.sync(Number(s.ts), now);
     const ts = Number(s.ts);
     const p = g.player;
-    // estado confirmado propio: se reconcilia en la posición física (sin el desfase visual)
-    p.x = this.phys.x;
-    p.y = this.phys.y;
-    if (this.fresh) {
-      unpackBody(p, s.me);
-      this.pred.pending.length = 0;
-      this.pred.ox = this.pred.oy = 0;
-      this.fresh = false;
-      g.camera.x = p.x;
-      g.camera.y = p.y;
-    } else this.pred.reconcile(s.me, Number(s.ack) || 0);
-    this.phys.x = p.x;
-    this.phys.y = p.y;
-    p.x += this.pred.ox;
-    p.y += this.pred.oy;
     this.applyStats(p, s);
     const d = g.director;
     d.wave = s.w | 0;
@@ -590,11 +666,30 @@ export class Online {
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
     // jugadores, robots, zombis, objetos, balas y estructuras: lo que arma el servidor para este jugador
+    if (s.sz && this.room) this.zombiesFromState(s);
     g.remote.applyWorld(s, ts, { myIdx: this.me ? this.me.idx : -1, identify: (idx: number) => this.identify(idx) });
     this.applyHeavy(s);
     if (Array.isArray(s.fx)) for (const e of s.fx) g.remote.replay(e);
     if (Array.isArray(s.tt) && s.tt.length) g.toast(String(s.tt[s.tt.length - 1]));
     if (s.dg) this.diag = s.dg;
+  }
+
+  // Con los zombis en el Schema de la sala, la foto ya no trae z/zx/zh: se rearman desde el estado (mismo formato).
+  zombiesFromState(s: Snapshot) {
+    const [ox, oy] = s.o;
+    const z: number[] = [];
+    const zx: number[] = [];
+    const zh: number[] = [];
+    // el mapa no existe en el cliente hasta que el primer zombi entra en su vista
+    this.room?.state.zombies?.forEach((e, key) => {
+      const id = Number(key);
+      z.push(id, e.t, e.x - ox, e.y - oy, e.a, e.fl);
+      if (e.hp) zh.push(id, e.hp);
+      if (e.air || e.sw) zx.push(id, e.air, e.sw);
+    });
+    s.z = z;
+    s.zx = zx;
+    s.zh = zh;
   }
 
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
@@ -650,8 +745,7 @@ export class Online {
       g.camera.shake(0.6);
       g.input.reset();
     }
-    // al revivir aparece junto a un compañero: salto directo
-    if (!p.alive && alive) this.fresh = true;
+    // al revivir aparece junto a un compañero: el salto lo absorbe el reconciliador (opción snap)
     p.hp = hp;
     p.stats.maxHp = Number(st[1]) || 100;
     p.alive = alive;
@@ -767,8 +861,8 @@ export class Online {
   // Construir, lanzar o subir al robot: el servidor lo hace al llegar a la última entrada que
   // mandamos (s), así ocurre donde se veía el jugador y hacia donde apuntaba.
   act(k: string, extra: Record<string, unknown> = {}) {
-    if (!this.pred) return;
-    this.send('act', { s: this.pred.seq, k, ...extra });
+    if (!this.inp) return;
+    this.send('act', { s: this.inp.sentCount, k, ...extra });
     if (k === 'ab') this.abAt = performance.now();
   }
 
@@ -825,7 +919,13 @@ export class Online {
     const kout = this.bytesOut / 1024 / secs;
     this.bytesIn = 0;
     this.bytesOut = 0;
-    const c = this.pred ? this.pred.takeStats() : { n: 0, avg: 0, max: 0, snaps: 0 };
+    const c = {
+      n: this.corr.n,
+      avg: this.corr.n ? this.corr.sum / this.corr.n : 0,
+      max: this.corr.max,
+      snaps: this.corr.snaps,
+    };
+    this.corr = { n: 0, sum: 0, max: 0, snaps: 0 };
     const el = this.game.$('net-diag');
     if (!el.hidden) {
       const d = this.diag;
@@ -840,7 +940,7 @@ export class Online {
         `Fotos recibidas: ${per}/s (envío ${NET.snapHz}/s) · retraso de dibujo ${NET.interpDelay} ms`,
         `Datos: ↓ ${kin.toFixed(1)} KB/s · ↑ ${kout.toFixed(1)} KB/s (WebSocket, sin cabeceras TCP/TLS)`,
         `Correcciones: ${c.n}/s · media ${c.avg.toFixed(1)} px · máx ${c.max.toFixed(1)} px · saltos ${c.snaps}`,
-        `Entradas sin confirmar: ${this.pred ? this.pred.pending.length : 0} · FPS ${fps}`,
+        `Entradas sin confirmar: ${this.rec ? this.rec.pendingCount : 0} · FPS ${fps}`,
         'Pérdida de paquetes: no se mide (WebSocket va sobre TCP y la oculta con reenvíos).',
       ]
         .filter(Boolean)

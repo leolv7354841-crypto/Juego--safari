@@ -10,6 +10,10 @@ export const STATS = {
   skipped: 0, // pasos descartados por atraso (pausas largas del proceso)
   cpu: 0, // % de un núcleo usado por el proceso en el último segundo
   rssMb: 0,
+  lagN: 0, // disparos medidos con el rebobinado (paso 4)
+  lagSum: 0, // px que se movieron los zombis entre lo que veía quien disparó y la posición actual
+  lagMax: 0,
+  tx: 0, // bytes enviados a los clientes por WebSocket (medición)
   startedAt: Date.now(),
 };
 

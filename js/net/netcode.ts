@@ -62,7 +62,9 @@ export class Predictor {
 
   // game: el juego real (para los sonidos); en las repeticiones se usa uno mudo.
   step(cmd: Cmd, game?: Pick<GameHost, 'world' | 'sfx'>) {
-    cmd.s = ++this.seq;
+    // la secuencia puede venir ya puesta (la del SDK al enviar); si no, se numera aquí
+    cmd.s = cmd.s > 0 ? cmd.s : this.seq + 1;
+    this.seq = cmd.s;
     applyMove(this.p, cmd, game || this.quiet);
     this.pending.push(cmd);
     // si el servidor deja de confirmar, no se acumula sin fin

@@ -12,7 +12,7 @@ import { Pickups } from '../../../js/sim/pickups.ts';
 import { Player } from '../../../js/sim/player.ts';
 import { Structures } from '../../../js/sim/build.ts';
 import { Robot } from '../../../js/sim/robot.ts';
-import { applyMove, packBody, TICK } from '../../../js/net/netcode.ts';
+import { applyMove, TICK } from '../../../js/net/netcode.ts';
 import { ServerMode } from '../../../js/net/mode.ts';
 import { encodeWorld } from '../../../js/net/snapshot.ts';
 import { IN_RELOAD, IN_FIRE, IN_RUN, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/net/protocol.ts';
@@ -70,12 +70,17 @@ export const STAT_KEYS = [
 
 type Fx = { e: unknown[]; x?: number; y?: number; by: string | null };
 
+// Origen de las entradas de un jugador: el buffer de Colyseus (defineInput). ack = entradas ya consumidas.
+export type CmdPort = { size: number; next(): Cmd | undefined; ack(): number };
+
 export type Slot = {
   id: string;
   idx: number;
   name: string;
   p: any;
   queue: Cmd[];
+  // entradas del canal de Colyseus (las pone la sala); si hay, la cola propia no se usa
+  port?: CmdPort;
   last: Cmd;
   ack: number;
   kills: number;
@@ -124,6 +129,7 @@ export class ServerSim {
   toastTo: string | null = null;
   lastPos = { x: 0, y: 0, ok: false };
   game: any;
+  schemaZombies = false;
   flowT = 0;
   goldenT = GOLDEN.firstAfter;
   waitT = 0;
@@ -690,9 +696,10 @@ export class ServerSim {
     for (const s of live) {
       const p = s.p;
       if (!p.alive) continue;
-      const n = s.queue.length > BACKLOG ? 2 : 1;
+      const port = s.port;
+      const n = (port ? port.size : s.queue.length) > BACKLOG ? 2 : 1;
       for (let k = 0; k < n; k++) {
-        let cmd = s.queue.shift();
+        let cmd = port ? port.next() : s.queue.shift();
         if (cmd) {
           s.ack = cmd.s;
           s.starve = 0;
@@ -792,6 +799,12 @@ export class ServerSim {
         skipBullet: (b: any) => b.owner === id || !!b.turret,
       },
     );
+    // spike: los zombis viajan en el Schema de la sala (ver DeadZoneRoom.syncZombies), no en la foto
+    if (this.schemaZombies) {
+      delete (world as { z?: number[] }).z;
+      delete (world as { zx?: number[] }).zx;
+      delete (world as { zh?: number[] }).zh;
+    }
     const st = this.structures;
     const fx: unknown[] = [];
     for (const f of this.fx) {
@@ -807,7 +820,7 @@ export class ServerSim {
       t: this.tick,
       ts: Math.round(now),
       ack: s.ack,
-      me: packBody(me),
+      sz: this.schemaZombies ? 1 : 0,
       st: [
         Math.ceil(me.hp),
         me.stats.maxHp,

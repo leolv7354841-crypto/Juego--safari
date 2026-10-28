@@ -49,16 +49,34 @@ export type WorldSource = {
   time: number;
 };
 
-/** Zombis cercanos a la pantalla del espectador: z, zx (en el aire / hinchados), zh (vida de los heridos, en %). */
-export function encodeZombies(list: Zombie[], viewer: Viewer) {
+/** ¿Entra este zombi en lo que se le manda al espectador? (dentro de su pantalla con margen; dorado y gigante, más lejos). */
+export function zombieNear(viewer: Viewer) {
   const near = (x: number, y: number) => Math.abs(x - viewer.x) < NET.view && Math.abs(y - viewer.y) < NET.view;
   // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
   const ZW = Math.max(NET.zombieView[0], (viewer.vw || 0) + 150);
   const ZH = Math.max(NET.zombieView[1], (viewer.vh || 0) + 150);
-  const nearZ = (o: Zombie) =>
+  return (o: Zombie) =>
     o.type === 'golden' || o.type === 'giant'
       ? near(o.x, o.y)
       : Math.abs(o.x - viewer.x) < ZW && Math.abs(o.y - viewer.y) < ZH;
+}
+
+/** Banderas de dibujo de un zombi (las mismas en el arreglo `z` y en el Schema). */
+export function zombieFlags(o: Zombie) {
+  return (
+    (o.flash > 0 ? 1 : 0) |
+    (o.burn > 0 ? 2 : 0) |
+    (o.wounded ? 4 : 0) |
+    (o.bs === 'windup' ? 8 : 0) |
+    (o.hitT > 0 ? 16 : 0) |
+    (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
+    (o.lunge > 0.3 ? 64 : 0)
+  );
+}
+
+/** Zombis cercanos a la pantalla del espectador: z, zx (en el aire / hinchados), zh (vida de los heridos, en %). */
+export function encodeZombies(list: Zombie[], viewer: Viewer) {
+  const nearZ = zombieNear(viewer);
   const ox = Math.round(viewer.x);
   const oy = Math.round(viewer.y);
   const z: number[] = [];
@@ -66,14 +84,7 @@ export function encodeZombies(list: Zombie[], viewer: Viewer) {
   const zh: number[] = [];
   for (const o of list) {
     if (o.dead || !nearZ(o)) continue;
-    const flags =
-      (o.flash > 0 ? 1 : 0) |
-      (o.burn > 0 ? 2 : 0) |
-      (o.wounded ? 4 : 0) |
-      (o.bs === 'windup' ? 8 : 0) |
-      (o.hitT > 0 ? 16 : 0) |
-      (o.type === 'golden' && o.life < GOLDEN.warnAt ? 32 : 0) |
-      (o.lunge > 0.3 ? 64 : 0);
+    const flags = zombieFlags(o);
     z.push(
       o.id,
       TYPES.indexOf(o.type),
