@@ -173,9 +173,6 @@ export function encodeScene(src, viewer, skipBullet) {
 
 /**
  * La parte del mundo de una foto (todo menos lo propio de cada modo).
- * @param {{ horde: any, pickups: any, bullets: any, structures: any, director: any, time: number }} src
- * @param {Viewer} viewer
- * @param {{ players?: PeerEntry[], robots?: RobotEntry[], skipBullet?: (b: any) => boolean }} [opts]
  */
 export function encodeWorld(
   src: { horde: any; pickups: any; bullets: any; structures: any; director: any; time: number },

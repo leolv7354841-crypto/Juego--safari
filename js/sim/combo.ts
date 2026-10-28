@@ -24,7 +24,6 @@ export function comboMult(n) {
 /**
  * Una baja de este tipo alarga la racha (el dorado vale COMBO.golden) y reinicia el reloj.
  * Devuelve el multiplicador que toca a esa baja.
- * @param {Combo} c
  */
 export function comboKill(c: Combo, type) {
   c.n += type === 'golden' ? COMBO.golden : 1;

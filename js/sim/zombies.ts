@@ -11,6 +11,7 @@ import {
 } from '../core/config.ts';
 import { clamp, rand, angleTo, TAU } from '../core/util.ts';
 import type { Zombie } from '../core/types.d.ts';
+import type { GameHost } from '../core/types.d.ts';
 
 const CELL = 64;
 
@@ -282,11 +283,7 @@ export class Horde {
     return best;
   }
 
-  /**
-   * @param {number} dt
-   * @param {import('../core/types.js').GameHost} game
-   */
-  update(dt: number, game: import('../core/types.js').GameHost) {
+  update(dt: number, game: GameHost) {
     // en línea (servidor): game.targets = jugadores presentes, cada uno con su campo de rutas
     const targets = game.targets || null;
     // cooperativo: cada zombi va por el jugador vivo más cercano (en el anfitrión)

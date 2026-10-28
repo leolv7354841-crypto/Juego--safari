@@ -3,6 +3,8 @@
 // de los demás a partir de las fotos del servidor.
 import { NET } from '../core/config.ts';
 import { IN_RUN } from './protocol.ts';
+import type { Player } from '../sim/player.ts';
+import type { Cmd, GameHost } from '../core/types.d.ts';
 
 export const TICK = 1 / NET.tickHz;
 
@@ -25,16 +27,7 @@ export function unpackBody(p, a) {
 }
 
 // Aplica una entrada al cuerpo del jugador (igual en el servidor y en el cliente).
-/**
- * @param {import('../sim/player.ts').Player} p
- * @param {import('../core/types.js').Cmd} cmd
- * @param {Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
- */
-export function applyMove(
-  p: import('../sim/player.ts').Player,
-  cmd: import('../core/types.js').Cmd,
-  game: Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>,
-) {
+export function applyMove(p: Player, cmd: Cmd, game: Pick<GameHost, 'world' | 'sfx'>) {
   p.move(TICK, cmd.mx, cmd.my, !!(cmd.f & IN_RUN), game);
 }
 

@@ -51,8 +51,6 @@ export function gainXp(h, n) {
 /**
  * Una bala acierta a un zombi: aplica el daño y devuelve true si murió (quien llama lo mata).
  * `shotHit` suma el acierto al disparo de quien la lanzó, una sola vez por disparo.
- * @param {GameHost} game
- * @param {(b: any) => void} shotHit
  */
 export function hitZombie(game: GameHost, z, b, hx, hy, shotHit: (b: any) => void) {
   if (z.dead) return false;
@@ -68,8 +66,6 @@ export function hitZombie(game: GameHost, z, b, hx, hy, shotHit: (b: any) => voi
 /**
  * Baja de un zombi: cuenta, cadáver, dorado, ácido del gordo, experiencia, dinero y botín.
  * Devuelve false si ya estaba muerto.
- * @param {GameHost} game
- * @param {KillHooks} h
  */
 export function killZombie(game: GameHost, z, h: KillHooks) {
   if (z.dead) return false;
@@ -108,8 +104,6 @@ export function killZombie(game: GameHost, z, h: KillHooks) {
 
 /**
  * Hace aparecer un zombi dorado en el borde de la pantalla, fuera de la vista y alcanzable.
- * @param {GameHost} game
- * @param {(msg: string) => void} toast
  */
 export function spawnGolden(game: GameHost, toast: (msg: string) => void) {
   const d = game.director;
@@ -129,8 +123,6 @@ export function spawnGolden(game: GameHost, toast: (msg: string) => void) {
 /**
  * Reloj del zombi dorado durante una ronda: de vez en cuando, nunca dos a la vez.
  * Devuelve los segundos que faltan para el siguiente intento.
- * @param {GameHost} game
- * @param {(msg: string) => void} toast
  */
 export function goldenTick(game: GameHost, t, dt, toast: (msg: string) => void) {
   t -= dt;
@@ -154,7 +146,6 @@ export function startAcid(h) {
 /**
  * Avanza la quemadura: cada segundo quita vida fija. `onTick` añade lo propio de cada lado
  * (destello, sonido) y `onDeath` avisa de la caída. Devuelve lo que falta de quemadura.
- * @param {GameHost} game
  */
 export function acidStep(game: GameHost, p, h, dt, onTick, onDeath) {
   if (!(h.acidT > 0)) return 0;
@@ -180,8 +171,6 @@ export function acidStep(game: GameHost, p, h, dt, onTick, onDeath) {
 
 /**
  * Explosión de un cohete (no la calcula quien solo mira: invitado o cliente en línea).
- * @param {GameHost} game
- * @param {string | null} [owner]
  */
 export function rocketBlast(game: GameHost, x, y, owner: string | null = null) {
   if (!game.mode.authority()) return;
@@ -190,8 +179,6 @@ export function rocketBlast(game: GameHost, x, y, owner: string | null = null) {
 
 /**
  * Microexplosión de una bala de la torreta pesada (no la calcula quien solo mira).
- * @param {GameHost} game
- * @param {string | null} [owner]
  */
 export function heavyBlast(game: GameHost, x, y, owner: string | null = null) {
   if (!game.mode.authority()) return;
@@ -215,7 +202,6 @@ export function superPunch(game, x, y) {
 /**
  * Golpe a quien va en su robot: lo aguanta el blindaje. Si se acaba, el robot explota y el
  * piloto sale despedido; devuelve true en ese caso.
- * @param {GameHost} game
  */
 export function robotHit(game: GameHost, rb, dmg, p) {
   game.sfx.blockHit('metal');

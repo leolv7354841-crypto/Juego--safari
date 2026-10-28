@@ -14,6 +14,7 @@ import {
 } from '../core/config.ts';
 import { clamp, rand, angleTo } from '../core/util.ts';
 import { newCombo } from './combo.ts';
+import type { GameHost } from '../core/types.d.ts';
 
 // Distancia (local) desde el centro del personaje hasta la boca del cañón.
 // px/s al caminar: PLAYER_BASE.walk veces lo que camina un zombi normal en la primera oleada
@@ -260,20 +261,7 @@ export class Player {
 
   // Estamina y movimiento con choques. Sólo depende de la entrada y del mundo, así que el
   // servidor y la predicción del cliente en línea dan exactamente el mismo resultado.
-  /**
-   * @param {number} dt
-   * @param {number} mx
-   * @param {number} my
-   * @param {boolean} run
-   * @param {import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>} game
-   */
-  move(
-    dt: number,
-    mx: number,
-    my: number,
-    run: boolean,
-    game: import('../core/types.js').GameHost | Pick<import('../core/types.js').GameHost, 'world' | 'sfx'>,
-  ) {
+  move(dt: number, mx: number, my: number, run: boolean, game: GameHost | Pick<GameHost, 'world' | 'sfx'>) {
     const st = this.stats;
     const mv = { x: mx, y: my };
     const mag = Math.hypot(mv.x, mv.y);

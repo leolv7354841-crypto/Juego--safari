@@ -63,7 +63,6 @@ export class Remote {
   declare nearCount: any;
   declare net: NetStats;
   /**
-   * @param {any} game
    * @param {{ zombieSprites?: () => any }} [deps]  para probar sin lienzo
    */
   constructor(game: any, deps: { zombieSprites?: () => any } = {}) {
@@ -110,8 +109,6 @@ export class Remote {
   /**
    * Aplica la parte del mundo de una foto. t: instante de la foto en el reloj que luego se pasa a place*.
    * @param {any} s  foto (ver snapshot.js)
-   * @param {number} t
-   * @param {{ myIdx?: number, identify?: (idx: number) => { name?: string, look?: any, code?: string } | null, collide?: boolean }} [opts]
    *   myIdx: el robot de este jugador va en game.robot; identify: nombre y aspecto; collide: las barricadas también
    *   chocan en el mapa local (para predecir igual que el servidor).
    */
