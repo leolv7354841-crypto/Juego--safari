@@ -1,18 +1,28 @@
 import { rand, pick } from '../core/util.ts';
 import { CRATE_WEAPONS, WEAPONS } from '../core/config.ts';
 import type { GameHost } from '../core/types.d.ts';
+import type { Player } from './player.ts';
+
+/** Objeto en el suelo: k = 'ammo' | 'med' | caja de armas. */
+export interface Pickup {
+  k: string;
+  x: number;
+  y: number;
+  t: number;
+  taken?: boolean;
+}
 
 export const LIFE = 22;
 
 export class Pickups {
-  declare list: any;
+  declare list: Pickup[];
   constructor() {
     this.list = [];
   }
   clear() {
     this.list.length = 0;
   }
-  drop(k, x, y) {
+  drop(k: string, x: number, y: number) {
     this.list.push({ k, x: x + rand(-6, 6), y: y + rand(-6, 6), t: 0 });
   }
 
@@ -71,14 +81,14 @@ export class Pickups {
     }
   }
 
-  canCollect(it, p) {
+  canCollect(it: Pick<Pickup, 'k'>, p: Player) {
     if (p.remote) return it.k === 'med' ? p.hp < p.stats.maxHp : it.k === 'ammo' ? !!p.needAmmo : true;
     if (it.k === 'med') return p.hp < p.stats.maxHp;
     if (it.k === 'ammo') return p.weapons.some((w) => w.reserve !== Infinity && w.reserve < p.reserveMax(w.def));
     return true;
   }
 
-  collect(it, game) {
+  collect(it: Pick<Pickup, 'k' | 'x' | 'y'>, game: GameHost) {
     const p = game.player;
     if (it.k === 'ammo') {
       if (!p.addAmmo(1)) return false;
@@ -95,7 +105,7 @@ export class Pickups {
       if (locked.length) {
         const id = pick(locked);
         p.unlock(id);
-        game.toast(`Nueva arma: ${WEAPONS[id].name}`);
+        game.toast(`Nueva arma: ${(WEAPONS as Record<string, { name: string }>)[id].name}`);
       } else {
         p.addAmmo(3);
         game.toast('+ Munición extra');

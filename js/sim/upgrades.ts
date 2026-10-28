@@ -1,5 +1,6 @@
-import { ABILITY, WEAPONS } from '../core/config.ts';
+import { ABILITY } from '../core/config.ts';
 import { cooldownOf } from './abilities.ts';
+import type { Player } from './player.ts';
 
 // Cada mejora modifica las estadísticas reales del jugador.
 export type Upgrade = {
@@ -7,10 +8,10 @@ export type Upgrade = {
   name: string;
   desc: string;
   icon: string;
-  apply: (p: any) => any;
+  apply: (p: Player) => unknown;
   max?: number;
   repeat?: boolean;
-  when?: (p: any) => boolean;
+  when?: (p: Player) => boolean;
   weight?: number;
   minLevel?: number;
 };
@@ -123,14 +124,14 @@ export const UPGRADES: Upgrade[] = [
   },
 ];
 
-export function rollUpgrades(player, level, taken, count = 3) {
+export function rollUpgrades(player: Player, level: number, taken: Record<string, number>, count = 3) {
   const pool = UPGRADES.filter((u) => {
     if (u.minLevel && level < u.minLevel) return false;
     if (u.when && !u.when(player)) return false;
     if (u.max && (taken[u.id] || 0) >= u.max) return false;
     return true;
   });
-  const out = [];
+  const out: Upgrade[] = [];
   while (out.length < count && pool.length) {
     const total = pool.reduce((s, u) => s + (u.weight || 1), 0);
     let r = Math.random() * total;

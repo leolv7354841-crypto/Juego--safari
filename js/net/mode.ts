@@ -10,20 +10,27 @@
 //   OnlineClient  cliente del servidor autoritativo: sólo manda intenciones.
 //   ServerMode    el servidor (ServerSim) visto desde los módulos de simulación compartidos.
 //
-// No importa nada: carga igual en el navegador y en Node.
+// Sólo importa tipos: carga igual en el navegador y en Node.
+import type { GameHost, Vec } from '../core/types.d.ts';
+import type { Player } from '../sim/player.ts';
+
+/** Cómo se llama cada modo. */
+export type ModeKind = 'solo' | 'coopHost' | 'coopGuest' | 'online' | 'server';
+/** Estadísticas de un disparo que el invitado reporta al anfitrión. */
+export type ShotStats = { dmgMult: number; pierce: number };
+export type ShotWeapon = { id: string; damage: number; pierce: number };
 
 export class Mode {
-  declare game: any;
-  declare detached: any;
-  /** @param {any} game */
-  constructor(game: any, detached = false) {
+  declare game: GameHost;
+  declare detached: boolean;
+  constructor(game: GameHost, detached = false) {
     this.game = game;
     /** Solo tras un cooperativo o una partida en línea: la partida no se guarda ni toca tu progreso. */
     this.detached = detached;
   }
 
   /** 'solo' | 'coopHost' | 'coopGuest' | 'online' | 'server' */
-  get kind() {
+  get kind(): ModeKind {
     return 'solo';
   }
 
@@ -61,34 +68,34 @@ export class Mode {
   }
 
   /** El compañero que se simula aquí (sólo el anfitrión del cooperativo). */
-  hostedPeer() {
+  hostedPeer(): Player | null {
     return null;
   }
 
   /** El otro jugador del cooperativo que se ve en pantalla (anfitrión o invitado). */
-  companion() {
+  companion(): Player | null {
     return null;
   }
 
   /* ---------- pedir cosas a quien manda (devuelven true si lo manejaron) ---------- */
 
-  sendAbility(_p, _t) {}
+  sendAbility(_p: Player, _t: Vec) {}
 
   sendNextRound() {
     return false;
   }
 
-  sendBuild(_kind) {}
+  sendBuild(_kind: string) {}
 
-  sendThrow(_kind, _tx, _ty) {
+  sendThrow(_kind: string, _tx: number, _ty: number) {
     return false;
   }
 
   /** Disparo del jugador local: el invitado le avisa al anfitrión, que crea las balas con daño. */
-  reportShot(_x, _y, _fired, _d, _stats) {}
+  reportShot(_x: number, _y: number, _fired: number[], _d: ShotWeapon, _stats: ShotStats) {}
 
   /** Ácido en el suelo: el anfitrión avisa a su compañero si le toca. */
-  onAcid(_x, _y, _R) {}
+  onAcid(_x: number, _y: number, _R: number) {}
 
   /** Muerte del jugador local. true: el cooperativo la maneja (revive al terminar la oleada). */
   onLocalDeath() {
@@ -98,7 +105,7 @@ export class Mode {
   onGameOver() {}
 
   /** Motivo por el que no se puede reiniciar aquí, o null. */
-  restartBlocked() {
+  restartBlocked(): string | null {
     return null;
   }
 
@@ -108,12 +115,12 @@ export class Mode {
   }
 
   /** Un fotograma de juego. true: el modo lo avanzó él mismo (si no, corre la simulación local). */
-  step(_dt) {
+  step(_dt: number) {
     return false;
   }
 
   /** Texto del indicador de conexión (una vez por segundo) o null. */
-  netStats(_dt) {
+  netStats(_dt: number): string | null {
     return null;
   }
 }
@@ -121,8 +128,7 @@ export class Mode {
 export class Solo extends Mode {}
 
 export class CoopHost extends Mode {
-  declare game: any;
-  get kind() {
+  get kind(): ModeKind {
     return 'coopHost';
   }
   inGroup() {
@@ -137,7 +143,7 @@ export class CoopHost extends Mode {
   companion() {
     return this.game.coop.peer;
   }
-  onAcid(x, y, R) {
+  onAcid(x: number, y: number, R: number) {
     this.game.coop.acidAt(x, y, R);
   }
   onLocalDeath() {
@@ -151,14 +157,13 @@ export class CoopHost extends Mode {
     this.game.coop.restart();
     return true;
   }
-  netStats(dt) {
+  netStats(dt: number) {
     return this.game.coop.stats(dt);
   }
 }
 
 export class CoopGuest extends Mode {
-  declare game: any;
-  get kind() {
+  get kind(): ModeKind {
     return 'coopGuest';
   }
   authority() {
@@ -182,21 +187,21 @@ export class CoopGuest extends Mode {
   companion() {
     return this.game.coop.peer;
   }
-  sendAbility(p, t) {
+  sendAbility(p: Player, t: Vec) {
     if (p.cls === 'bomber') this.game.coop.guestMissile(t.x, t.y);
   }
   sendNextRound() {
     this.game.coop.send({ t: 'next' });
     return true;
   }
-  sendBuild(kind) {
+  sendBuild(kind: string) {
     this.game.coop.guestBuild(kind);
   }
-  sendThrow(kind, tx, ty) {
+  sendThrow(kind: string, tx: number, ty: number) {
     this.game.coop.guestThrow(kind, tx, ty);
     return true;
   }
-  reportShot(x, y, fired, d, stats) {
+  reportShot(x: number, y: number, fired: number[], d: ShotWeapon, stats: ShotStats) {
     this.game.coop.sendShot(x, y, fired, d, stats);
   }
   onLocalDeath() {
@@ -206,18 +211,17 @@ export class CoopGuest extends Mode {
   restartBlocked() {
     return 'Espera a que el anfitrión reinicie la partida';
   }
-  step(dt) {
+  step(dt: number) {
     this.game.coop.guestUpdate(dt);
     return true;
   }
-  netStats(dt) {
+  netStats(dt: number) {
     return this.game.coop.stats(dt);
   }
 }
 
 export class OnlineClient extends Mode {
-  declare game: any;
-  get kind() {
+  get kind(): ModeKind {
     return 'online';
   }
   authority() {
@@ -235,17 +239,17 @@ export class OnlineClient extends Mode {
   canBuild() {
     return false;
   }
-  sendAbility(_p, t) {
+  sendAbility(_p: Player, t: Vec) {
     this.game.online.act('ab', { tx: Math.round(t.x), ty: Math.round(t.y) });
   }
   sendNextRound() {
     this.game.online.send('next');
     return true;
   }
-  sendBuild(kind) {
+  sendBuild(kind: string) {
     this.game.online.act('build', { kind });
   }
-  sendThrow(kind, tx, ty) {
+  sendThrow(kind: string, tx: number, ty: number) {
     this.game.online.act('throw', { kind, tx: Math.round(tx), ty: Math.round(ty) });
     return true;
   }
@@ -253,17 +257,17 @@ export class OnlineClient extends Mode {
     return 'En línea la partida sigue mientras quede alguien vivo';
   }
   // en línea el mundo lo mueve el servidor (Online.update corre aparte, en cada fotograma)
-  step(_dt) {
+  step(_dt: number) {
     return true;
   }
-  netStats(dt) {
+  netStats(dt: number) {
     return this.game.online.stats(dt);
   }
 }
 
 /** El servidor: simula (authority) y hay grupo, pero no guarda, no pide nada ni dibuja. */
 export class ServerMode extends Mode {
-  get kind() {
+  get kind(): ModeKind {
     return 'server';
   }
   inGroup() {

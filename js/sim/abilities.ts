@@ -2,6 +2,8 @@
 // cada cierto tiempo. Lo usan el juego del navegador y el servidor en línea.
 import { ABILITY, CLASS_ORDER, WEAPONS } from '../core/config.ts';
 import { rand } from '../core/util.ts';
+import type { GameHost, Vec } from '../core/types.d.ts';
+import type { Player, WeaponDef } from './player.ts';
 
 const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 export const CLASSES = {
@@ -22,36 +24,36 @@ export const CLASSES = {
   },
 };
 
-export const isClass = (c) => CLASS_ORDER.includes(c);
+export const isClass = (c: string) => CLASS_ORDER.includes(c);
 
 // Ametralladoras de la megarráfaga: las de la tienda con el daño y la perforación de la habilidad.
-const RAGE_GUN = {
-  ...WEAPONS[ABILITY.berserker.weapon],
+const RAGE_GUN: WeaponDef = {
+  ...(WEAPONS as Record<string, WeaponDef>)[ABILITY.berserker.weapon],
   damage: ABILITY.berserker.damage,
   pierce: ABILITY.berserker.pierce,
 };
 
 // Espera de la habilidad con las mejoras tomadas (nunca menos de ABILITY.minCooldown).
-export function cooldownOf(p) {
+export function cooldownOf(p: Pick<Player, 'stats'>) {
   return Math.max(ABILITY.minCooldown, ABILITY.cooldown * (p.stats.cdMult || 1));
 }
 
 // A dónde apunta la habilidad: el ratón, el zombi fijado o un poco delante de la mira.
-export function abilityTarget(game, p) {
+export function abilityTarget(game: GameHost, p: Player): Vec {
   if (game.input.mode === 'mouse') return game.mouseWorld();
   if (p.target && !p.target.dead) return { x: p.target.x, y: p.target.y };
   return { x: p.x + Math.cos(p.angle) * 350, y: p.y + Math.sin(p.angle) * 350 };
 }
 
 export const Abilities = {
-  ready(p) {
+  ready(p: Player) {
     return !!p.cls && p.alive && !(p.abCd > 0);
   },
 
   // Lanza la habilidad. owner: dueño de las bajas (en línea, el id del jugador).
   // Sin autoridad (invitado o cliente en línea) el misil lo crea quien simula.
   /** @param {string | null} [owner] */
-  use(game, p, tx, ty, owner: string | null = null) {
+  use(game: GameHost, p: Player, tx: number, ty: number, owner: string | null = null) {
     if (!this.ready(p)) return false;
     p.abCd = cooldownOf(p);
     if (p.cls === 'bomber') {
@@ -69,7 +71,7 @@ export const Abilities = {
   },
 
   // Espera y megarráfaga (boostT lo baja Player.move, que también usa la predicción en línea).
-  update(dt, game, p) {
+  update(dt: number, game: GameHost, p: Player) {
     if (p.abCd > 0) p.abCd = Math.max(0, p.abCd - dt);
     if (!(p.rageT > 0)) return;
     if (!p.alive) {
@@ -87,7 +89,7 @@ export const Abilities = {
     if (p.rageT <= 0) p.rageAcc += 1e-6;
     const ca = Math.cos(p.angle);
     const sa = Math.sin(p.angle);
-    const fired = [];
+    const fired: number[] = [];
     let ox = p.x;
     let oy = p.y;
     while (p.rageAcc >= 1) {

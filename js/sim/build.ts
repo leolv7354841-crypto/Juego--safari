@@ -2,6 +2,119 @@
 import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.ts';
 import { TAU, rand, clamp } from '../core/util.ts';
 import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
+import type { Player } from './player.ts';
+
+// Ficha de la tienda: sólo los campos que usa este módulo (todas las piezas no los tienen todos).
+interface ShopDef {
+  w?: number;
+  h?: number;
+  hp?: number;
+  rotates?: boolean;
+  ground?: boolean;
+  turret?: boolean;
+}
+const shopDef = (kind: string): ShopDef => (SHOP as Record<string, ShopDef>)[kind];
+
+// Pieza en pie (barricada, torreta...) registrada en el mundo como obstáculo dinámico.
+export interface Block {
+  k: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  low: boolean;
+  block: boolean;
+  kind: string;
+  hp: number;
+  max: number;
+  hitT: number;
+  cd: number;
+  ang: number;
+  owner: string | null;
+  layer?: number;
+  flash?: number;
+  recoil?: number;
+  side?: number;
+  manned?: Player | null;
+}
+// Alambre, púas y minas (en el suelo).
+export interface Wire {
+  kind: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  hp: number;
+  max: number;
+  hitT: number;
+  owner: string | null;
+}
+export interface Grenade {
+  sx: number;
+  sy: number;
+  ex: number;
+  ey: number;
+  x: number;
+  y: number;
+  h: number;
+  t: number;
+  dur: number;
+  fuse: number;
+  rot: number;
+  owner: string | null;
+  kind?: string;
+}
+export interface Missile {
+  x: number;
+  y: number;
+  t: number;
+  dur: number;
+  owner: string | null;
+}
+export interface Stuck {
+  z: Zombie;
+  kind: string;
+  x: number;
+  y: number;
+  owner: string | null;
+  ox: number;
+  oy: number;
+  a: number;
+  t: number;
+  stick: number;
+  glow: number;
+  ang?: number;
+  beeped?: boolean;
+}
+export interface Fire {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  t: number;
+  life: number;
+  tick: number;
+  flames: { x: number; y: number; s: number; ph: number }[];
+  owner: string | null;
+}
+export interface Scorch {
+  x: number;
+  y: number;
+  t: number;
+  life: number;
+  a: number;
+}
+export interface Blast {
+  x: number;
+  y: number;
+  t: number;
+}
+// Punto de impacto de una explosión (granada, misil, mina...).
+interface BlastAt {
+  x: number;
+  y: number;
+  owner?: string | null;
+}
 
 const SNAP = 20;
 const TRAP_WIRE = { slow: 0.35, dps: 14 };
@@ -10,10 +123,10 @@ const TURRET_RANGE = 340;
 const BLAST_R = 140;
 // Al morir, el gordo revienta en ácido verde.
 export const ACID = { radius: 105, burn: 5, dps: 2 };
-const near = [];
+const near: Zombie[] = [];
 
 // Bala de la torreta (la misma en el servidor y, de adorno, en los clientes en línea).
-export function turretBullet(x, y, a, owner = null) {
+export function turretBullet(x: number, y: number, a: number, owner: string | null = null) {
   return {
     x,
     y,
@@ -24,8 +137,8 @@ export function turretBullet(x, y, a, owner = null) {
     dmg: 34,
     pierce: 1,
     knock: 40,
-    shot: null,
-    hits: null,
+    shot: null as unknown,
+    hits: null as Zombie[] | null,
     owner,
     turret: true,
   };
@@ -33,17 +146,17 @@ export function turretBullet(x, y, a, owner = null) {
 
 // Distancia al jugador más cercano (en línea, el servidor tiene varios en game.targets).
 export class Structures {
-  declare blocks: any;
-  declare wires: any;
-  declare grenades: any;
-  declare blasts: any;
-  declare scorches: any;
-  declare pending: any;
-  declare fires: any;
-  declare stuck: any;
-  declare missiles: any;
-  declare fireId: any;
-  declare time: any;
+  declare blocks: Block[];
+  declare wires: Wire[];
+  declare grenades: Grenade[];
+  declare blasts: Blast[];
+  declare scorches: Scorch[];
+  declare pending: { kind: string; x: number; y: number; t: number }[];
+  declare fires: Fire[];
+  declare stuck: Stuck[];
+  declare missiles: Missile[];
+  declare fireId: number;
+  declare time: number;
   constructor() {
     this.blocks = [];
     this.wires = [];
@@ -72,7 +185,7 @@ export class Structures {
 
   // Dónde caería el bloque: delante del jugador, alineado a una rejilla de 20 px.
   placement(game: GameHost, kind: string) {
-    const def = SHOP[kind];
+    const def = shopDef(kind);
     const p = game.player;
     const ca = Math.cos(p.angle);
     const sa = Math.sin(p.angle);
@@ -110,7 +223,7 @@ export class Structures {
     }
     if (ok && !def.ground) {
       for (const b of this.blocks) {
-        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || SHOP[b.kind].turret)) {
+        if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y && (def.turret || shopDef(b.kind).turret)) {
           ok = false;
           break;
         }
@@ -123,11 +236,11 @@ export class Structures {
   place(game: GameHost, kind: string, owner: string | null = null) {
     const pl = this.placement(game, kind);
     if (!pl.ok) return false;
-    const def = SHOP[kind];
+    const def = shopDef(kind);
     if (def.ground) {
       this.wires.push({ kind, x: pl.x, y: pl.y, w: pl.w, h: pl.h, hp: def.hp, max: def.hp, hitT: 0, owner });
     } else {
-      const o = {
+      const o: Block = {
         k: 0,
         x: pl.x,
         y: pl.y,
@@ -167,16 +280,16 @@ export class Structures {
   }
 
   // La pieza de más arriba de la pila que incluye a o (los zombis rompen primero esa).
-  topOf(o) {
+  topOf(o: Block) {
     for (let i = this.blocks.length - 1; i >= 0; i--) {
       const b = this.blocks[i];
       if (b === o) return o;
-      if (!SHOP[b.kind].turret && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
+      if (!shopDef(b.kind).turret && o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y) return b;
     }
     return o;
   }
 
-  damageBlock(game: GameHost, o: any, dmg: number) {
+  damageBlock(game: GameHost, o: Block, dmg: number) {
     if (o.hp <= 0) return;
     o = this.topOf(o);
     o.hp -= dmg;
@@ -199,7 +312,7 @@ export class Structures {
   }
 
   // Llamado por cada zombi: devuelve el efecto de la trampa que pisa (o null).
-  trapAt(z, dt, game) {
+  trapAt(z: Zombie, dt: number, game: GameHost) {
     for (let i = 0; i < this.wires.length; i++) {
       const w = this.wires[i];
       if (z.x + z.r * 0.5 < w.x || z.x - z.r * 0.5 > w.x + w.w || z.y + z.r * 0.5 < w.y || z.y - z.r * 0.5 > w.y + w.h)
@@ -220,7 +333,7 @@ export class Structures {
 
   /* ---------- granadas ---------- */
 
-  throwGrenade(game, tx, ty, owner = null) {
+  throwGrenade(game: GameHost, tx: number, ty: number, owner: string | null = null) {
     const p = game.player;
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -235,7 +348,7 @@ export class Structures {
   /* ---------- misil balístico (habilidad del Bomber) ---------- */
 
   // Cae del cielo donde apunta el jugador (como mucho a ABILITY.bomber.range de él).
-  launchMissile(game, p, tx, ty, owner = null) {
+  launchMissile(game: GameHost, p: Player, tx: number, ty: number, owner: string | null = null) {
     const M = ABILITY.bomber;
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -245,7 +358,7 @@ export class Structures {
     game.sfx.missile();
   }
 
-  updateMissiles(dt, game) {
+  updateMissiles(dt: number, game: GameHost) {
     const M = ABILITY.bomber;
     for (let i = this.missiles.length - 1; i >= 0; i--) {
       const m = this.missiles[i];
@@ -259,7 +372,7 @@ export class Structures {
   }
 
   // Los reventones de ácido se encolan: así una cadena de gordos no se pisa a sí misma.
-  queueDeathBlast(kind, x, y) {
+  queueDeathBlast(kind: string, x: number, y: number) {
     this.pending.push({ kind, x, y, t: 0.06 });
   }
 
@@ -290,7 +403,7 @@ export class Structures {
     game.particles.impact(x, y, -b.dx, -b.dy);
   }
 
-  updateStuck(dt, game) {
+  updateStuck(dt: number, game: GameHost) {
     for (let i = this.stuck.length - 1; i >= 0; i--) {
       const r = this.stuck[i];
       const z = r.z;
@@ -340,7 +453,7 @@ export class Structures {
 
   /* ---------- molotov ---------- */
 
-  throwMolotov(game, tx, ty, owner = null) {
+  throwMolotov(game: GameHost, tx: number, ty: number, owner: string | null = null) {
     this.throwGrenade(game, tx, ty, owner);
     const g = this.grenades[this.grenades.length - 1];
     g.kind = 'molotov';
@@ -348,9 +461,9 @@ export class Structures {
     game.sfx.throwBottle();
   }
 
-  ignite(game, x, y, owner = null) {
+  ignite(game: GameHost, x: number, y: number, owner: string | null = null) {
     const R = MOLOTOV.radius;
-    const flames = [];
+    const flames: Fire['flames'] = [];
     for (let i = 0; i < 16; i++) {
       const a = rand(0, TAU);
       const d = Math.sqrt(Math.random()) * R * 0.85;
@@ -364,7 +477,7 @@ export class Structures {
     game.camera.shake(0.12, x, y);
   }
 
-  updateFires(dt, game) {
+  updateFires(dt: number, game: GameHost) {
     for (let i = this.fires.length - 1; i >= 0; i--) {
       const f = this.fires[i];
       f.t += dt;
@@ -392,7 +505,7 @@ export class Structures {
     }
   }
 
-  acidBurst(game, x, y) {
+  acidBurst(game: GameHost, x: number, y: number) {
     const R = ACID.radius;
     game.particles.acidBurst(x, y, R);
     game.decals.acid(x, y, R * 0.75);
@@ -405,7 +518,7 @@ export class Structures {
 
   // fling > 0: la onda lanza a volar a los que sobreviven (cohetes de bazuca)
   // small: microexplosión (balas de la torreta pesada): mismo daño en área, efectos pequeños
-  explode(game, g, R = BLAST_R, power = 330, fling = 0, small = false) {
+  explode(game: GameHost, g: BlastAt, R = BLAST_R, power = 330, fling = 0, small = false) {
     const { x, y } = g;
     game.horde.grid.query(x - R - 44, y - R - 44, x + R + 44, y + R + 44, near);
     for (const z of near) {
@@ -426,7 +539,7 @@ export class Structures {
           shot: null,
           blast: true,
           owner: g.owner,
-        },
+        } as Partial<Bullet> as Bullet,
         z.x,
         z.y,
       );
@@ -496,7 +609,7 @@ export class Structures {
   }
 
   // Torreta: apunta al zombi más cercano dentro de su alcance y dispara sola.
-  updateTurret(b, dt, game) {
+  updateTurret(b: Block, dt: number, game: GameHost) {
     b.cd -= dt;
     b.flash = Math.max(0, (b.flash || 0) - dt);
     const cx = b.x + b.w / 2;
@@ -533,7 +646,7 @@ export class Structures {
   /* ---------- dibujo ---------- */
 
   // La torreta pesada libre más cercana al alcance de p (o null).
-  nearHeavy(p) {
+  nearHeavy(p: Player) {
     let best = null;
     let bd = HEAVY.reach + p.r;
     for (const b of this.blocks) {
@@ -548,14 +661,14 @@ export class Structures {
   }
 
   // Montar o dejar la torreta pesada (en solitario, en el anfitrión y en el servidor).
-  mountHeavy(p, b) {
+  mountHeavy(p: Player, b: Block) {
     p.manned = b;
     b.manned = p;
     p.reloadT = 0;
     p.target = null;
   }
 
-  leaveHeavy(p) {
+  leaveHeavy(p: Player) {
     if (p.manned && p.manned.manned === p) p.manned.manned = null;
     p.manned = null;
   }

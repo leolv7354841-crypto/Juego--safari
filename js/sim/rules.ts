@@ -7,18 +7,27 @@ import { rand, randInt } from '../core/util.ts';
 import { ACID } from './build.ts';
 import { bulletHit } from './combat.ts';
 
-import type { GameHost } from '../core/types.d.ts';
+import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
+import type { Player } from './player.ts';
+import type { Robot } from './robot.ts';
+
+/** Quien acumula experiencia (jugador, ranura del servidor). */
+export type XpHolder = { xp: number; xpNeed: number; level: number };
+/** Quien puede quemarse con ácido. */
+export type Burnable = { alive: boolean; inRobot?: boolean; boostT?: number };
+/** Estado de quemadura de ácido. */
+export type AcidState = { acidT: number; acidTick: number };
 
 /** Ganchos de una baja: lo que depende de quién juega. */
 export type KillHooks = {
   /** contador de bajas por tipo */
   kills: Record<string, number>;
   /** reparte la experiencia del zombi */
-  xp: (z: any) => void;
+  xp: (z: Zombie) => void;
   /** paga la recompensa del zombi a quien lo mató */
-  bounty: (z: any) => void;
+  bounty: (z: Zombie) => void;
   /** paga la recompensa única del dorado */
-  golden: (z: any, reward: number) => void;
+  golden: (z: Zombie, reward: number) => void;
   /** aviso para todos (gigante abatido) */
   toast: (msg: string) => void;
 };
@@ -27,16 +36,16 @@ export type KillHooks = {
 export const goldenReward = () => randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
 
 /** Recompensa por matar a un zombi de ese tipo. */
-export const bountyOf = (type) => BOUNTY[type] || 0;
+export const bountyOf = (type: string) => (BOUNTY as Record<string, number>)[type] || 0;
 
 /** Dinero que cuesta un golpe de zombi: nunca más del que se tiene. */
-export const hitLoss = (money) => Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+export const hitLoss = (money: number) => Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
 
 /**
  * Suma experiencia a quien tenga `xp`, `xpNeed` y `level`; devuelve cuántos niveles subió
  * (quien llama los suma a sus mejoras pendientes).
  */
-export function gainXp(h, n) {
+export function gainXp(h: XpHolder, n: number) {
   let up = 0;
   h.xp += n;
   while (h.xp >= h.xpNeed) {
@@ -52,7 +61,7 @@ export function gainXp(h, n) {
  * Una bala acierta a un zombi: aplica el daño y devuelve true si murió (quien llama lo mata).
  * `shotHit` suma el acierto al disparo de quien la lanzó, una sola vez por disparo.
  */
-export function hitZombie(game: GameHost, z, b, hx, hy, shotHit: (b: any) => void) {
+export function hitZombie(game: GameHost, z: Zombie, b: Bullet, hx: number, hy: number, shotHit: (b: Bullet) => void) {
   if (z.dead) return false;
   z.lastOwner = b.owner || null;
   bulletHit(game, z, b, hx, hy);
@@ -67,7 +76,7 @@ export function hitZombie(game: GameHost, z, b, hx, hy, shotHit: (b: any) => voi
  * Baja de un zombi: cuenta, cadáver, dorado, ácido del gordo, experiencia, dinero y botín.
  * Devuelve false si ya estaba muerto.
  */
-export function killZombie(game: GameHost, z, h: KillHooks) {
+export function killZombie(game: GameHost, z: Zombie, h: KillHooks) {
   if (z.dead) return false;
   z.dead = true;
   h.kills[z.type] = (h.kills[z.type] || 0) + 1;
@@ -94,7 +103,7 @@ export function killZombie(game: GameHost, z, h: KillHooks) {
     game.sfx.kill(true);
     h.toast('Gigante abatido');
   } else {
-    const drop = DROPS[z.type] || DROPS.normal;
+    const drop = (DROPS as Record<string, { ammo: number; med: number }>)[z.type] || DROPS.normal;
     if (r < drop.ammo && hasGuns) game.pickups.drop('ammo', z.x, z.y);
     else if (r < drop.ammo + drop.med) game.pickups.drop('med', z.x, z.y);
     game.sfx.kill(z.type === 'fat' || z.type === 'heavy');
@@ -124,10 +133,10 @@ export function spawnGolden(game: GameHost, toast: (msg: string) => void) {
  * Reloj del zombi dorado durante una ronda: de vez en cuando, nunca dos a la vez.
  * Devuelve los segundos que faltan para el siguiente intento.
  */
-export function goldenTick(game: GameHost, t, dt, toast: (msg: string) => void) {
+export function goldenTick(game: GameHost, t: number, dt: number, toast: (msg: string) => void) {
   t -= dt;
   if (t > 0) return t;
-  const alive = game.horde.list.some((z) => z.type === 'golden' && !z.dead);
+  const alive = game.horde.list.some((z: Zombie) => z.type === 'golden' && !z.dead);
   if (!alive && spawnGolden(game, toast)) return rand(GOLDEN.every[0], GOLDEN.every[1]);
   return 5;
 }
@@ -135,10 +144,11 @@ export function goldenTick(game: GameHost, t, dt, toast: (msg: string) => void) 
 /* ---------- ácido del gordo ---------- */
 
 /** ¿Puede el ácido quemar a este jugador? No en el menú, ni dentro del robot ni con el impulso. */
-export const canBurn = (game, p) => game.state !== 'menu' && p.alive && !p.inRobot && !(p.boostT > 0);
+export const canBurn = (game: GameHost, p: Burnable) =>
+  game.state !== 'menu' && p.alive && !p.inRobot && !(p.boostT > 0);
 
 /** Empieza (o renueva) la quemadura de `h`, que guarda `acidT` y `acidTick`. */
-export function startAcid(h) {
+export function startAcid(h: AcidState) {
   if (!(h.acidT > 0)) h.acidTick = 0;
   h.acidT = ACID.burn;
 }
@@ -147,7 +157,7 @@ export function startAcid(h) {
  * Avanza la quemadura: cada segundo quita vida fija. `onTick` añade lo propio de cada lado
  * (destello, sonido) y `onDeath` avisa de la caída. Devuelve lo que falta de quemadura.
  */
-export function acidStep(game: GameHost, p, h, dt, onTick, onDeath) {
+export function acidStep(game: GameHost, p: Player, h: AcidState, dt: number, onTick: () => void, onDeath: () => void) {
   if (!(h.acidT > 0)) return 0;
   h.acidTick += dt;
   while (h.acidTick >= 1 && p.alive) {
@@ -172,7 +182,7 @@ export function acidStep(game: GameHost, p, h, dt, onTick, onDeath) {
 /**
  * Explosión de un cohete (no la calcula quien solo mira: invitado o cliente en línea).
  */
-export function rocketBlast(game: GameHost, x, y, owner: string | null = null) {
+export function rocketBlast(game: GameHost, x: number, y: number, owner: string | null = null) {
   if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, ROCKET.radius, ROCKET.power, 1);
 }
@@ -180,20 +190,20 @@ export function rocketBlast(game: GameHost, x, y, owner: string | null = null) {
 /**
  * Microexplosión de una bala de la torreta pesada (no la calcula quien solo mira).
  */
-export function heavyBlast(game: GameHost, x, y, owner: string | null = null) {
+export function heavyBlast(game: GameHost, x: number, y: number, owner: string | null = null) {
   if (!game.mode.authority()) return;
   game.structures.explode(game, { x, y, owner }, HEAVY.blastR, HEAVY.blastPower, 0, true);
 }
 
 /** Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante. */
-export function rocketHit(game, z, x, y, b) {
+export function rocketHit(game: GameHost, z: Zombie, x: number, y: number, b: Bullet) {
   if (!game.mode.authority()) return;
   if ((z.type === 'fat' || z.type === 'heavy') && !z.dead) game.structures.stickRocket(game, z, x, y, b);
   else rocketBlast(game, x, y, b.owner);
 }
 
 /** Super golpe del blindado (al jugador o a una estructura). */
-export function superPunch(game, x, y) {
+export function superPunch(game: GameHost, x: number, y: number) {
   game.particles.dust(x, y, 18);
   game.camera.shake(0.35, x, y);
   game.sfx.punch();
@@ -203,7 +213,7 @@ export function superPunch(game, x, y) {
  * Golpe a quien va en su robot: lo aguanta el blindaje. Si se acaba, el robot explota y el
  * piloto sale despedido; devuelve true en ese caso.
  */
-export function robotHit(game: GameHost, rb, dmg, p) {
+export function robotHit(game: GameHost, rb: Robot, dmg: number, p: Player) {
   game.sfx.blockHit('metal');
   if (!rb.damage(dmg)) return false;
   game.structures.explode(game, { x: rb.x, y: rb.y }, 170, 450, 1);

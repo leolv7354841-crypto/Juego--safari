@@ -83,7 +83,7 @@ test('un error grande se corrige de golpe (sin deslizar por el mapa)', () => {
 test('la cola de pendientes está acotada', () => {
   const p = new Player(world.spawn.x, world.spawn.y);
   const pred = new Predictor(p, world);
-  for (let i = 0; i < NET.pendingMax * 3; i++) pred.step({ mx: 1, my: 0, f: 0, a: 0, w: -1 });
+  for (let i = 0; i < NET.pendingMax * 3; i++) pred.step({ s: 0, mx: 1, my: 0, f: 0, a: 0, w: -1 });
   assert.equal(pred.pending.length, NET.pendingMax);
 });
 

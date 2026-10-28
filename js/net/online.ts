@@ -13,7 +13,64 @@ import { UPGRADES } from '../sim/upgrades.ts';
 import { Abilities } from '../sim/abilities.ts';
 import { applyCombo } from '../sim/combo.ts';
 import { OnlineClient, Solo } from './mode.ts';
-import type { LobbyMember, Snapshot } from '../core/types.d.ts';
+import type { Cmd, LobbyMember, Snapshot } from '../core/types.d.ts';
+import type { Player } from '../sim/player.ts';
+
+// Lo mínimo que se usa de la sala de Colyseus (el SDK se carga con import() dinámico y no se importa aquí).
+interface WsLike {
+  dzCounted?: boolean;
+  addEventListener(
+    type: 'message',
+    cb: (e: { data: { byteLength?: number; size?: number; length?: number } }) => void,
+  ): void;
+}
+interface ConnLike {
+  transport?: { ws?: WsLike };
+  send(d: { byteLength?: number; length?: number }): void;
+  dzSend?: (d: { byteLength?: number; length?: number }) => void;
+}
+export interface RoomLike {
+  sessionId: string;
+  reconnectionToken: string;
+  state: {
+    members: { get(id: string): LobbyMember | undefined; forEach(cb: (m: LobbyMember) => void): void };
+    ownerId: string;
+  };
+  reconnection: object;
+  connection: ConnLike;
+  onStateChange(cb: () => void): void;
+  onMessage<T = unknown>(type: string, cb: (m: T) => void): void;
+  onDrop(cb: () => void): void;
+  onReconnect(cb: () => void): void;
+  onLeave(cb: (code: number) => void): void;
+  onError(cb: (code: number, msg?: string) => void): void;
+  send(type: string, m?: unknown): void;
+  leave(consented?: boolean): Promise<void>;
+}
+interface ClientLike {
+  create(name: string, opts: object): Promise<RoomLike>;
+  joinById(id: string, opts: object): Promise<RoomLike>;
+  reconnect(token: string): Promise<RoomLike>;
+}
+interface SdkLike {
+  Client: new (url: string) => ClientLike;
+}
+type IdsMsg = { ids?: string[] } | null;
+type LoadMsg = { seed: number; ids?: string[] };
+type ResumeMsg = { seed: number; phase: string; inGame: boolean };
+export type ResultsMsg = { wave: number } | null;
+type Diag = { hz: number; ms: number; mx: number; skip: number; rooms: number; players: number; cpu: number };
+type HeavyBlock = {
+  kind: string;
+  x: number;
+  y: number;
+  manned: unknown;
+  ang: number;
+  ta: number;
+  side: number;
+  flash: number;
+  recoil: number;
+};
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
@@ -32,14 +89,14 @@ const STAT_KEYS = [
   'reloadMult',
   'cdMult',
 ];
-const r3 = (v) => Math.round(v * 1000) / 1000;
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
 // códigos de cierre del servidor (server/src/rooms/DeadZoneRoom.ts)
 const KICKED = 4100;
 const IDLE = 4101;
 
 // Mensaje claro para cada error del servidor o de la red.
-export function explainOnline(err) {
-  const m = String((err && err.message) || err || '');
+export function explainOnline(err: unknown) {
+  const m = String((err && (err as { message?: unknown }).message) || err || '');
   if (m === 'nombre') return 'Nombre no válido: de 1 a 16 letras, números, espacios, _ . -';
   if (m === 'origen') return 'Esta página no tiene permiso para usar el servidor (ALLOWED_ORIGINS).';
   if (/not found/i.test(m)) return 'No existe una sala con ese código (o ya se cerró).';
@@ -52,36 +109,36 @@ export function explainOnline(err) {
 
 export class Online {
   declare game: any;
-  declare room: any;
-  declare playing: any;
-  declare leaving: any;
-  declare reconnecting: any;
-  declare seed: any;
-  declare clock: any;
-  declare batch: any;
-  declare rtt: any;
-  declare jitter: any;
-  declare diag: any;
-  declare bytesIn: any;
-  declare bytesOut: any;
-  declare results: any;
-  declare sdkP: any;
-  declare shutdown: any;
-  declare pingT: any;
-  declare pred: any;
-  declare phys: any;
-  declare fresh: any;
-  declare acc: any;
-  declare lastQ: any;
-  declare wantReload: any;
-  declare up: any;
-  declare upDone: any;
-  declare lastDs: any;
+  declare room: RoomLike | null;
+  declare playing: boolean;
+  declare leaving: boolean;
+  declare reconnecting: boolean;
+  declare seed: number;
+  declare clock: ServerClock;
+  declare batch: number[][];
+  declare rtt: number;
+  declare jitter: number;
+  declare diag: Diag | null;
+  declare bytesIn: number;
+  declare bytesOut: number;
+  declare results: ResultsMsg;
+  declare sdkP: Promise<SdkLike> | null;
+  declare shutdown: boolean;
+  declare pingT: number;
+  declare pred: Predictor;
+  declare phys: { x: number; y: number };
+  declare fresh: boolean;
+  declare acc: number;
+  declare lastQ: number;
+  declare wantReload: boolean;
+  declare up: { n: number; ids: string[] } | null;
+  declare upDone: number;
+  declare lastDs: string;
   declare left: number;
   declare myKills: number;
-  declare abAt: any;
-  declare shopSig: any;
-  constructor(game) {
+  declare abAt: number;
+  declare shopSig: string;
+  constructor(game: any) {
     this.game = game;
     this.room = null;
     this.playing = false;
@@ -131,7 +188,7 @@ export class Online {
   // El SDK de Colyseus sólo se descarga cuando alguien entra al modo en línea.
   sdk() {
     if (!this.sdkP) {
-      this.sdkP = import('@colyseus/sdk').catch(() => {
+      this.sdkP = (import('@colyseus/sdk') as unknown as Promise<SdkLike>).catch(() => {
         this.sdkP = null;
         throw new Error('sdk');
       });
@@ -146,12 +203,12 @@ export class Online {
     return new C.Client(url);
   }
 
-  async create(name) {
+  async create(name: string) {
     const c = await this.client();
     this.attach(await c.create('dz', { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
 
-  async join(code, name) {
+  async join(code: string, name: string) {
     const c = await this.client();
     this.attach(await c.joinById(code, { name, look: lookCode(this.game.look), cls: this.game.classPick }));
   }
@@ -192,7 +249,7 @@ export class Online {
     }
   }
 
-  attach(room) {
+  attach(room: RoomLike) {
     const g = this.game;
     this.room = room;
     this.leaving = false;
@@ -203,18 +260,18 @@ export class Online {
     this.countBytes();
     this.remember();
     room.onStateChange(() => this.onState());
-    room.onMessage('load', (m) => this.onLoad(m));
-    room.onMessage('go', (m) => this.onGo(m));
-    room.onMessage('snap', (s) => this.applySnap(s));
-    room.onMessage('resume', (m) => this.onResume(m));
-    room.onMessage('results', (r) => this.onResults(r));
-    room.onMessage('notice', (m) => g.onlineStatus(String((m && m.m) || '')));
-    room.onMessage('error', (m) => g.onlineStatus(String((m && m.m) || 'Error'), true));
+    room.onMessage<LoadMsg>('load', (m) => this.onLoad(m));
+    room.onMessage<IdsMsg>('go', (m) => this.onGo(m));
+    room.onMessage<Snapshot>('snap', (s) => this.applySnap(s));
+    room.onMessage<ResumeMsg>('resume', (m) => this.onResume(m));
+    room.onMessage<ResultsMsg>('results', (r) => this.onResults(r));
+    room.onMessage<{ m?: string } | null>('notice', (m) => g.onlineStatus(String((m && m.m) || '')));
+    room.onMessage<{ m?: string } | null>('error', (m) => g.onlineStatus(String((m && m.m) || 'Error'), true));
     room.onMessage('shutdown', () => {
       this.shutdown = true;
       g.onlineStatus('El servidor se está reiniciando: las partidas en memoria se pierden.', true);
     });
-    room.onMessage('p', (m) => this.onPong(m));
+    room.onMessage<{ c: number }>('p', (m) => this.onPong(m));
     room.onDrop(() => {
       this.reconnecting = true;
       g.onlineStatus('Conexión perdida: reconectando…', true);
@@ -239,14 +296,14 @@ export class Online {
     ws.addEventListener('message', (e) => (this.bytesIn += e.data.byteLength || e.data.size || e.data.length || 0));
     if (!conn.dzSend) {
       conn.dzSend = conn.send.bind(conn);
-      conn.send = (d) => {
+      conn.send = (d: { byteLength?: number; length?: number }) => {
         this.bytesOut += (d && (d.byteLength || d.length)) || 0;
         conn.dzSend(d);
       };
     }
   }
 
-  send(type, m?) {
+  send(type: string, m?: unknown) {
     if (this.room && !this.reconnecting) this.room.send(type, m);
   }
 
@@ -260,7 +317,7 @@ export class Online {
     r.leave(true).catch(() => {});
   }
 
-  onLeave(code) {
+  onLeave(code: number) {
     const g = this.game;
     const mine = this.leaving;
     this.room = null;
@@ -288,7 +345,7 @@ export class Online {
     if (g.state === 'online') g.renderLobby();
   }
 
-  onLoad(m) {
+  onLoad(m: LoadMsg) {
     const g = this.game;
     this.seed = m.seed | 0;
     this.results = null;
@@ -301,18 +358,18 @@ export class Online {
     }, 30);
   }
 
-  onGo(m) {
+  onGo(m: IdsMsg) {
     if (!this.inList(m) || this.playing) return;
     this.game.onlineStatus('');
     this.startPlay();
   }
 
   // ¿Este jugador está en la lista de los que juegan esta partida?
-  inList(m) {
+  inList(m: IdsMsg) {
     return !!(m && Array.isArray(m.ids) && this.room && m.ids.includes(this.room.sessionId));
   }
 
-  onResume(m) {
+  onResume(m: ResumeMsg) {
     if (!m) return;
     this.seed = m.seed | 0;
     // volvió tras recargar la página en plena partida: mismo mapa y a jugar
@@ -322,7 +379,7 @@ export class Online {
     } else if (!this.playing) this.game.showOnline(true);
   }
 
-  onResults(r) {
+  onResults(r: ResultsMsg) {
     const g = this.game;
     this.results = r;
     if (this.playing) this.stopPlay();
@@ -377,7 +434,7 @@ export class Online {
   }
 
   // Cada fotograma (también en pausa): reloj, ping y entradas a paso fijo.
-  tick(dt) {
+  tick(dt: number) {
     if (!this.room) return;
     this.pingT -= dt;
     if (this.pingT <= 0) {
@@ -416,7 +473,8 @@ export class Online {
       f |= IN_RELOAD;
       this.wantReload = false;
     }
-    const cmd: { mx: number; my: number; f: number; a: number; w: any; s?: number } = {
+    const cmd: Cmd = {
+      s: 0, // lo pone pred.step
       mx: r3(mv.x),
       my: r3(mv.y),
       f,
@@ -438,7 +496,7 @@ export class Online {
 
   // Reemplaza a game.update() mientras se juega en línea. Con otra pantalla encima (mejoras,
   // tienda, pausa) el mundo sigue moviéndose detrás: la partida no se detiene por nadie.
-  update(dt) {
+  update(dt: number) {
     const g = this.game;
     const inp = g.input;
     const p = g.player;
@@ -531,7 +589,7 @@ export class Online {
     g.kills.normal = s.kl | 0;
     this.left = s.lft | 0;
     // jugadores, robots, zombis, objetos, balas y estructuras: lo mismo que ve el invitado del cooperativo
-    g.remote.applyWorld(s, ts, { myIdx: this.me ? this.me.idx : -1, identify: (idx) => this.identify(idx) });
+    g.remote.applyWorld(s, ts, { myIdx: this.me ? this.me.idx : -1, identify: (idx: number) => this.identify(idx) });
     this.applyHeavy(s);
     if (Array.isArray(s.fx)) for (const e of s.fx) g.remote.replay(e);
     if (Array.isArray(s.tt) && s.tt.length) g.toast(String(s.tt[s.tt.length - 1]));
@@ -539,14 +597,14 @@ export class Online {
   }
 
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
-  identify(idx) {
+  identify(idx: number) {
     const ms = this.room && this.room.state && this.room.state.members;
     let found: LobbyMember | null = null;
     if (ms) ms.forEach((m) => m.idx === idx && (found = m));
     return { name: (found && found.name) || 'Jugador', code: (found && found.look) || '' };
   }
 
-  applyStats(p, s) {
+  applyStats(p: Player, s: Snapshot) {
     const g = this.game;
     const st = Array.isArray(s.st) ? s.st : [];
     const hp = Number(st[0]) || 0;
@@ -607,7 +665,7 @@ export class Online {
     }
     g.money = money;
     applyCombo(p.combo, s.cb);
-    const wp = Array.isArray(s.wp) ? s.wp.filter((w) => Array.isArray(w) && WEAPONS[w[0]]) : [];
+    const wp = Array.isArray(s.wp) ? s.wp.filter((w) => Array.isArray(w) && w[0] in WEAPONS) : [];
     if (wp.length) {
       const ids = wp.map((w) => w[0]).join();
       if (ids !== p.weapons.map((w) => w.id).join()) {
@@ -626,7 +684,7 @@ export class Online {
   }
 
   // Barricadas, trampas y lanzables que tiene sin usar (los cuenta el servidor).
-  applyInventory(s) {
+  applyInventory(s: Snapshot) {
     const g = this.game;
     if (!Array.isArray(s.iv)) return;
     SHOP_ORDER.forEach((k, i) => (g.inv[k] = Math.max(0, s.iv[i] | 0)));
@@ -634,7 +692,7 @@ export class Online {
   }
 
   // Nivel, mejoras ofrecidas y estadísticas (todo lo decide el servidor).
-  applyEconomy(s) {
+  applyEconomy(s: Snapshot) {
     const g = this.game;
     const p = g.player;
     const ec = Array.isArray(s.ec) ? s.ec : [];
@@ -643,7 +701,7 @@ export class Online {
     const shopSig =
       g.money +
       '|' +
-      p.weapons.map((w) => w.id + ':' + w.reserve).join() +
+      p.weapons.map((w: { id: string; reserve: number }) => w.id + ':' + w.reserve).join() +
       '|' +
       SHOP_ORDER.map((k) => g.inv[k]).join() +
       '|' +
@@ -665,7 +723,7 @@ export class Online {
     }
     const up =
       Array.isArray(s.up) && s.up.length > 1
-        ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id) => UPGRADES.some((u) => u.id === id)) }
+        ? { n: s.up[0] | 0, ids: s.up.slice(1).filter((id: string) => UPGRADES.some((u) => u.id === id)) }
         : null;
     this.up = up && up.ids.length ? up : null;
     // fin de oleada: tienda y mejoras; si empieza la siguiente con la tienda abierta, se cierra
@@ -691,19 +749,19 @@ export class Online {
     return this.up ? this.up.ids.map((id) => UPGRADES.find((u) => u.id === id)) : [];
   }
 
-  pickUpgrade(i) {
+  pickUpgrade(i: number) {
     if (!this.up) return;
     this.upDone = this.up.n;
     this.send('pick', { i, n: this.up.n });
   }
 
-  buy(k, id, n = 0) {
+  buy(k: string, id: string, n = 0) {
     this.send('buy', { k, id, n });
   }
 
   // Construir, lanzar o subir al robot: el servidor lo hace al llegar a la última entrada que
   // mandamos (s), así ocurre donde se veía el jugador y hacia donde apuntaba.
-  act(k, extra = {}) {
+  act(k: string, extra: Record<string, unknown> = {}) {
     if (!this.pred) return;
     this.send('act', { s: this.pred.seq, k, ...extra });
     if (k === 'ab') this.abAt = performance.now();
@@ -711,13 +769,13 @@ export class Online {
 
   // Torretas pesadas: la que maneja él (su cuerpo queda detrás del cañón, también al predecir)
   // y las de los demás (el cañón gira hacia el ángulo de la foto, ver update).
-  applyHeavy(s) {
+  applyHeavy(s: Snapshot) {
     const g = this.game;
     const p = g.player;
     const st = Array.isArray(s.st) ? s.st : [];
     p.heavyAmmo = Math.max(0, st[10] | 0);
-    const heavy = g.structures.blocks.filter((b) => b.kind === 'heavy');
-    const at = (x, y) => heavy.find((b) => b.x === x && b.y === y) || null;
+    const heavy: HeavyBlock[] = g.structures.blocks.filter((b: HeavyBlock) => b.kind === 'heavy');
+    const at = (x: number, y: number) => heavy.find((b) => b.x === x && b.y === y) || null;
     const old = p.manned;
     for (const b of heavy) b.manned = null;
     for (const q of g.remote.peers.values()) q.manned = null;
@@ -743,7 +801,7 @@ export class Online {
 
   /* ---------- ping y diagnóstico ---------- */
 
-  onPong(m) {
+  onPong(m: { c: number }) {
     const c = Number(m && m.c);
     if (!Number.isFinite(c)) return;
     const rtt = performance.now() - c;
@@ -754,7 +812,7 @@ export class Online {
   }
 
   // Texto corto del indicador (una vez por segundo) y, si está abierto, el panel de diagnóstico.
-  stats(dt) {
+  stats(dt: number) {
     const r = this.game.remote.net.tick(dt);
     if (!r) return null;
     const { secs, fps, per } = r;
@@ -788,6 +846,6 @@ export class Online {
   }
 }
 
-export function validName(s) {
+export function validName(s: unknown) {
   return NAME_RE.test(String(s || '').trim());
 }

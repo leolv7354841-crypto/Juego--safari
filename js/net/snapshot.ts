@@ -9,6 +9,14 @@
 import { ABILITY, GOLDEN, NET, WEAPON_ORDER } from '../core/config.ts';
 import { TAU } from '../core/util.ts';
 import { PICKS, TYPES } from './protocol.ts';
+import type { Bullet, Zombie } from '../core/types.d.ts';
+import type { Player } from '../sim/player.ts';
+import type { Robot } from '../sim/robot.ts';
+import type { Structures } from '../sim/build.ts';
+import type { Horde } from '../sim/zombies.ts';
+import type { Pickups } from '../sim/pickups.ts';
+import type { Bullets } from '../sim/bullets.ts';
+import type { Director } from '../sim/director.ts';
 
 /** Números por zombi en `z`: id, tipo, dx, dy, ángulo (64 pasos), banderas. */
 export const ZOMBIE_N = 6;
@@ -20,29 +28,42 @@ export const ROBOT_N = 8;
 /** Claves de la parte del mundo (encodeWorld): están en toda foto, del cooperativo o del servidor. */
 export const WORLD_KEYS = ['o', 'z', 'zx', 'zh', 'pl', 'rb', 'pk', 'b', 'gr', 'fi', 'so', 'ms', 'bl', 'w', 'ds', 'tm'];
 
-const r100 = (v) => Math.round(v * 100);
+const r100 = (v: number) => Math.round(v * 100);
 
 /** A quién se le manda la foto. */
 export type Viewer = { x: number; y: number; vw?: number; vh?: number };
 /** Un jugador que ve el espectador. */
-export type PeerEntry = { idx: number; p: any; away?: boolean };
-export type RobotEntry = { idx: number; r: any };
+export type PeerEntry = { idx: number; p: Player; away?: boolean };
+export type RobotEntry = { idx: number; r: Robot };
+
+/** Lo que encodeScene y encodeStatic leen de `Structures`. */
+type SceneStructures = Pick<Structures, 'grenades' | 'fires' | 'stuck' | 'missiles' | 'blasts'>;
+type StaticStructures = Pick<Structures, 'blocks' | 'wires' | 'scorches'>;
+/** Lo que encodeWorld lee de la partida (el anfitrión del cooperativo o la simulación del servidor). */
+export type WorldSource = {
+  horde: Pick<Horde, 'list'>;
+  pickups: Pick<Pickups, 'list'>;
+  bullets: Pick<Bullets, 'list'>;
+  structures: SceneStructures;
+  director: Pick<Director, 'wave' | 'state'>;
+  time: number;
+};
 
 /** Zombis cercanos a la pantalla del espectador: z, zx (en el aire / hinchados), zh (vida de los heridos, en %). */
-export function encodeZombies(list, viewer) {
-  const near = (x, y) => Math.abs(x - viewer.x) < NET.view && Math.abs(y - viewer.y) < NET.view;
+export function encodeZombies(list: Zombie[], viewer: Viewer) {
+  const near = (x: number, y: number) => Math.abs(x - viewer.x) < NET.view && Math.abs(y - viewer.y) < NET.view;
   // los zombis sólo dentro de lo que cabe en su pantalla, con margen (son lo que más pesa en la foto)
   const ZW = Math.max(NET.zombieView[0], (viewer.vw || 0) + 150);
   const ZH = Math.max(NET.zombieView[1], (viewer.vh || 0) + 150);
-  const nearZ = (o) =>
+  const nearZ = (o: Zombie) =>
     o.type === 'golden' || o.type === 'giant'
       ? near(o.x, o.y)
       : Math.abs(o.x - viewer.x) < ZW && Math.abs(o.y - viewer.y) < ZH;
   const ox = Math.round(viewer.x);
   const oy = Math.round(viewer.y);
-  const z = [];
-  const zx = [];
-  const zh = [];
+  const z: number[] = [];
+  const zx: number[] = [];
+  const zh: number[] = [];
   for (const o of list) {
     if (o.dead || !nearZ(o)) continue;
     const flags =
@@ -66,12 +87,12 @@ export function encodeZombies(list, viewer) {
       zh.push(o.id, Math.max(0, Math.ceil((o.hp / o.maxHp) * 100)));
     if (o.air > 0 || o.swell > 0) zx.push(o.id, Math.round(o.air || 0), r100(o.swell || 0));
   }
-  return { o: [ox, oy], z, zx, zh };
+  return { o: [ox, oy] as [number, number], z, zx, zh };
 }
 
 /** Los demás jugadores: idx, x, y, mira, piernas, corre, arma, fogonazo, vivo, golpe, retroceso, velocidad, vida, ausente, en robot, habilidad, cargador, recarga. */
-export function encodePlayers(entries) {
-  const pl = [];
+export function encodePlayers(entries: PeerEntry[]) {
+  const pl: number[] = [];
   for (const { idx, p, away } of entries) {
     pl.push(
       idx,
@@ -99,9 +120,9 @@ export function encodePlayers(entries) {
 }
 
 /** Robots de todos (el del espectador también): estacionados o con su piloto dentro. */
-export function encodeRobots(entries, viewer) {
-  const near = (x, y) => Math.abs(x - viewer.x) < NET.view && Math.abs(y - viewer.y) < NET.view;
-  const rb = [];
+export function encodeRobots(entries: RobotEntry[], viewer: Viewer) {
+  const near = (x: number, y: number) => Math.abs(x - viewer.x) < NET.view && Math.abs(y - viewer.y) < NET.view;
+  const rb: number[] = [];
   for (const { idx, r } of entries) {
     if (!r.owned || !near(r.x, r.y)) continue;
     rb.push(
@@ -119,13 +140,13 @@ export function encodeRobots(entries, viewer) {
 }
 
 /** Objetos, balas ajenas, granadas, fuego, cohetes clavados, misiles y explosiones cercanos. */
-export function encodeScene(src, viewer, skipBullet) {
+export function encodeScene(src: WorldSource, viewer: Viewer, skipBullet: (b: Bullet) => boolean) {
   const V = NET.view;
-  const near = (x, y) => Math.abs(x - viewer.x) < V && Math.abs(y - viewer.y) < V;
+  const near = (x: number, y: number) => Math.abs(x - viewer.x) < V && Math.abs(y - viewer.y) < V;
   const st = src.structures;
   const M = V + ABILITY.bomber.radius;
   return {
-    pk: src.pickups.list.flatMap((it) =>
+    pk: src.pickups.list.flatMap((it: { k: string; x: number; y: number; t: number }) =>
       near(it.x, it.y) ? [PICKS.indexOf(it.k), Math.round(it.x), Math.round(it.y), Math.round(it.t * 10)] : [],
     ),
     b: src.bullets.list.flatMap((b) =>
@@ -175,9 +196,9 @@ export function encodeScene(src, viewer, skipBullet) {
  * La parte del mundo de una foto (todo menos lo propio de cada modo).
  */
 export function encodeWorld(
-  src: { horde: any; pickups: any; bullets: any; structures: any; director: any; time: number },
+  src: WorldSource,
   viewer: Viewer,
-  opts: { players?: PeerEntry[]; robots?: RobotEntry[]; skipBullet?: (b: any) => boolean } = {},
+  opts: { players?: PeerEntry[]; robots?: RobotEntry[]; skipBullet?: (b: Bullet) => boolean } = {},
 ) {
   const d = src.director;
   return {
@@ -192,7 +213,7 @@ export function encodeWorld(
 }
 
 /** Barricadas, trampas y quemaduras del suelo (son de todo el mapa: se mandan cuando cambian o cada cierto tiempo). */
-export function encodeStatic(st) {
+export function encodeStatic(st: StaticStructures) {
   return {
     blk: st.blocks.map((b) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]),
     wir: st.wires.map((w) => [w.kind, w.x, w.y, w.w, w.h, Math.round(w.hp)]),

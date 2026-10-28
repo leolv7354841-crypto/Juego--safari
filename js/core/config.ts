@@ -414,7 +414,7 @@ export const ZOMBIES = {
 // Curva de experiencia: barata al principio (mejoras seguidas en los primeros minutos)
 // y cuadrática después, sin saltos bruscos entre niveles.
 //   nv1 51 · nv2 89 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
-export const xpForLevel = (lvl) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
+export const xpForLevel = (lvl: number) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
 
 // Dinero por cada zombi eliminado. El doble que el original (y doble xp en ZOMBIES): con las
 // oleadas de WAVES.count = 0,75 por ronda se gana 1,5 veces lo de las oleadas originales.

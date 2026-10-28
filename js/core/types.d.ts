@@ -244,5 +244,5 @@ export interface CoopSnap extends WorldSnap {
   xn: number;
   /** Racha del invitado: bajas seguidas y décimas que le quedan (sim/combo.js). */
   cb: number[];
-  kl?: Record<string, number>;
+  kl?: number;
 }

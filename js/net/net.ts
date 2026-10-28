@@ -12,18 +12,21 @@ const ROOM_TTL = 15 * 60 * 1000;
 // tiempo máximo para que se abra la conexión directa
 const OPEN_LIMIT = 15000;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const base = () => ONLINE.url.replace(/\/$/, '');
-const url = (path) => `${base()}/rooms/${path}.json`;
+const url = (path: string) => `${base()}/rooms/${path}.json`;
 
-async function db(path, method = 'GET', body?) {
+/** Lo que se guarda en la sala de Firebase mientras se presentan los dos celulares. */
+type Room = { t?: number; offer?: string; answer?: string | null; joined?: number; connected?: boolean };
+
+async function db(path: string, method = 'GET', body?: unknown): Promise<Room | null> {
   const r = await window.fetch(url(path), { method, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'permiso' : 'red');
   return r.json();
 }
 
 // Espera (poco) a que el navegador junte sus rutas de conexión directa.
-function gathered(pc, limit = 2500) {
+function gathered(pc: RTCPeerConnection, limit = 2500) {
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
   return new Promise<void>((resolve) => {
     pc.addEventListener('icegatheringstatechange', () => {
@@ -34,16 +37,16 @@ function gathered(pc, limit = 2500) {
 }
 
 export class Net {
-  declare role: any;
-  declare code: any;
-  declare pc: any;
-  declare rel: any;
-  declare fast: any;
-  declare open: any;
-  declare onMessage: any;
-  declare onClose: any;
-  declare cancelled: any;
-  declare lastRecv: any;
+  declare role: 'host' | 'guest' | null;
+  declare code: string | null;
+  declare pc: RTCPeerConnection | null;
+  declare rel: RTCDataChannel | null;
+  declare fast: RTCDataChannel | null;
+  declare open: boolean;
+  declare onMessage: ((m: unknown) => void) | null;
+  declare onClose: (() => void) | null;
+  declare cancelled: boolean;
+  declare lastRecv: number;
   constructor() {
     this.role = null; // 'host' | 'guest'
     this.code = null;
@@ -80,13 +83,13 @@ export class Net {
     return pc;
   }
 
-  wire(ch) {
-    ch.addEventListener('message', (e) => this.receive(e.data));
+  wire(ch: RTCDataChannel) {
+    ch.addEventListener('message', (e: MessageEvent) => this.receive(e.data));
     if (ch.label === 'rel') ch.addEventListener('close', () => this.lost());
   }
 
-  receive(text) {
-    let m;
+  receive(text: string) {
+    let m: unknown;
     try {
       m = JSON.parse(text);
     } catch {
@@ -114,7 +117,7 @@ export class Net {
   /* ---------- sala ---------- */
 
   // Anfitrión: crea la sala y espera a que alguien se una (onCode recibe el código).
-  async host(onCode) {
+  async host(onCode: (code: string) => void) {
     this.role = 'host';
     this.cancelled = false;
     const pc = this.makePc();
@@ -135,11 +138,11 @@ export class Net {
     await db(code, 'PUT', { t: Date.now(), offer });
     onCode(code);
     // esperar a que entre el invitado
-    let room = null;
+    let room: Room | null = null;
     for (;;) {
       if (this.cancelled) throw new Error('cancelado');
       await sleep(900);
-      room = await db(code).catch(() => null);
+      room = await db(code).catch((): Room | null => null);
       if (room && room.joined) break;
     }
     await db(`${code}/connected`, 'PUT', true);
@@ -153,7 +156,7 @@ export class Net {
   }
 
   // Invitado: se une a la sala con el código.
-  async join(code) {
+  async join(code: string) {
     this.role = 'guest';
     this.cancelled = false;
     code = String(code || '')
@@ -165,12 +168,12 @@ export class Net {
     if (!room.offer) throw new Error('directa');
     this.code = code;
     const pc = this.makePc();
-    pc.addEventListener('datachannel', (e) => {
+    pc.addEventListener('datachannel', (e: RTCDataChannelEvent) => {
       if (e.channel.label === 'rel') this.rel = e.channel;
       else this.fast = e.channel;
       this.wire(e.channel);
     });
-    let answer = null;
+    let answer: string | null = null;
     try {
       await pc.setRemoteDescription({ type: 'offer', sdp: room.offer });
       await pc.setLocalDescription(await pc.createAnswer());
@@ -185,7 +188,7 @@ export class Net {
   }
 
   // fiable y en orden (eventos) o rápido sin reintentos (estado que se repite)
-  send(m, fast = false) {
+  send(m: object, fast = false) {
     if (!this.open || !this.direct) return;
     const ch = fast ? this.fast : this.rel;
     // si el canal rápido está saturado, se salta este estado (llegará el siguiente)

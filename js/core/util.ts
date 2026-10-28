@@ -1,13 +1,13 @@
 export const TAU = Math.PI * 2;
 
-export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-export const lerp = (a, b, t) => a + (b - a) * t;
-export const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
-export const randInt = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
-export const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+export const rand = (a: number = 0, b: number = 1) => a + Math.random() * (b - a);
+export const randInt = (a: number, b: number) => Math.floor(a + Math.random() * (b - a + 1));
+export const pick = <T>(arr: ArrayLike<T>): T => arr[(Math.random() * arr.length) | 0];
 
 // Generador pseudoaleatorio con semilla: el mapa se dibuja igual en cada trozo.
-export function mulberry32(seed) {
+export function mulberry32(seed: number): () => number {
   let s = seed | 0;
   return function () {
     s = (s + 0x6d2b79f5) | 0;
@@ -16,17 +16,17 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-export const rrange = (rng, a, b) => a + rng() * (b - a);
-export const rpick = (rng, arr) => arr[(rng() * arr.length) | 0];
+export const rrange = (rng: () => number, a: number, b: number) => a + rng() * (b - a);
+export const rpick = <T>(rng: () => number, arr: ArrayLike<T>): T => arr[(rng() * arr.length) | 0];
 
-export function angleTo(a, b, maxStep) {
+export function angleTo(a: number, b: number, maxStep: number) {
   let d = ((((b - a + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
   if (d > maxStep) d = maxStep;
   else if (d < -maxStep) d = -maxStep;
   return a + d;
 }
 
-export function makeCanvas(w, h) {
+export function makeCanvas(w: number, h: number) {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.ceil(w));
   c.height = Math.max(1, Math.ceil(h));
@@ -34,7 +34,7 @@ export function makeCanvas(w, h) {
 }
 
 // Intersección segmento-círculo: devuelve t en [0,1] de entrada o -1.
-export function segCircleT(x1, y1, dx, dy, cx, cy, r) {
+export function segCircleT(x1: number, y1: number, dx: number, dy: number, cx: number, cy: number, r: number) {
   const fx = x1 - cx;
   const fy = y1 - cy;
   const c = fx * fx + fy * fy - r * r;
@@ -47,7 +47,14 @@ export function segCircleT(x1, y1, dx, dy, cx, cy, r) {
   return t >= 0 && t <= 1 ? t : -1;
 }
 
-export function roundRect(ctx, x, y, w, h, r) {
+export function roundRect(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
   r = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -58,7 +65,7 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-export function shade(hex, f) {
+export function shade(hex: string, f: number) {
   const n = parseInt(hex.slice(1), 16);
   const r = clamp(Math.round(((n >> 16) & 255) * f), 0, 255);
   const g = clamp(Math.round(((n >> 8) & 255) * f), 0, 255);
@@ -66,14 +73,14 @@ export function shade(hex, f) {
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
-export function fmtTime(s) {
+export function fmtTime(s: number) {
   const m = Math.floor(s / 60);
   const ss = Math.floor(s % 60);
   return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
 export const storage = {
-  get(key, fallback) {
+  get<T>(key: string, fallback: T): T {
     try {
       const v = localStorage.getItem(key);
       return v == null ? fallback : JSON.parse(v);
@@ -81,14 +88,14 @@ export const storage = {
       return fallback;
     }
   },
-  remove(key) {
+  remove(key: string) {
     try {
       localStorage.removeItem(key);
     } catch {
       /* almacenamiento no disponible */
     }
   },
-  set(key, value) {
+  set(key: string, value: unknown) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {

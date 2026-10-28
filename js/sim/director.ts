@@ -1,21 +1,29 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
 import { MAX_ALIVE, WORLD_SIZE, WAVES } from '../core/config.ts';
-import { rand, randInt, TAU } from '../core/util.ts';
-import type { GameHost } from '../core/types.d.ts';
+import { rand, randInt } from '../core/util.ts';
+import type { GameHost, Vec } from '../core/types.d.ts';
+
+/** Lo que ve un jugador: caja centrada en (x, y) de medio ancho hw y medio alto hh. */
+export interface View {
+  x: number;
+  y: number;
+  hw: number;
+  hh: number;
+}
 
 export class Director {
-  declare wave: any;
-  declare state: any;
-  declare timer: any;
-  declare queue: any;
-  declare spawnT: any;
-  declare waveSize: any;
+  declare wave: number;
+  declare state: string;
+  declare timer: number;
+  declare queue: string[];
+  declare spawnT: number;
+  declare waveSize: number;
   /** partida cooperativa o en línea (lo pone quien crea la partida) */
   declare coop?: boolean;
   /** multiplicador de zombis en línea (NET.crowd) */
   declare crowd?: number;
-  declare waveT: any;
-  declare straggleT: any;
+  declare waveT: number;
+  declare straggleT: number;
   constructor() {
     this.wave = 0;
     this.state = 'break';
@@ -33,7 +41,7 @@ export class Director {
     return WAVES.speed * (1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02));
   }
 
-  startWave(game) {
+  startWave(game: GameHost) {
     this.wave++;
     const w = this.wave;
     // hordas masivas: 5 veces más normales y velocistas que antes
@@ -42,7 +50,7 @@ export class Director {
     // en línea: crowd crece con el número de jugadores (ver NET.crowd)
     // WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno
     const m = (this.coop ? this.crowd || 0.5 : 1) * WAVES.count;
-    const few = (n) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
+    const few = (n: number) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
     const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
     const swats = Math.round(normalTotal * 0.2);
     const normals = normalTotal - swats;
@@ -52,7 +60,7 @@ export class Director {
     const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
     // toros desde la oleada 3: pocos, pero embisten
     const bulls = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
-    const q = [];
+    const q: string[] = [];
     for (let i = 0; i < normals - heavies; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
@@ -83,7 +91,7 @@ export class Director {
   }
 
   // Lo llama el botón INICIAR SIGUIENTE RONDA.
-  nextRound(game) {
+  nextRound(game: GameHost) {
     if (this.state !== 'waiting') return false;
     this.startWave(game);
     return true;
@@ -121,9 +129,9 @@ export class Director {
   // Lo que ve cada jugador vivo: caja { x, y, hw, hh }. El de este equipo usa su cámara real;
   // los demás (cooperativo, servidor) mandan su media pantalla (vw, vh) y nunca se toma menos
   // que WAVES.view, por si aún no llegó o la mandan mal.
-  views(game) {
+  views(game: GameHost): View[] {
     const [vw, vh] = WAVES.view;
-    const out = [];
+    const out: View[] = [];
     if (game.targets) {
       for (const p of game.targets)
         if (p.alive) out.push({ x: p.x, y: p.y, hw: Math.max(vw, p.vw || 0), hh: Math.max(vh, p.vh || 0) });
@@ -140,14 +148,14 @@ export class Director {
   }
 
   // ¿Algún jugador vería un círculo de radio r en (x, y)? (con margen por la cámara que sigue a la mira)
-  seen(views, x, y, r) {
+  seen(views: View[], x: number, y: number, r: number) {
     const m = r + 40;
     for (const v of views) if (Math.abs(x - v.x) < v.hw + m && Math.abs(y - v.y) < v.hh + m) return true;
     return false;
   }
 
   // ¿Hay ruta desde (x, y) hasta algún jugador? En el servidor cada jugador tiene su propio campo.
-  canReach(game, x, y) {
+  canReach(game: GameHost, x: number, y: number) {
     const world = game.world;
     if (game.targets) {
       for (const p of game.targets) if (p.alive && p.field && world.reachable(x, y, p.field)) return true;
@@ -158,7 +166,7 @@ export class Director {
 
   // Durante toda la ronda: el zombi que nadie ve y quedó lejos de todos (WAVES.lost) o atascado
   // vuelve a salir por fuera del equipo (ver edgePoint), por un punto con ruta. Nunca a la vista.
-  herdStragglers(dt, game) {
+  herdStragglers(dt: number, game: GameHost) {
     this.straggleT = (this.straggleT || 0) + dt;
     if (this.straggleT < WAVES.straggle) return;
     this.straggleT = 0;
@@ -199,7 +207,7 @@ export class Director {
   // Punto al azar justo fuera de la caja que encierra las vistas de todo el equipo, por cualquier
   // lado: así nadie aparece entre dos jugadores separados. Con team = false (respaldo, cuando
   // esa orilla cae fuera del mapa) usa la vista de un solo jugador al azar.
-  edgePoint(game, margin, views = this.views(game), team = true) {
+  edgePoint(game: GameHost, margin: number, views: View[] = this.views(game), team = true): Vec {
     let v = views[randInt(0, views.length - 1)];
     if (!v) {
       const f = game.spawnFocus();
@@ -232,7 +240,7 @@ export class Director {
 
   // Cada ráfaga (n zombis) se reparte en grupitos por las orillas, siempre fuera de la vista de todos.
   // Lo que no quepa sale en la siguiente ráfaga.
-  spawnGroup(game, n) {
+  spawnGroup(game: GameHost, n: number) {
     const world = game.world;
     const views = this.views(game);
     let left = Math.min(this.queue.length, n);

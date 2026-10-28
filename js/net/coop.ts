@@ -17,6 +17,7 @@ import { PARTICLE_SKIP, PICKS, SFX_SYNC, DECAL_SYNC } from './protocol.ts';
 import { encodeStatic, encodeWorld } from './snapshot.ts';
 import { GUEST_IDX, HOST_IDX } from './remote.ts';
 import { CoopHost, CoopGuest, Solo } from './mode.ts';
+import type { CoopSnap, GameHost, Zombie } from '../core/types.d.ts';
 
 const SNAP_HZ = 12;
 const IN_HZ = 20;
@@ -26,23 +27,113 @@ const WINDOW = 6;
 const FX_MAX = 500;
 // el invitado adelanta lo que ve algo más que el cliente en línea (el P2P llega a tirones)
 const EXTRAPOLATE = 250;
-const r100 = (v) => Math.round(v * 100);
+const r100 = (v: number) => Math.round(v * 100);
+
+type Look = ReturnType<typeof cleanLook>;
+/** Efecto grabado en el anfitrión: [grupo (p/d/s/c/g), método, argumentos]. */
+export type FxEntry = [tag: string, name: string, args: unknown[]];
+
+/** Invitado -> anfitrión. */
+type HelloMsg = { t: 'hello'; name: string; look: Look };
+type InMsg = {
+  t: 'in';
+  ak: number;
+  ts: number;
+  x: number;
+  y: number;
+  a: number;
+  la: number;
+  wp: number;
+  sp: number;
+  run: number;
+  al: number;
+  hp: number;
+  mh: number;
+  na: number;
+  w: string;
+  mag: number;
+  rl: number;
+  rp: number;
+  ab: number;
+  vw: number;
+  vh: number;
+};
+type ShotMsg = { t: 'shot'; x: number; y: number; a: number[]; w: string; dmg: number; pi: number };
+type BuildMsg = { t: 'build'; kind: string; x: number; y: number; a: number };
+type ThrowMsg = { t: 'throw'; kind: string; tx: number; ty: number; x: number; y: number; a: number };
+type AbMsg = { t: 'ab'; tx: number; ty: number; x: number; y: number; a: number };
+export type GuestMsg =
+  | HelloMsg
+  | InMsg
+  | ShotMsg
+  | BuildMsg
+  | ThrowMsg
+  | AbMsg
+  | { t: 'dead' }
+  | { t: 'next' }
+  | { t: 'bye' };
+/** Anfitrión -> invitado (la foto es CoopSnap). */
+type StartMsg = { t: 'start'; seed: number; x: number; y: number; name: string; look: Look };
+export type HostMsg =
+  | StartMsg
+  | CoopSnap
+  | { t: 'fx'; e: FxEntry[] }
+  | { t: 'k'; x: number; y: number }
+  | { t: 'hurt'; d: number }
+  | { t: 'hit' }
+  | { t: 'earn'; n: number; gold?: number }
+  | { t: 'pick'; k: string }
+  | { t: 'acid' }
+  | { t: 'built'; kind: string; ok: boolean }
+  | { t: 'revive'; x: number; y: number }
+  | { t: 'over' }
+  | { t: 'bye' };
+export type CoopMsg = GuestMsg | HostMsg;
+
+// Armas y tienda como tablas por id (el id llega de la red): sólo lo que se lee aquí.
+type WeaponDef = {
+  id: string;
+  damage: number;
+  speed: number;
+  range: number;
+  pellets: number;
+  knock: number;
+  rocket?: boolean;
+};
+const WEAPON_DEFS: Record<string, WeaponDef> = WEAPONS;
+const SHOP_DEFS: Record<string, { price: number; consumable?: boolean }> = SHOP;
+
+/** Un jugador remoto que se predice y se alisa (track/place) y gira suave (turn). */
+type Tracked = {
+  x: number;
+  y: number;
+  st?: number;
+  sx?: number;
+  sy?: number;
+  vx?: number;
+  vy?: number;
+  rendered?: boolean;
+};
+type Puppet = Player & Tracked & { lx?: number; ly?: number };
+/** Un zombi tal como lo graba `corpse` y como se manda (packCorpse). */
+type Corpse = { type: string; si?: number; x: number; y: number; r: number; angle: number; burnt?: boolean };
+type PackedCorpse = Omit<Corpse, 'angle'> & { a: number };
 
 // Reloj de llegada: convierte la hora del otro celular en la nuestra y calcula cuánto
 // atrasar el dibujo para tener siempre dos posiciones entre las que trazar el camino,
 // aunque los datos lleguen disparejos o en grupitos (sobre todo por Firebase).
 class Clock {
-  declare off: any;
-  declare prevTs: any;
-  declare gap: any;
-  declare late: any;
+  declare off: number | null;
+  declare prevTs: number | null;
+  declare gap: number;
+  declare late: number;
   constructor() {
     this.off = null;
     this.prevTs = null;
     this.gap = 100;
     this.late = 20;
   }
-  stamp(ts) {
+  stamp(ts: number) {
     const now = performance.now();
     if (!Number.isFinite(ts)) return now;
     const raw = now - ts;
@@ -65,7 +156,7 @@ class Clock {
 const MAX_V = 0.65; // px por ms (más que el toro embistiendo)
 const HORIZON = 900; // ms máximos que se predice sin datos nuevos
 
-function track(o, t, x, y) {
+function track(o: Tracked, t: number, x: number, y: number) {
   if (o.st !== undefined && t > o.st && t - o.st < 1000) {
     let vx = (x - o.sx) / (t - o.st);
     let vy = (y - o.sy) / (t - o.st);
@@ -87,7 +178,7 @@ function track(o, t, x, y) {
 }
 
 // Coloca o donde debería estar ahora: avanza con su velocidad y corrige suave hacia la predicción.
-function place(o, now, dt) {
+function place(o: Tracked, now: number, dt: number) {
   if (o.st === undefined) return;
   const ahead = Math.min(Math.max(0, now - o.st), HORIZON);
   const px = o.sx + (o.vx || 0) * ahead;
@@ -110,30 +201,30 @@ function place(o, now, dt) {
 }
 
 export class Coop {
-  declare game: any;
-  declare net: any;
-  declare role: any;
-  declare peer: any;
-  declare peerName: any;
-  declare peerLook: any;
-  declare fx: any;
-  declare rec: any;
-  declare depth: any;
-  declare orig: any;
-  declare sendT: any;
-  declare inT: any;
-  declare snapN: any;
-  declare pendingBuild: any;
-  declare lastDs: any;
-  declare levelSeen: any;
-  declare clock: any;
-  declare snapSeq: any;
-  declare peerAck: any;
-  declare lastSeq: any;
-  declare lastT: any;
-  declare lastSnapAt: any;
-  declare peerAbAt: any;
-  constructor(game) {
+  declare game: GameHost;
+  declare net: Net;
+  declare role: 'host' | 'guest' | null;
+  declare peer: Puppet | null;
+  declare peerName: string;
+  declare peerLook: Look | null;
+  declare fx: FxEntry[];
+  declare rec: boolean;
+  declare depth: number;
+  declare orig: [Record<string, unknown>, string][];
+  declare sendT: number;
+  declare inT: number;
+  declare snapN: number;
+  declare pendingBuild: string | null;
+  declare lastDs: string | null;
+  declare levelSeen: number;
+  declare clock: Clock;
+  declare snapSeq: number;
+  declare peerAck: number;
+  declare lastSeq: number;
+  declare lastT: number;
+  declare lastSnapAt: number;
+  declare peerAbAt: number;
+  constructor(game: GameHost) {
     this.game = game;
     this.net = new Net();
     this.role = null; // 'host' | 'guest' (game.mode es el modo de la partida: js/net/mode.js)
@@ -153,7 +244,7 @@ export class Coop {
     this.clock = new Clock();
   }
 
-  send(m, fast = false) {
+  send(m: CoopMsg, fast = false) {
     if (this.net.open) this.net.send(m, fast);
   }
 
@@ -164,15 +255,15 @@ export class Coop {
 
   /* ---------- sala ---------- */
 
-  async create(onCode) {
-    this.net.onMessage = (m) => this.onMessage(m);
+  async create(onCode: (code: string) => void) {
+    this.net.onMessage = (m) => this.onMessage(m as CoopMsg);
     this.net.onClose = () => this.lost();
     await this.net.host(onCode);
     this.startHost();
   }
 
-  async join(code) {
-    this.net.onMessage = (m) => this.onMessage(m);
+  async join(code: string) {
+    this.net.onMessage = (m) => this.onMessage(m as CoopMsg);
     this.net.onClose = () => this.lost();
     await this.net.join(code);
     this.send({ t: 'hello', name: this.myName(), look: this.game.look });
@@ -230,7 +321,7 @@ export class Coop {
     this.startHost();
   }
 
-  startGuest(m) {
+  startGuest(m: StartMsg) {
     const g = this.game;
     g.sfx.unlock();
     g.newWorld(m.seed);
@@ -270,14 +361,18 @@ export class Coop {
   installRecording() {
     const g = this.game;
     const self = this;
-    const wrap = (obj, tag, names) => {
+    const wrap = (obj: Record<string, unknown>, tag: string, names: string[]) => {
       for (const n of names) {
         const f = obj[n];
         if (typeof f !== 'function') continue;
         this.orig.push([obj, n]);
-        obj[n] = function (...args) {
+        obj[n] = function (this: unknown, ...args: unknown[]) {
           if (self.rec && self.depth === 0 && self.fx.length < FX_MAX && self.nearPeer(tag, n, args)) {
-            self.fx.push([tag, n, tag === 'd' && n === 'corpse' ? self.packCorpse(args as [any, any, any]) : args]);
+            self.fx.push([
+              tag,
+              n,
+              tag === 'd' && n === 'corpse' ? self.packCorpse(args as [Corpse, number, number]) : args,
+            ]);
           }
           self.depth++;
           try {
@@ -305,7 +400,7 @@ export class Coop {
   }
 
   // Los efectos visuales lejos del compañero no se mandan (no los vería y gastan conexión).
-  nearPeer(tag, n, args) {
+  nearPeer(tag: string, n: string, args: unknown[]) {
     const q = this.peer;
     // temblor: sólo los que tienen lugar (los del anfitrión, como sus golpes, son sólo suyos)
     if (tag === 'c')
@@ -315,14 +410,14 @@ export class Coop {
         (!q || (Math.abs(args[1] - q.x) < VIEW && Math.abs(args[2] - q.y) < VIEW))
       );
     if (!q || (tag !== 'p' && tag !== 'd')) return true;
-    const o = n === 'corpse' ? args[0] : null;
+    const o = n === 'corpse' ? (args[0] as Corpse) : null;
     const x = o ? o.x : args[0];
     const y = o ? o.y : args[1];
     if (typeof x !== 'number' || typeof y !== 'number') return true;
     return Math.abs(x - q.x) < VIEW && Math.abs(y - q.y) < VIEW;
   }
 
-  packCorpse([z, dx, dy]) {
+  packCorpse([z, dx, dy]: [Corpse, number, number]): [PackedCorpse, number, number] {
     return [
       {
         type: z.type,
@@ -339,7 +434,7 @@ export class Coop {
   }
 
   // Ejecuta algo sin grabarlo (lo que provoca el invitado ya lo vio en su celular).
-  quiet(fn) {
+  quiet<T>(fn: () => T): T {
     const was = this.rec;
     this.rec = false;
     try {
@@ -349,7 +444,7 @@ export class Coop {
     }
   }
 
-  withPlayer(pl, fn) {
+  withPlayer<T>(pl: Player, fn: () => T): T {
     const g = this.game;
     const saved = g.player;
     g.player = pl;
@@ -362,14 +457,14 @@ export class Coop {
 
   /* ---------- cada fotograma ---------- */
 
-  tick(dt) {
+  tick(dt: number) {
     if (!this.role) return;
     this.net.check();
     if (this.role === 'host') this.hostTick(dt);
     else this.guestTick(dt);
   }
 
-  hostTick(dt) {
+  hostTick(dt: number) {
     const g = this.game;
     const peer = this.peer;
     if (!peer) return;
@@ -404,7 +499,7 @@ export class Coop {
     const g = this.game;
     const peer = this.peer;
     // la parte del mundo es la misma que arma el servidor en línea (js/net/snapshot.js)
-    const s: Record<string, any> = {
+    const s: CoopSnap = {
       t: 's',
       q: ++this.snapSeq,
       ts: Math.round(performance.now()),
@@ -434,7 +529,7 @@ export class Coop {
   }
 
   // La mira y las piernas del compañero giran suave hacia lo último recibido.
-  turn(q, dt) {
+  turn(q: Puppet, dt: number) {
     if (q.ta !== undefined) q.angle = angleTo(q.angle, q.ta, dt * 14);
     if (q.tla !== undefined) q.legAngle = angleTo(q.legAngle, q.tla, dt * 10);
     // el paso de las piernas sale del movimiento que se ve, así no salta
@@ -445,16 +540,16 @@ export class Coop {
 
   /* ---------- mensajes ---------- */
 
-  onMessage(m) {
+  onMessage(m: CoopMsg) {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'start') return this.startGuest(m);
     if (m.t === 'bye') return this.lost();
-    if (this.role === 'host') this.onGuestMessage(m);
-    else if (this.role === 'guest') this.onHostMessage(m);
+    if (this.role === 'host') this.onGuestMessage(m as GuestMsg);
+    else if (this.role === 'guest') this.onHostMessage(m as HostMsg);
     else if (m.t === 'hello') this.onHello(m);
   }
 
-  onHello(m) {
+  onHello(m: HelloMsg) {
     this.peerName = String(m.name || '').slice(0, 16);
     this.peerLook = cleanLook(m.look);
     if (this.peer) {
@@ -463,7 +558,7 @@ export class Coop {
     }
   }
 
-  onGuestMessage(m) {
+  onGuestMessage(m: GuestMsg) {
     const g = this.game;
     const peer = this.peer;
     switch (m.t) {
@@ -487,7 +582,7 @@ export class Coop {
           peer.vh = Math.min(1600, Math.max(100, m.vh));
         }
         peer.needAmmo = !!m.na;
-        if (WEAPONS[m.w] && (!peer.weapons[0] || peer.weapons[0].id !== m.w)) {
+        if (WEAPON_DEFS[m.w] && (!peer.weapons[0] || peer.weapons[0].id !== m.w)) {
           peer.weapons = [peer.makeWeapon(m.w)];
           peer.wi = 0;
         }
@@ -505,8 +600,8 @@ export class Coop {
         const kind = m.kind;
         this.syncPeer(m);
         const ok =
-          !!SHOP[kind] &&
-          !SHOP[kind].consumable &&
+          !!SHOP_DEFS[kind] &&
+          !SHOP_DEFS[kind].consumable &&
           this.quiet(() => this.withPlayer(peer, () => g.structures.place(g, kind)));
         this.send({ t: 'built', kind, ok });
         break;
@@ -544,7 +639,7 @@ export class Coop {
   }
 
   // Las acciones traen la posición y la mira exactas del invitado en ese instante.
-  syncPeer(m) {
+  syncPeer(m: { x: number; y: number; a: number }) {
     const q = this.peer;
     if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
       q.x = q.tx = m.x;
@@ -557,9 +652,9 @@ export class Coop {
     if (Number.isFinite(m.a)) q.angle = q.ta = m.a;
   }
 
-  peerShot(m) {
+  peerShot(m: ShotMsg) {
     const g = this.game;
-    const d = WEAPONS[m.w];
+    const d = WEAPON_DEFS[m.w];
     if (!d || !Array.isArray(m.a)) return;
     const peer = this.peer;
     for (const a of m.a.slice(0, 12)) {
@@ -586,7 +681,7 @@ export class Coop {
     g.particles.muzzleSmoke(Number(m.x), Number(m.y), m.a[0]);
   }
 
-  onHostMessage(m) {
+  onHostMessage(m: HostMsg) {
     const g = this.game;
     const p = g.player;
     switch (m.t) {
@@ -632,7 +727,7 @@ export class Coop {
         if (PICKS.includes(m.k)) g.pickups.collect({ k: m.k, x: p.x, y: p.y }, g);
         break;
       case 'acid':
-        g.applyAcid();
+        g.applyAcid(g.player);
         break;
       case 'built': {
         const kind = this.pendingBuild;
@@ -654,7 +749,7 @@ export class Coop {
 
   /* ---------- invitado ---------- */
 
-  guestTick(dt) {
+  guestTick(dt: number) {
     const g = this.game;
     const p = g.player;
     this.inT -= dt;
@@ -690,12 +785,18 @@ export class Coop {
     );
   }
 
-  sendShot(x, y, angles, d, stats) {
+  sendShot(
+    x: number,
+    y: number,
+    angles: number[],
+    d: { id: string; damage: number; pierce: number },
+    stats: { dmgMult: number; pierce: number },
+  ) {
     this.send({
       t: 'shot',
       x: Math.round(x),
       y: Math.round(y),
-      a: angles.map((a) => Math.round(a * 1000) / 1000),
+      a: angles.map((a: number) => Math.round(a * 1000) / 1000),
       w: d.id,
       dmg: d.damage * stats.dmgMult,
       pi: d.pierce + stats.pierce,
@@ -703,7 +804,7 @@ export class Coop {
   }
 
   // game.mode.sendBuild: la pieza se descuenta cuando el anfitrión confirma ('built')
-  guestBuild(kind) {
+  guestBuild(kind: string) {
     const g = this.game;
     if (this.pendingBuild) return;
     this.pendingBuild = kind;
@@ -718,7 +819,7 @@ export class Coop {
   }
 
   // game.mode.sendThrow: tryGrenade ya eligió el blanco y descontó la granada
-  guestThrow(kind, tx, ty) {
+  guestThrow(kind: string, tx: number, ty: number) {
     const p = this.game.player;
     this.send({
       t: 'throw',
@@ -731,7 +832,7 @@ export class Coop {
     });
   }
 
-  guestMissile(tx, ty) {
+  guestMissile(tx: number, ty: number) {
     const p = this.game.player;
     this.send({
       t: 'ab',
@@ -743,7 +844,7 @@ export class Coop {
     });
   }
 
-  applySnapshot(s) {
+  applySnapshot(s: CoopSnap) {
     const g = this.game;
     const d = g.director;
     // fin de oleada: tienda y mejoras para el invitado también
@@ -781,7 +882,7 @@ export class Coop {
   }
 
   // Reemplaza a game.update() en el celular del invitado.
-  guestUpdate(dt) {
+  guestUpdate(dt: number) {
     const g = this.game;
     const p = g.player;
     if (g.input.consume('pause')) return g.pause();
@@ -803,7 +904,7 @@ export class Coop {
     const grid = g.horde.grid;
     // choque local con los zombis que ves: no los atraviesas (en el anfitrión sólo se aparta el zombi)
     if (p.alive) {
-      const q = [];
+      const q: Zombie[] = [];
       grid.query(p.x - p.r - 30, p.y - p.r - 30, p.x + p.r + 30, p.y + p.r + 30, q);
       for (const z of q) {
         const dx = p.x - z.x;
@@ -850,7 +951,7 @@ export class Coop {
     } else if (this.peer && this.peer.alive) g.toast('Caíste: revives al terminar la oleada');
   }
 
-  revive(p, x, y) {
+  revive(p: Player, x: number, y: number) {
     const g = this.game;
     p.alive = true;
     p.hp = Math.round(p.stats.maxHp * 0.5);
@@ -877,16 +978,16 @@ export class Coop {
 
   /* ---------- ayudas para el resto del juego (anfitrión) ---------- */
 
-  earn(n) {
+  earn(n: number) {
     this.send({ t: 'earn', n });
   }
 
-  peerPickup(it) {
+  peerPickup(it: { k: string }) {
     this.send({ t: 'pick', k: it.k });
     return true;
   }
 
-  acidAt(x, y, R) {
+  acidAt(x: number, y: number, R: number) {
     const q = this.peer;
     if (q && q.alive && Math.hypot(q.x - x, q.y - y) < R + q.r) this.send({ t: 'acid' });
   }
@@ -894,7 +995,7 @@ export class Coop {
   /* ---------- indicador de conexión ---------- */
 
   // Texto corto para la pantalla: tipo de conexión, retraso, fotos por segundo y FPS.
-  stats(dt) {
+  stats(dt: number) {
     const r = this.game.remote.net.tick(dt);
     if (!r) return null;
     const via = 'Directa';

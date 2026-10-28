@@ -4,6 +4,7 @@
 import { NET } from '../core/config.ts';
 import { IN_RUN } from './protocol.ts';
 import type { Player } from '../sim/player.ts';
+import type { World } from '../sim/world.ts';
 import type { Cmd, GameHost } from '../core/types.d.ts';
 
 export const TICK = 1 / NET.tickHz;
@@ -12,16 +13,17 @@ const silent = new Proxy({}, { get: () => () => {} });
 
 // Estado del jugador que manda el servidor y que la predicción restaura.
 // boostT: impulso del Booster (lo baja Player.move, así que se predice igual que el movimiento)
-export const BODY = ['x', 'y', 'vx', 'vy', 'kx', 'ky', 'stamina', 'sinceRun', 'legAngle', 'boostT'];
+type BodyKey = 'x' | 'y' | 'vx' | 'vy' | 'kx' | 'ky' | 'stamina' | 'sinceRun' | 'legAngle' | 'boostT';
+export const BODY: BodyKey[] = ['x', 'y', 'vx', 'vy', 'kx', 'ky', 'stamina', 'sinceRun', 'legAngle', 'boostT'];
 
-export function packBody(p) {
+export function packBody(p: Pick<Player, BodyKey | 'exhausted'>) {
   return [...BODY.map((k) => Math.round(p[k] * 100) / 100), p.exhausted ? 1 : 0];
 }
 
-export function unpackBody(p, a) {
+export function unpackBody(p: Pick<Player, BodyKey | 'exhausted'>, a: unknown) {
   if (!Array.isArray(a) || a.length < BODY.length + 1) return false;
   for (let i = 0; i < BODY.length; i++) if (!Number.isFinite(a[i])) return false;
-  BODY.forEach((k, i) => (p[k] = a[i]));
+  BODY.forEach((k, i) => (p[k] = a[i] as number));
   p.exhausted = !!a[BODY.length];
   return true;
 }
@@ -35,17 +37,17 @@ export function applyMove(p: Player, cmd: Cmd, game: Pick<GameHost, 'world' | 's
 // confirma que la procesó. Al llegar el estado confirmado se restaura y se vuelven a
 // aplicar las pendientes. La diferencia con lo que se veía se borra poco a poco (offset).
 export class Predictor {
-  declare p: any;
-  declare quiet: any;
-  declare pending: any;
-  declare seq: any;
-  declare ox: any;
-  declare oy: any;
-  declare corrections: any;
-  declare corrSum: any;
-  declare corrMax: any;
-  declare snaps: any;
-  constructor(player, world) {
+  declare p: Player;
+  declare quiet: Pick<GameHost, 'world' | 'sfx'>;
+  declare pending: Cmd[];
+  declare seq: number;
+  declare ox: number;
+  declare oy: number;
+  declare corrections: number;
+  declare corrSum: number;
+  declare corrMax: number;
+  declare snaps: number;
+  constructor(player: Player, world: World) {
     this.p = player;
     this.quiet = { world, sfx: silent };
     this.pending = [];
@@ -59,7 +61,7 @@ export class Predictor {
   }
 
   // game: el juego real (para los sonidos); en las repeticiones se usa uno mudo.
-  step(cmd, game?) {
+  step(cmd: Cmd, game?: Pick<GameHost, 'world' | 'sfx'>) {
     cmd.s = ++this.seq;
     applyMove(this.p, cmd, game || this.quiet);
     this.pending.push(cmd);
@@ -68,7 +70,7 @@ export class Predictor {
     return cmd;
   }
 
-  reconcile(body, ack) {
+  reconcile(body: unknown, ack: number) {
     const p = this.p;
     const bx = p.x;
     const by = p.y;
@@ -98,7 +100,7 @@ export class Predictor {
     return err;
   }
 
-  decay(dt) {
+  decay(dt: number) {
     const k = Math.exp(-dt * NET.smooth);
     this.ox *= k;
     this.oy *= k;
@@ -125,21 +127,21 @@ export class Predictor {
 // Reloj del servidor visto desde aquí: off = hora local - hora del servidor (con el retraso de
 // ida más corto visto). Se ajusta despacio para que el dibujo no dé saltos.
 export class ServerClock {
-  declare off: any;
+  declare off: number | null;
   constructor() {
     this.off = null;
   }
-  sync(serverMs, localMs) {
+  sync(serverMs: number, localMs: number) {
     const raw = localMs - serverMs;
     if (this.off === null || raw < this.off) this.off = raw;
     else this.off += (raw - this.off) * 0.01;
   }
-  now(localMs) {
+  now(localMs: number) {
     return this.off === null ? 0 : localMs - this.off;
   }
 }
 
-function lerpAngle(a, b, t) {
+function lerpAngle(a: number, b: number, t: number) {
   let d = b - a;
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
@@ -149,11 +151,11 @@ function lerpAngle(a, b, t) {
 // Fotos de una entidad (tiempo del servidor + valores) para dibujarla un poco en diferido.
 // ang = índices de los valores que son ángulos.
 export class Interp {
-  declare ang: any;
-  declare max: any;
-  declare extrapolate: any;
-  declare t: any;
-  declare v: any;
+  declare ang: number[];
+  declare max: number;
+  declare extrapolate: number;
+  declare t: number[];
+  declare v: number[][];
   constructor(ang: number[] = [], max = 24, extrapolate = NET.maxExtrapolate) {
     this.ang = ang;
     this.max = max;
@@ -162,7 +164,7 @@ export class Interp {
     this.v = [];
   }
   // las fotos viejas que llegan tarde no hacen retroceder a nadie
-  push(t, vals) {
+  push(t: number, vals: number[]) {
     const n = this.t.length;
     if (n && t <= this.t[n - 1]) return false;
     this.t.push(t);
@@ -177,7 +179,7 @@ export class Interp {
     return this.v[this.v.length - 1];
   }
   // escribe en out los valores en el instante t (extrapola como mucho `extrapolate` ms, NET.maxExtrapolate por omisión)
-  sample(t, out) {
+  sample(t: number, out: number[]) {
     const T = this.t;
     const V = this.v;
     const n = T.length;
