@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 // Efectos de sonido sintetizados con Web Audio (sin archivos externos).
 // Cada efecto se arma por capas (chasquido, cuerpo, golpe grave, cola) con pequeñas
 // variaciones aleatorias, y un límite de voces evita que la horda sature la mezcla.
@@ -22,7 +21,7 @@ const SHOTS = {
 
 export class Sfx {
   constructor() {
-    /** @type {(() => void) | undefined} lo asigna Game para arrancar la música */
+    /** @type {((sfx: Sfx) => void) | undefined} lo asigna Game para arrancar la música */
     this.onReady;
     this.ctx = null;
     this.muted = storage.get('dz-muted', false);
@@ -81,6 +80,10 @@ export class Sfx {
     node.stop(end);
   }
 
+  /**
+   * Ráfaga de ruido filtrado.
+   * @param {{ dur: number, freq: number, q?: number, gain: number, type?: BiquadFilterType, attack?: number, sweep?: number, delay?: number, out?: AudioNode }} o
+   */
   burst({ dur, freq, q = 1, gain, type = 'lowpass', attack = 0.002, sweep, delay = 0, out }) {
     const c = this.ctx;
     const t = c.currentTime + delay;
@@ -103,6 +106,10 @@ export class Sfx {
     this.track(src, t + dur + 0.02);
   }
 
+  /**
+   * Tono con barrido opcional de frecuencia.
+   * @param {{ freq: number, to?: number, dur: number, gain: number, type?: OscillatorType, delay?: number, attack?: number, out?: AudioNode }} o
+   */
   tone({ freq, to, dur, gain, type = 'sine', delay = 0, attack = 0.005, out }) {
     const c = this.ctx;
     const t = c.currentTime + delay;
