@@ -15,7 +15,9 @@ Probar en Chrome de escritorio y Safari de iPhone, sobre la preview de Vercel.
 - [ ] Cuentas: crear (nombre + PIN), entrar, salir, cambiar.
 - [ ] Ranking global.
 - [ ] Controles táctiles (joysticks, botones) en celular.
-- [ ] Cooperativo: 2 celulares, código de sala de 4 letras, host y invitado se ven y se sincronizan.
-- [ ] Online: 4 jugadores en una sala, listos, partida, reconexión.
+- [ ] Menú: sólo «Un jugador» y «En línea · 2 a 4» (no hay botón de cooperativo).
+- [ ] Online, 2 jugadores: uno crea la sala, el otro entra con el enlace de invitación (`?sala=`); con 1 persona *Iniciar partida* queda desactivado y pide otra; con ambos listos, empiezan y se ven.
+- [ ] Online, 4 jugadores en una sala, listos, partida, reconexión.
+- [ ] Salir de una sala en línea: vuelves a una partida en solitario que no se guarda; tu progreso de «Un jugador» sigue intacto.
 - [ ] Como Artifact de Claude: guardado en la nube.
 - [ ] Vía `yeyo.games/deadzone/`.
