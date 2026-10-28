@@ -1188,6 +1188,7 @@ kbd {
 .coop-join .btn { width: auto; font-size: 22px; }
 .coop-label { margin: 0; font-size: 14px; color: var(--dim); }
 .coop-code { font-family: var(--display); font-size: 84px; line-height: 0.9; letter-spacing: 0.25em; color: #cfe6ff; text-shadow: 0 0 22px rgba(120, 180, 255, 0.5); padding-left: 0.25em; }
+.ol-link { font: inherit; font-size: 13px; padding: 7px 8px; color: var(--ink); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 0; -webkit-user-select: text; user-select: text; width: 100%; box-sizing: border-box; }
 .coop-status { min-height: 1.3em; margin: 10px 0; font-size: 15px; color: #cfc8b8; }
 .coop-status.bad { color: #e0a060; }
 

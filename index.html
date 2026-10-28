@@ -180,7 +180,7 @@
       <div class="panel coop-panel">
         <p class="kicker">De 2 a 4 jugadores</p>
         <h2>En línea</h2>
-        <p class="acct-lead">Todos se conectan a un <b>servidor</b>: funciona en cualquier red. Sala privada con código o invitación; si alguien cae, revive al terminar la oleada.</p>
+        <p class="acct-lead">Todos se conectan a un <b>servidor</b>: funciona en cualquier red. Crea una sala y pásale el código o el enlace a tu amigo: se juega de <b>2 a 4</b>. Si alguien cae, revive al terminar la oleada.</p>
         <p class="coop-label">Tu clase</p>
         <div class="class-row"></div>
         <div class="coop-step" id="ol-choose">
@@ -198,6 +198,8 @@
         <div class="coop-step" id="ol-lobby" hidden>
           <p class="coop-label">Código de la sala · <span id="ol-phase"></span></p>
           <div class="coop-code ol-code" id="ol-code">······</div>
+          <p class="coop-label">Enlace de invitación</p>
+          <input id="ol-link" class="ol-link" readonly aria-label="Enlace de invitación" onfocus="this.select()">
           <button class="btn" id="btn-ol-copy" type="button">Copiar invitación</button>
           <p class="coop-label">Jugadores <span id="ol-count"></span></p>
           <ul class="ol-members" id="ol-members"></ul>

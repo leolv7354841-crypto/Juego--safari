@@ -77,6 +77,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       ownerId: '',
       code: this.roomId,
       maxPlayers: this.maxClients,
+      minPlayers: CONFIG.minPlayers,
       wave: 0,
     });
     this.setPatchRate(100);
@@ -319,6 +320,9 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (c.sessionId !== this.state.ownerId)
       return c.send('error', { m: 'Sólo el propietario puede iniciar la partida' });
     if (this.phase !== 'waiting' && this.phase !== 'finished') return;
+    const conectados = [...this.state.members.values()].filter((m) => m.connected).length;
+    if (conectados < CONFIG.minPlayers)
+      return c.send('error', { m: `Hacen falta al menos ${CONFIG.minPlayers} jugadores para iniciar la partida` });
     const others = [...this.state.members.entries()].filter(([id, m]) => id !== this.state.ownerId && m.connected);
     if (others.some(([, m]) => !m.ready)) return c.send('error', { m: 'Faltan jugadores por estar listos' });
     this.seed = randomInt(1, 2 ** 31 - 1);

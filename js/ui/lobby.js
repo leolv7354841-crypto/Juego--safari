@@ -74,10 +74,17 @@ export function renderLobby(game) {
   game.$('btn-ol-ready').textContent = me && me.ready ? 'Ya no estoy listo' : 'Estoy listo';
   game.$('btn-ol-start').hidden = !owner || !lobbyLike;
   const waitingFor = rows.filter(([id, m]) => id !== st.ownerId && m.connected && !m.ready).length;
-  game.$('btn-ol-start').disabled = waitingFor > 0;
-  game.$('btn-ol-start').textContent = waitingFor
-    ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
-    : 'Iniciar partida';
+  const here = rows.filter(([, m]) => m.connected).length;
+  const min = st.minPlayers || 2;
+  const start = game.$('btn-ol-start');
+  start.disabled = here < min || waitingFor > 0;
+  start.textContent =
+    here < min
+      ? `Hace falta ${min - here === 1 ? 'otra persona' : `${min - here} personas más`} (de ${min} a ${st.maxPlayers})`
+      : waitingFor
+        ? `Esperando ${waitingFor} listo${waitingFor > 1 ? 's' : ''}`
+        : 'Iniciar partida';
+  game.$('ol-link').value = inviteUrl(game);
   game.$('btn-ol-lobby').hidden = !owner || phase !== 'finished';
   const ph =
     {
@@ -121,7 +128,7 @@ export async function onlineCreate(game) {
   onlineStatus(game, 'Conectando con el servidor…');
   try {
     await game.online.create(name);
-    onlineStatus(game, 'Sala creada: comparte el código o la invitación.');
+    onlineStatus(game, 'Sala creada: pasa el código o el enlace a tus amigos (de 2 a 4 jugadores).');
     renderLobby(game);
   } catch (err) {
     onlineStatus(game, explainOnline(err), true);
@@ -147,16 +154,22 @@ export async function onlineJoin(game) {
   game.onlineBusy = false;
 }
 
-export function copyInvite(game) {
+// Enlace de invitación a la sala actual (?sala=CÓDIGO; conserva ?servidor= si lo hay).
+export function inviteUrl(game) {
   const room = game.online.room;
-  if (!room) return;
+  if (!room) return '';
   const u = new URL(location.href);
   u.search = '';
   u.hash = '';
   const keep = new URLSearchParams(location.search).get('servidor');
   if (keep) u.searchParams.set('servidor', keep);
   u.searchParams.set('sala', room.roomId);
-  const text = u.toString();
+  return u.toString();
+}
+
+export function copyInvite(game) {
+  const text = inviteUrl(game);
+  if (!text) return;
   const done = () => onlineStatus(game, 'Invitación copiada: ' + text);
   if (navigator.clipboard && navigator.clipboard.writeText)
     navigator.clipboard.writeText(text).then(done, () => onlineStatus(game, text));

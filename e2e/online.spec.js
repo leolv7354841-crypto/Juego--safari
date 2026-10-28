@@ -28,6 +28,9 @@ test('dos jugadores en la misma sala en línea', async ({ browser }) => {
   await expect(a.locator('#ol-lobby')).toBeVisible();
   await expect(a.locator('#ol-code')).not.toHaveText(/·/);
   const codigo = (await a.locator('#ol-code').innerText()).trim();
+  // con una sola persona no se puede iniciar y el botón dice por qué
+  await expect(a.locator('#btn-ol-start')).toBeDisabled();
+  await expect(a.locator('#btn-ol-start')).toContainText('otra persona');
 
   await clic(b, '#btn-online');
   await b.locator('#ol-name').fill('Beto');
@@ -46,6 +49,45 @@ test('dos jugadores en la misma sala en línea', async ({ browser }) => {
     await expect.poll(() => p.evaluate(() => window.__deadzone.state), { timeout: 30_000 }).toBe('play');
     expect(await p.evaluate(() => window.__deadzone.online.active)).toBe(true);
   }
+  expect(erroresA.filter((e) => !CONOCIDO.test(e))).toEqual([]);
+  expect(erroresB.filter((e) => !CONOCIDO.test(e))).toEqual([]);
+});
+
+// El amigo entra con el enlace de invitación (?sala=CÓDIGO) que muestra la sala, sin escribir el código.
+test('2 jugadores: el segundo entra por el enlace de invitación y empiezan', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const url = `/index.html?servidor=${encodeURIComponent(SERVER_URL)}`;
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  const erroresA = await abrir(a, url);
+
+  await clic(a, '#btn-online');
+  await a.locator('#ol-name').fill('Ana');
+  await clic(a, '#btn-ol-create');
+  await expect(a.locator('#ol-lobby')).toBeVisible();
+  await expect(a.locator('#ol-code')).not.toHaveText(/·/);
+  const codigo = (await a.locator('#ol-code').innerText()).trim();
+  const enlace = await a.locator('#ol-link').inputValue();
+  expect(new URL(enlace).searchParams.get('sala')).toBe(codigo);
+
+  // Beto abre el enlace: cae en la pantalla en línea con el código ya escrito
+  const erroresB = await abrir(b, enlace);
+  await expect(b.locator('#screen-online')).toBeVisible();
+  await expect(b.locator('#ol-code-in')).toHaveValue(codigo);
+  await b.locator('#ol-name').fill('Beto');
+  await b.locator('#ol-code-in').press('Enter');
+  await expect(b.locator('#ol-lobby')).toBeVisible();
+  await expect(a.locator('#ol-members li')).toHaveCount(2);
+
+  await clic(b, '#btn-ol-ready');
+  await expect(a.locator('#btn-ol-start')).toBeEnabled();
+  await clic(a, '#btn-ol-start');
+  for (const p of [a, b]) {
+    await expect.poll(() => p.evaluate(() => window.__deadzone.state), { timeout: 30_000 }).toBe('play');
+    expect(await p.evaluate(() => window.__deadzone.online.active)).toBe(true);
+  }
+  // al salir de la sala vuelves a Solo separado: la partida no se guarda
+  expect(await b.evaluate(() => window.__deadzone.mode.kind)).toBe('online');
   expect(erroresA.filter((e) => !CONOCIDO.test(e))).toEqual([]);
   expect(erroresB.filter((e) => !CONOCIDO.test(e))).toEqual([]);
 });

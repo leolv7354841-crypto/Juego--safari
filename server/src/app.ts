@@ -17,6 +17,7 @@ export const health = () => ({
   rooms: STATS.rooms,
   maxRooms: CONFIG.maxRooms,
   maxPlayers: CONFIG.maxPlayers,
+  minPlayers: CONFIG.minPlayers,
   full: STATS.rooms >= CONFIG.maxRooms,
   players: STATS.players,
   simRooms: STATS.simRooms,
