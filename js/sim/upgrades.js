@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 import { ABILITY, WEAPONS } from '../core/config.js';
 import { cooldownOf } from './abilities.js';
 
