@@ -1,4 +1,3 @@
-// @ts-nocheck — pendiente de tipar (Etapa 3: checkJs ya cubre el resto de js/)
 import { rand, TAU, pick } from '../core/util.js';
 import { zombieSprite } from './zombies.js';
 
@@ -33,9 +32,28 @@ function fireSprite() {
   return c;
 }
 
+/**
+ * Partícula del banco reutilizable (se reescribe entera en `add`).
+ * @typedef {object} Particle
+ * @property {number} life
+ * @property {number} [delay]
+ * @property {number} [type]
+ * @property {number} [x]
+ * @property {number} [y]
+ * @property {number} [vx]
+ * @property {number} [vy]
+ * @property {number} [max]
+ * @property {number} [size]
+ * @property {string} [color]
+ * @property {number} [drag]
+ * @property {number} [grow]
+ * @property {number} [rot]
+ * @property {number} [vr]
+ */
 export class Particles {
   constructor(max = 1000) {
     this.max = max;
+    /** @type {Particle[]} */
     this.p = Array.from({ length: max }, () => ({ life: 0 }));
     this.idx = 0;
   }
