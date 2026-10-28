@@ -36,7 +36,7 @@ export interface RoomLike {
     members: { get(id: string): LobbyMember | undefined; forEach(cb: (m: LobbyMember) => void): void };
     ownerId: string;
     bodies: { get(id: string): object | undefined };
-    zombies: { forEach(cb: (e: ZombieRow, key: string) => void): void };
+    zombies?: { forEach(cb: (e: ZombieRow, key: string) => void): void };
   };
   reconnection: object;
   connection: ConnLike;
@@ -47,7 +47,7 @@ export interface RoomLike {
   onLeave(cb: (code: number) => void): void;
   onError(cb: (code: number, msg?: string) => void): void;
   send(type: string, m?: unknown): void;
-  input(opts?: { mode?: 'reliable' | 'unreliable' }): InputLike;
+  input(opts?: { mode?: 'reliable' | 'unreliable'; renderDelay?: number }): InputLike;
   leave(consented?: boolean): Promise<void>;
 }
 // Canal de entradas del SDK (room.input()): se rellena `data` y send() manda una entrada y devuelve su secuencia.
@@ -569,7 +569,7 @@ export class Online {
       w: p.wi,
     };
     if (this.room) {
-      const d = (this.inp ||= this.room.input({ mode: 'reliable' })).data;
+      const d = (this.inp ||= this.room.input({ mode: 'reliable', renderDelay: NET.interpDelay })).data;
       d.mx = cmd.mx;
       d.my = cmd.my;
       d.f = cmd.f;
@@ -680,7 +680,8 @@ export class Online {
     const z: number[] = [];
     const zx: number[] = [];
     const zh: number[] = [];
-    this.room?.state.zombies.forEach((e, key) => {
+    // el mapa no existe en el cliente hasta que el primer zombi entra en su vista
+    this.room?.state.zombies?.forEach((e, key) => {
       const id = Number(key);
       z.push(id, e.t, e.x - ox, e.y - oy, e.a, e.fl);
       if (e.hp) zh.push(id, e.hp);

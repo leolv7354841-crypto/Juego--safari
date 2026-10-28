@@ -28,6 +28,9 @@ export const health = () => ({
   cpuPercent: STATS.cpu,
   rssMb: STATS.rssMb,
   txBytes: STATS.tx,
+  lagN: STATS.lagN,
+  lagMeanPx: STATS.lagN ? Math.round((STATS.lagSum / STATS.lagN) * 10) / 10 : 0,
+  lagMaxPx: Math.round(STATS.lagMax),
   uptime: Math.round((Date.now() - STATS.startedAt) / 1000),
 });
 

@@ -120,7 +120,7 @@ function drive(bots: Bot[]) {
       const a = (t / 90 + b.name.length) % TAU;
       const aim = b.target ?? a;
       const run = t % 240 < 60 ? 1 : 0;
-      const d = (b.inp ||= b.room.input({ mode: 'reliable' })).data;
+      const d = (b.inp ||= b.room.input({ mode: 'reliable', renderDelay: 110 })).data;
       d.mx = Math.cos(a);
       d.my = Math.sin(a);
       d.f = run | 2;
@@ -199,6 +199,11 @@ async function scenario(rooms: number, per: number) {
   console.log(
     `recibido por cliente: media ${avg(kbPer).toFixed(1)} KB/s · máx ${Math.max(...kbPer).toFixed(1)} KB/s · total ${(avg(kbPer) * bots.length).toFixed(0)} KB/s`,
   );
+  const last = ticks.filter(Boolean).at(-1);
+  if (last?.lagN)
+    console.log(
+      `rebobinado: ${last.lagN} muestras · los zombis se movieron ${last.lagMeanPx} px de media (máx ${last.lagMaxPx} px) desde lo que veía quien disparó`,
+    );
   console.log(
     `enviado por el servidor (medido en el servidor): ${((tx1 - tx0) / 1024 / secs / bots.length).toFixed(1)} KB/s por jugador`,
   );

@@ -231,6 +231,45 @@ test('desconexión y reconexión sin duplicados', async () => {
   await leaveAll([owner, guest]);
 });
 
+test('tras reconectar, las entradas del canal de Colyseus siguen llegando y el ack no retrocede', async () => {
+  const [owner, guest] = await fill(2);
+  guest.reconnection.minUptime = 0;
+  guest.send('ready', { v: true });
+  await sleep(100);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading');
+  owner.send('loaded');
+  guest.send('loaded');
+  await waitFor(() => owner.state.phase === 'playing');
+  const room = serverRoom(owner.roomId);
+  const sid = guest.sessionId;
+  const slot = room.sim.slots.get(sid);
+  let handle = guest.input({ mode: 'reliable' });
+  for (let i = 0; i < 30; i++) {
+    handle.data.mx = 0.5;
+    handle.send();
+    await sleep(17);
+  }
+  await waitFor(() => slot.ack >= 25, 2000, 'entradas antes de la caída');
+  const antes = slot.ack;
+  let back = false;
+  guest.onReconnect(() => (back = true));
+  cut(owner.roomId, sid);
+  await waitFor(() => back, 8000, 'reconectado');
+  handle = guest.input({ mode: 'reliable' });
+  for (let i = 0; i < 30; i++) {
+    handle.data.mx = 0.5;
+    handle.send();
+    await sleep(17);
+  }
+  await waitFor(
+    () => slot.ack > antes,
+    3000,
+    `el ack sigue avanzando tras reconectar (antes ${antes}, ahora ${slot.ack})`,
+  );
+  await leaveAll([owner, guest]);
+});
+
 test('el que no vuelve a tiempo sale de la sala', async () => {
   const [owner, guest] = await fill(2);
   guest.reconnection.enabled = false;

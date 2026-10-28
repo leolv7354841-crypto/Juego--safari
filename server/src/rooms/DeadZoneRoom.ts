@@ -4,6 +4,8 @@
 import { randomInt } from 'node:crypto';
 import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core';
 import { StateView } from '@colyseus/schema';
+import type { Rewind } from '@colyseus/core';
+import { IN_FIRE } from '../../../js/net/protocol.ts';
 import { zombieNear, zombieFlags } from '../../../js/net/snapshot.ts';
 import { TYPES } from '../../../js/net/protocol.ts';
 import { TAU } from '../../../js/core/util.ts';
@@ -54,6 +56,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
   // mundo de la próxima partida, armado durante la carga
   next: ServerSim | null = null;
   nextIdx = 1;
+  rewind: Rewind | null = null;
   limits = new Map<string, Limits>();
   // zombis que cada jugador tiene ahora en su StateView (clave del mapa)
   zseen = new Map<string, Set<string>>();
@@ -90,6 +93,10 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
     });
     // el estado (lobby y cuerpos de los jugadores) se parchea a la tasa de las fotos: cada parche lleva el ack de las entradas
     this.setPatchRate(1000 / CONFIG.snapHz);
+    if (CONFIG.rewind) {
+      this.rewind = this.allowRewindState({ maxRewindMs: 500 });
+      this.rewind.attachAll(this.state.zombies, { fields: ['x', 'y'] });
+    }
 
     this.onMessage('ready', (c, m) =>
       this.admin(c, () => {
@@ -308,16 +315,19 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
   // al cliente cuenta exactamente las que ya movieron al personaje).
   bindInputs(sim: ServerSim) {
     for (const id of sim.slots.keys()) {
-      const acc = this.inputs.get(id);
+      // el acceso se pide cada vez: al reconectar el SDK crea otro buffer para el mismo sessionId
+      const acc = () => this.inputs.get(id);
       const slot = sim.slots.get(id)!;
       slot.port = {
         get size() {
-          return acc.size;
+          return acc().size;
         },
-        ack: () => acc.consumedCount,
+        ack: () => acc().consumedCount,
         next: () => {
-          const inp = acc.next();
+          const a = acc();
+          const inp = a.next();
           if (!inp) return undefined;
+          if (inp.f & IN_FIRE && this.rewind) this.measureLag(id);
           let mx = inp.mx;
           let my = inp.my;
           const m = Math.hypot(mx, my);
@@ -325,9 +335,27 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }
             mx /= m;
             my /= m;
           }
-          return { s: acc.consumedCount, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w };
+          return { s: a.consumedCount, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w };
         },
       };
+    }
+  }
+
+  // Paso 4 (sólo medición): al disparar, cuánto se movió cada zombi cercano desde la posición que veía quien dispara
+  // (lastSeenBy usa el renderTime que el SDK sella en la entrada) hasta la actual: lo que la compensación corregiría.
+  measureLag(id: string) {
+    const seen = this.rewind!.lastSeenBy(id);
+    const mine = this.zseen.get(id);
+    if (!mine) return;
+    let n = 0;
+    for (const key of mine) {
+      const e = this.state.zombies.get(key);
+      if (!e) continue;
+      const d = Math.hypot(seen.value(e, 'x') - e.x, seen.value(e, 'y') - e.y);
+      STATS.lagN++;
+      STATS.lagSum += d;
+      STATS.lagMax = Math.max(STATS.lagMax, d);
+      if (++n >= 12) break;
     }
   }
 

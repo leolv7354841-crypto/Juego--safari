@@ -34,6 +34,8 @@ export const CONFIG = {
   loadSeconds: num('LOAD_SECONDS', 12),
   view: NET.view,
   // spike: los zombis van en el Schema de la sala con StateView por jugador (SCHEMA_ZOMBIES=0 los deja en la foto)
+  // spike (paso 4): REWIND=1 activa allowRewindState sobre los zombis y mide cuánto se movieron desde lo que veía quien dispara
+  rewind: process.env.REWIND === '1',
   schemaZombies: process.env.SCHEMA_ZOMBIES !== '0',
 };
 
