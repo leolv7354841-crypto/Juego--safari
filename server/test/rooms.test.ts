@@ -98,7 +98,8 @@ test('permisos del propietario y paso por las fases', async () => {
   await waitFor(() => owner.state.phase === 'playing', 3000, 'jugando');
   await waitFor(() => (oIn.snap?.length || 0) > 3, 3000, 'fotos');
   const s = oIn.snap[oIn.snap.length - 1];
-  assert.ok(Array.isArray(s.me) && s.me.length === 11);
+  assert.ok(!('me' in s), 'el cuerpo viaja en el estado de la sala (bodies), no en la foto');
+  assert.ok(owner.state.bodies.has(owner.sessionId), 'su cuerpo está en el estado sincronizado');
   assert.equal(s.pl.length, PEER_N, 'el otro jugador aparece en la foto');
   // el invitado no puede devolver la sala al lobby
   guest.send('lobby');
@@ -106,7 +107,7 @@ test('permisos del propietario y paso por las fases', async () => {
   await leaveAll([owner, guest]);
 });
 
-test('entradas inválidas se rechazan sin tirar la sala', async () => {
+test('entradas con valores raros se acotan y una ráfaga suma faltas, sin tirar la sala', async () => {
   const [owner, guest] = await fill(2);
   guest.send('ready', { v: true });
   await sleep(100);
@@ -117,31 +118,33 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   await waitFor(() => owner.state.phase === 'playing');
   const room = serverRoom(owner.roomId);
   const slot = room.sim.slots.get(guest.sessionId);
-  const bad: any[] = [
-    null,
-    5,
-    'x',
-    { i: 'no' },
-    { i: [] },
-    { i: new Array(50).fill([1, 0, 0, 0, 0, -1]) },
-    { i: [[1, NaN, 0, 0, 0, -1]] },
-    { i: [[1, 0, 0, 99, 0, -1]] },
-    { i: [['1', 0, 0, 0, 0, -1]] },
-    { i: [[-3, 0, 0, 0, 0, -1]] },
-    { i: [[1, 0, 0, 0, 1e9, -1]] },
-    { i: [[1, 0, 0, 0, 0, 77]] },
-    { i: [[999999, 0, 0, 0, 0, -1]] }, // secuencia muy adelantada
+  // por el canal de entradas el formato lo valida el SDK; los valores se acotan sin tirar la entrada
+  const handle = guest.input({ mode: 'reliable' });
+  const raros = [
+    { mx: 5, my: 5, f: 0, a: 0, w: -1 }, // dirección exagerada
+    { mx: NaN, my: 0, f: 0, a: 0, w: -1 },
+    { mx: 0, my: 0, f: 99, a: 1e9, w: 77 },
+    { mx: 0, my: 0, f: 3, a: NaN, w: -9 },
   ];
-  for (const m of bad) guest.send('in', m);
+  for (const d of raros) {
+    Object.assign(handle.data, d);
+    handle.send();
+    await waitFor(() => slot.last && slot.queue.length + slot.ack >= 0, 500, 'entrada');
+    await sleep(40);
+    const c = slot.last;
+    assert.ok(Math.hypot(c.mx, c.my) <= 1.0001, 'dirección acotada');
+    assert.ok(Number.isFinite(c.mx) && Number.isFinite(c.a) && Math.abs(c.a) <= Math.PI + 1e-6, 'valores finitos');
+    assert.ok(c.f >= 0 && c.f <= 7 && c.w >= -1 && c.w <= 8, 'bits y arma en rango');
+  }
+  assert.ok(slot.ack >= 4, 'las entradas llegaron a la simulación en orden');
+  // una ráfaga muy por encima de 60 por segundo suma faltas
+  const faltas0 = room.limits.get(guest.sessionId).bad;
+  for (let i = 0; i < 400; i++) handle.send();
+  await sleep(400);
+  assert.ok(room.limits.get(guest.sessionId).bad > faltas0, 'la ráfaga cuenta como falta');
   guest.send('nada', { x: 1 });
   guest.send('ready', 'raro');
-  await sleep(300);
-  assert.equal(slot.queue.length, 0, 'nada inválido llegó a la cola');
-  assert.ok(room.limits.get(guest.sessionId).bad >= bad.length - 1);
-  // una entrada buena con dirección exagerada se recorta a longitud 1
-  guest.send('in', { i: [[1, 5, 5, 0, 0, -1]] });
-  await waitFor(() => slot.ack === 1 || slot.queue.length === 1, 2000, 'entrada buena');
-  assert.ok(Math.hypot(slot.last.mx, slot.last.my) <= 1.0001);
+  await sleep(100);
   // un mensaje enorme corta la conexión pero no la sala
   const before = owner.state.members.size;
   guest.send('in', { i: [[2, 0, 0, 0, 0, -1]], basura: 'x'.repeat(40000) });
@@ -186,8 +189,10 @@ test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', a
   const l = serverRoom(owner.roomId).limits.get(owner.sessionId);
   // un mensaje por fotograma durante 3 s, como js/net/online.js (antes, a partir de 2 s, eran faltas)
   const t0 = performance.now();
-  for (let seq = 1, next = t0; performance.now() - t0 < 3000; seq++) {
-    owner.send('in', { i: [[seq, 0.5, 0, 0, 0, -1]] });
+  const handle = owner.input({ mode: 'reliable' });
+  for (let next = t0; performance.now() - t0 < 3000; ) {
+    handle.data.mx = 0.5;
+    handle.send();
     next += 1000 / 60;
     await sleep(Math.max(0, next - performance.now()));
   }
@@ -223,6 +228,39 @@ test('desconexión y reconexión sin duplicados', async () => {
   assert.equal(room.sim.slots.size, 2, 'sin personajes duplicados');
   assert.equal(room.clients.length, 2);
   assert.equal(room.sim.slots.get(sid).away, false);
+  await leaveAll([owner, guest]);
+});
+
+test('tras reconectar, las entradas del canal de Colyseus siguen moviendo al jugador (buffer nuevo, contador desde 0)', async () => {
+  const [owner, guest] = await fill(2);
+  guest.reconnection.minUptime = 0;
+  guest.send('ready', { v: true });
+  await sleep(100);
+  owner.send('start');
+  await waitFor(() => owner.state.phase === 'loading');
+  owner.send('loaded');
+  guest.send('loaded');
+  await waitFor(() => owner.state.phase === 'playing');
+  const room = serverRoom(owner.roomId);
+  const sid = guest.sessionId;
+  const slot = room.sim.slots.get(sid);
+  // el SDK reinicia solo este handle al caer la conexión; el servidor da un buffer nuevo al volver
+  const handle = guest.input({ mode: 'reliable' });
+  const mandar = async (mx: number) => {
+    for (let i = 0; i < 20; i++) {
+      handle.data.mx = mx;
+      handle.send();
+      await sleep(17);
+    }
+  };
+  await mandar(0.5);
+  await waitFor(() => slot.last.mx > 0.4, 2000, 'entradas antes de la caída');
+  let back = false;
+  guest.onReconnect(() => (back = true));
+  cut(owner.roomId, sid);
+  await waitFor(() => back, 8000, 'reconectado');
+  await mandar(-0.5);
+  await waitFor(() => slot.last.mx < -0.4, 3000, 'las entradas de después de reconectar mueven al jugador');
   await leaveAll([owner, guest]);
 });
 
@@ -356,7 +394,7 @@ test('entre oleadas llegan las mejoras y la tienda funciona por la red', async (
   sim.director.state = 'waiting';
   sim.addXp(slot, slot.xpNeed);
   slot.money = 2000;
-  const last = () => got.snap[got.snap.length - 1];
+  const last = () => got.snap?.[got.snap.length - 1];
   await waitFor(() => last()?.up, 3000, 'mejoras en la foto');
   const up = last().up;
   assert.deepEqual([last().st[7], last().ec[0]], [2000, 2]);

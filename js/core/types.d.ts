@@ -85,7 +85,7 @@ export interface Weapon {
 }
 
 // Entrada de un jugador en un paso fijo. La fabrica el cliente (netcode.ts) y la valida el servidor
-// (server/src/validate.ts, cleanCmd): un solo tipo para los dos lados.
+// (server/src/rooms/DeadZoneRoom.ts, bindInputs: la entrada del canal de Colyseus ya saneada): un solo tipo para los dos lados.
 export type Cmd = { s: number; mx: number; my: number; f: number; a: number; w: number };
 
 // Acción de un jugador ligada a su última entrada (s): construir, lanzar, subir al robot o usar la

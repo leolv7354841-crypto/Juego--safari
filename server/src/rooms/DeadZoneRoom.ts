@@ -3,10 +3,11 @@
 // reconectar con su token recupera el mismo sitio y el mismo personaje.
 import { randomInt } from 'node:crypto';
 import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core';
-import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
+import { LobbyState, Member, Body, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanLookCode, cleanClass, cleanCmd, cleanAct, cleanView, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanClass, cleanAct, cleanView, Bucket } from '../validate.ts';
+import { MoveInput, MOVE_SANITIZE, type MoveInputT } from '../input.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -28,8 +29,6 @@ function newCode() {
 
 // strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
 type Limits = {
-  inp: Bucket;
-  cmds: Bucket;
   adm: Bucket;
   shop: Bucket;
   act: Bucket;
@@ -41,8 +40,11 @@ type Limits = {
 const STRIKE_FORGET = 10;
 const STRIKE_KICK = 200;
 
-export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
+export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }> {
   maxClients = CONFIG.maxPlayers;
+  // entradas por el canal de Colyseus (room.input() en el cliente); el SDK ya valida el formato
+  // y aquí se acotan los valores (sanitize). Se vacían en cada paso de update().
+  inputs = this.defineInput(MoveInput, { sanitize: MOVE_SANITIZE, bufferMaxSize: 64, tickRate: CONFIG.tickHz });
   sim: ServerSim | null = null;
   seed = 0;
   // mundo de la próxima partida, armado durante la carga
@@ -80,7 +82,8 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       minPlayers: CONFIG.minPlayers,
       wave: 0,
     });
-    this.setPatchRate(100);
+    // el estado (lobby y cuerpos de los jugadores) se parchea a la tasa de las fotos: cada parche lleva el ack de las entradas
+    this.setPatchRate(1000 / CONFIG.snapHz);
 
     this.onMessage('ready', (c, m) =>
       this.admin(c, () => {
@@ -132,7 +135,6 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       if (!a) return this.strike(c, 'acción mal formada');
       this.sim.act(c.sessionId, a);
     });
-    this.onMessage('in', (c, m) => this.input(c, m));
     this.onMessage('p', (c, m) => {
       const l = this.limits.get(c.sessionId);
       if (!l || !l.ping.take()) return;
@@ -190,8 +192,6 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (!this.state.ownerId) this.state.ownerId = client.sessionId;
     this.limits.set(client.sessionId, {
       // mensajes de entrada por segundo: el navegador manda uno por fotograma con entradas (~60)
-      inp: new Bucket(90, 60),
-      cmds: new Bucket(80, 40), // entradas sueltas por segundo (60 Hz + margen)
       adm: new Bucket(3, 6), // listo, iniciar, siguiente…
       shop: new Bucket(8, 16), // compras y mejoras (clics seguidos en la tienda)
       act: new Bucket(6, 10), // construir, lanzar, robot
@@ -226,6 +226,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
   onLeave(client: Client) {
     const id = client.sessionId;
     this.state.members.delete(id);
+    this.state.bodies.delete(id);
     this.limits.delete(id);
     this.loaded.delete(id);
     this.sim?.remove(id);
@@ -285,33 +286,62 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     fn();
   }
 
-  input(c: Client, m: any) {
-    const l = this.limits.get(c.sessionId);
-    if (!l || !this.sim || this.phase !== 'playing') return;
-    if (!l.inp.take()) return this.strike(c, 'demasiadas entradas');
-    if (!m || !Array.isArray(m.i) || m.i.length === 0 || m.i.length > 10) return this.strike(c, 'entrada mal formada');
-    const slot = this.sim.slots.get(c.sessionId);
-    if (!slot) return;
-    const cmds: Cmd[] = [];
-    for (const raw of m.i) {
-      const cmd = cleanCmd(raw);
-      if (!cmd) {
-        this.strike(c, 'entrada inválida');
-        continue;
-      }
-      // demasiado adelantada respecto a lo ya recibido: se rechaza
-      const top = slot.queue.length ? slot.queue[slot.queue.length - 1].s : slot.ack;
-      if (cmd.s > top + 240) {
-        this.strike(c, 'secuencia adelantada');
-        continue;
-      }
-      if (!l.cmds.take()) {
-        this.strike(c, 'demasiadas entradas');
-        break;
-      }
-      cmds.push(cmd);
+  // La simulación toma las entradas de una en una del buffer de Colyseus (así el ack que el SDK devuelve
+  // al cliente cuenta exactamente las que ya movieron al personaje).
+  bindInputs(sim: ServerSim) {
+    for (const id of sim.slots.keys()) {
+      // el acceso se pide cada vez: al reconectar el SDK crea otro buffer para el mismo sessionId
+      const acc = () => this.inputs.get(id);
+      const slot = sim.slots.get(id)!;
+      slot.port = {
+        get size() {
+          return acc().size;
+        },
+        ack: () => acc().consumedCount,
+        next: () => {
+          const a = acc();
+          const inp = a.next();
+          if (!inp) return undefined;
+          let mx = inp.mx;
+          let my = inp.my;
+          const m = Math.hypot(mx, my);
+          if (m > 1) {
+            mx /= m;
+            my /= m;
+          }
+          return { s: a.consumedCount, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w };
+        },
+      };
     }
-    if (cmds.length) this.sim.push(c.sessionId, cmds);
+  }
+
+  // Una ráfaga que llena el buffer (mucho más de 60 por segundo) cuenta como falta.
+  checkFlood(sim: ServerSim) {
+    for (const id of sim.slots.keys()) {
+      const c = this.clients.getById(id);
+      if (c && this.inputs.get(id).size >= 48) this.strike(c, 'demasiadas entradas');
+    }
+  }
+
+  // Copia el cuerpo de cada jugador al estado sincronizado (sólo viajan los campos que cambian).
+  syncBodies(sim: ServerSim) {
+    const bodies = this.state.bodies;
+    for (const [id, s] of sim.slots) {
+      let b = bodies.get(id);
+      if (!b) bodies.set(id, (b = new Body()));
+      const p = s.p;
+      b.x = p.x;
+      b.y = p.y;
+      b.vx = p.vx;
+      b.vy = p.vy;
+      b.kx = p.kx;
+      b.ky = p.ky;
+      b.stamina = p.stamina;
+      b.sinceRun = p.sinceRun;
+      b.legAngle = p.legAngle;
+      b.boostT = p.boostT;
+      b.exhausted = !!p.exhausted;
+    }
   }
 
   /* ---------- fases ---------- */
@@ -367,6 +397,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     // quien se fue durante la carga no aparece en la partida
     for (const id of [...sim.slots.keys()]) if (!players.some((p) => p.id === id)) sim.remove(id);
     this.setSim(sim);
+    this.bindInputs(sim);
     for (const [id, m] of this.state.members.entries()) if (!m.connected) sim.setAway(id, true);
     this.acc = 0;
     this.state.phase = 'playing';
@@ -427,7 +458,9 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     let n = 0;
     while (this.acc >= step && n < CONFIG.maxCatchup) {
       const t0 = performance.now();
+      this.checkFlood(sim);
       sim.step();
+      this.syncBodies(sim);
       countTick(performance.now() - t0);
       this.acc -= step;
       n++;

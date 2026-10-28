@@ -4,124 +4,18 @@
 import { NET } from '../core/config.ts';
 import { IN_RUN } from './protocol.ts';
 import type { Player } from '../sim/player.ts';
-import type { World } from '../sim/world.ts';
 import type { Cmd, GameHost } from '../core/types.d.ts';
 
 export const TICK = 1 / NET.tickHz;
-
-const silent = new Proxy({}, { get: () => () => {} });
 
 // Estado del jugador que manda el servidor y que la predicción restaura.
 // boostT: impulso del Booster (lo baja Player.move, así que se predice igual que el movimiento)
 type BodyKey = 'x' | 'y' | 'vx' | 'vy' | 'kx' | 'ky' | 'stamina' | 'sinceRun' | 'legAngle' | 'boostT';
 export const BODY: BodyKey[] = ['x', 'y', 'vx', 'vy', 'kx', 'ky', 'stamina', 'sinceRun', 'legAngle', 'boostT'];
 
-export function packBody(p: Pick<Player, BodyKey | 'exhausted'>) {
-  return [...BODY.map((k) => Math.round(p[k] * 100) / 100), p.exhausted ? 1 : 0];
-}
-
-export function unpackBody(p: Pick<Player, BodyKey | 'exhausted'>, a: unknown) {
-  if (!Array.isArray(a) || a.length < BODY.length + 1) return false;
-  for (let i = 0; i < BODY.length; i++) if (!Number.isFinite(a[i])) return false;
-  BODY.forEach((k, i) => (p[k] = a[i] as number));
-  p.exhausted = !!a[BODY.length];
-  return true;
-}
-
 // Aplica una entrada al cuerpo del jugador (igual en el servidor y en el cliente).
 export function applyMove(p: Player, cmd: Cmd, game: Pick<GameHost, 'world' | 'sfx'>) {
   p.move(TICK, cmd.mx, cmd.my, !!(cmd.f & IN_RUN), game);
-}
-
-// Predicción local: cada entrada se aplica al instante y se guarda hasta que el servidor
-// confirma que la procesó. Al llegar el estado confirmado se restaura y se vuelven a
-// aplicar las pendientes. La diferencia con lo que se veía se borra poco a poco (offset).
-export class Predictor {
-  declare p: Player;
-  declare quiet: Pick<GameHost, 'world' | 'sfx'>;
-  declare pending: Cmd[];
-  declare seq: number;
-  declare ox: number;
-  declare oy: number;
-  declare corrections: number;
-  declare corrSum: number;
-  declare corrMax: number;
-  declare snaps: number;
-  constructor(player: Player, world: World) {
-    this.p = player;
-    this.quiet = { world, sfx: silent };
-    this.pending = [];
-    this.seq = 0;
-    this.ox = 0;
-    this.oy = 0;
-    this.corrections = 0;
-    this.corrSum = 0;
-    this.corrMax = 0;
-    this.snaps = 0;
-  }
-
-  // game: el juego real (para los sonidos); en las repeticiones se usa uno mudo.
-  step(cmd: Cmd, game?: Pick<GameHost, 'world' | 'sfx'>) {
-    cmd.s = ++this.seq;
-    applyMove(this.p, cmd, game || this.quiet);
-    this.pending.push(cmd);
-    // si el servidor deja de confirmar, no se acumula sin fin
-    if (this.pending.length > NET.pendingMax) this.pending.shift();
-    return cmd;
-  }
-
-  reconcile(body: unknown, ack: number) {
-    const p = this.p;
-    const bx = p.x;
-    const by = p.y;
-    let n = 0;
-    while (n < this.pending.length && this.pending[n].s <= ack) n++;
-    if (n) this.pending.splice(0, n);
-    if (!unpackBody(p, body)) return 0;
-    for (const cmd of this.pending) applyMove(p, cmd, this.quiet);
-    const ex = bx - p.x;
-    const ey = by - p.y;
-    const err = Math.hypot(ex, ey);
-    if (err > 0.5) {
-      this.corrections++;
-      this.corrSum += err;
-      this.corrMax = Math.max(this.corrMax, err);
-    }
-    if (err > NET.snapDist) {
-      // error grande (empujón fuerte, reaparición): directo a la posición buena
-      this.ox = 0;
-      this.oy = 0;
-      this.snaps++;
-    } else {
-      // error pequeño: se dibuja donde se veía y se acerca suave a la posición buena
-      this.ox += ex;
-      this.oy += ey;
-    }
-    return err;
-  }
-
-  decay(dt: number) {
-    const k = Math.exp(-dt * NET.smooth);
-    this.ox *= k;
-    this.oy *= k;
-    if (Math.abs(this.ox) < 0.05) this.ox = 0;
-    if (Math.abs(this.oy) < 0.05) this.oy = 0;
-  }
-
-  // correcciones del último periodo (para el diagnóstico) y reinicio del contador
-  takeStats() {
-    const s = {
-      n: this.corrections,
-      avg: this.corrections ? this.corrSum / this.corrections : 0,
-      max: this.corrMax,
-      snaps: this.snaps,
-    };
-    this.corrections = 0;
-    this.corrSum = 0;
-    this.corrMax = 0;
-    this.snaps = 0;
-    return s;
-  }
 }
 
 // Reloj del servidor visto desde aquí: off = hora local - hora del servidor (con el retraso de

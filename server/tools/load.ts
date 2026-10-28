@@ -31,10 +31,12 @@ type Bot = {
   left: number;
   snaps: number;
   bytes: number;
+  up: number;
   rtts: number[];
   jit: number;
   last: number;
   seq: number;
+  inp?: any;
   me: number[] | null;
   target: number | null;
   alive: boolean;
@@ -49,6 +51,7 @@ async function bot(room: any, name: string): Promise<Bot> {
     left: 0,
     snaps: 0,
     bytes: 0,
+    up: 0,
     rtts: [],
     jit: 0,
     last: 0,
@@ -61,6 +64,12 @@ async function bot(room: any, name: string): Promise<Bot> {
   };
   const ws = room.connection.transport.ws;
   ws.addEventListener('message', (e: any) => (b.bytes += e.data.byteLength || e.data.length || 0));
+  // bytes enviados (entradas, pings...), para medir la subida
+  const send0 = ws.send.bind(ws);
+  ws.send = (d: any) => {
+    b.up += d.byteLength ?? d.length ?? 0;
+    return send0(d);
+  };
   room.onMessage('*', () => {});
   room.onLeave((code: number) => (b.left = code));
   room.onMessage('snap', (s: any) => {
@@ -99,18 +108,13 @@ function drive(bots: Bot[]) {
       const a = (t / 90 + b.name.length) % TAU;
       const aim = b.target ?? a;
       const run = t % 240 < 60 ? 1 : 0;
-      b.room.send('in', {
-        i: [
-          [
-            ++b.seq,
-            Math.round(Math.cos(a) * 1000) / 1000,
-            Math.round(Math.sin(a) * 1000) / 1000,
-            run | 2,
-            Math.round(aim * 1000) / 1000,
-            -1,
-          ],
-        ],
-      });
+      const d = (b.inp ||= b.room.input({ mode: 'reliable' })).data;
+      d.mx = Math.cos(a);
+      d.my = Math.sin(a);
+      d.f = run | 2;
+      d.a = aim;
+      d.w = -1;
+      b.inp.send();
     }
   }, 1000 / 60);
   const ping = setInterval(() => {
@@ -144,6 +148,7 @@ async function scenario(rooms: number, per: number) {
   for (const b of bots) {
     b.snaps = 0;
     b.bytes = 0;
+    b.up = 0;
     b.rtts = [];
     b.t0 = Date.now();
   }
@@ -161,6 +166,7 @@ async function scenario(rooms: number, per: number) {
   const secs = (Date.now() - bots[0].t0) / 1000;
   const snapsPer = bots.map((b) => b.snaps / secs);
   const kbPer = bots.map((b) => b.bytes / 1024 / secs);
+  const upPer = bots.map((b) => b.up / 1024 / secs);
   const rtts = bots.flatMap((b) => b.rtts).sort((a, b) => a - b);
   const pct = (p: number) => (rtts.length ? rtts[Math.min(rtts.length - 1, Math.floor(rtts.length * p))] : NaN);
   const ok = ticks.filter(Boolean);
@@ -169,6 +175,7 @@ async function scenario(rooms: number, per: number) {
   console.log(
     `recibido por cliente: media ${avg(kbPer).toFixed(1)} KB/s · máx ${Math.max(...kbPer).toFixed(1)} KB/s · total ${(avg(kbPer) * bots.length).toFixed(0)} KB/s`,
   );
+  console.log(`enviado por cliente: media ${avg(upPer).toFixed(2)} KB/s · máx ${Math.max(...upPer).toFixed(2)} KB/s`);
   console.log(
     `RTT de aplicación: p50 ${pct(0.5).toFixed(1)} ms · p95 ${pct(0.95).toFixed(1)} ms · máx ${pct(1).toFixed(1)} ms · variación media ${avg(bots.map((b) => b.jit)).toFixed(1)} ms`,
   );
