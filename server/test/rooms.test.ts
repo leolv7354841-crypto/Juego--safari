@@ -106,7 +106,7 @@ test('permisos del propietario y paso por las fases', async () => {
   await leaveAll([owner, guest]);
 });
 
-test('entradas inválidas se rechazan sin tirar la sala', async () => {
+test('entradas con valores raros se acotan y una ráfaga suma faltas, sin tirar la sala', async () => {
   const [owner, guest] = await fill(2);
   guest.send('ready', { v: true });
   await sleep(100);
@@ -117,31 +117,33 @@ test('entradas inválidas se rechazan sin tirar la sala', async () => {
   await waitFor(() => owner.state.phase === 'playing');
   const room = serverRoom(owner.roomId);
   const slot = room.sim.slots.get(guest.sessionId);
-  const bad: any[] = [
-    null,
-    5,
-    'x',
-    { i: 'no' },
-    { i: [] },
-    { i: new Array(50).fill([1, 0, 0, 0, 0, -1]) },
-    { i: [[1, NaN, 0, 0, 0, -1]] },
-    { i: [[1, 0, 0, 99, 0, -1]] },
-    { i: [['1', 0, 0, 0, 0, -1]] },
-    { i: [[-3, 0, 0, 0, 0, -1]] },
-    { i: [[1, 0, 0, 0, 1e9, -1]] },
-    { i: [[1, 0, 0, 0, 0, 77]] },
-    { i: [[999999, 0, 0, 0, 0, -1]] }, // secuencia muy adelantada
+  // por el canal de entradas el formato lo valida el SDK; los valores se acotan sin tirar la entrada
+  const handle = guest.input({ mode: 'reliable' });
+  const raros = [
+    { mx: 5, my: 5, f: 0, a: 0, w: -1 }, // dirección exagerada
+    { mx: NaN, my: 0, f: 0, a: 0, w: -1 },
+    { mx: 0, my: 0, f: 99, a: 1e9, w: 77 },
+    { mx: 0, my: 0, f: 3, a: NaN, w: -9 },
   ];
-  for (const m of bad) guest.send('in', m);
+  for (const d of raros) {
+    Object.assign(handle.data, d);
+    handle.send();
+    await waitFor(() => slot.last && slot.queue.length + slot.ack >= 0, 500, 'entrada');
+    await sleep(40);
+    const c = slot.last;
+    assert.ok(Math.hypot(c.mx, c.my) <= 1.0001, 'dirección acotada');
+    assert.ok(Number.isFinite(c.mx) && Number.isFinite(c.a) && Math.abs(c.a) <= Math.PI + 1e-6, 'valores finitos');
+    assert.ok(c.f >= 0 && c.f <= 7 && c.w >= -1 && c.w <= 8, 'bits y arma en rango');
+  }
+  assert.ok(slot.ack >= 4, 'las entradas llegaron a la simulación en orden');
+  // una ráfaga muy por encima de 60 por segundo suma faltas
+  const faltas0 = room.limits.get(guest.sessionId).bad;
+  for (let i = 0; i < 400; i++) handle.send();
+  await sleep(400);
+  assert.ok(room.limits.get(guest.sessionId).bad > faltas0, 'la ráfaga cuenta como falta');
   guest.send('nada', { x: 1 });
   guest.send('ready', 'raro');
-  await sleep(300);
-  assert.equal(slot.queue.length, 0, 'nada inválido llegó a la cola');
-  assert.ok(room.limits.get(guest.sessionId).bad >= bad.length - 1);
-  // una entrada buena con dirección exagerada se recorta a longitud 1
-  guest.send('in', { i: [[1, 5, 5, 0, 0, -1]] });
-  await waitFor(() => slot.ack === 1 || slot.queue.length === 1, 2000, 'entrada buena');
-  assert.ok(Math.hypot(slot.last.mx, slot.last.my) <= 1.0001);
+  await sleep(100);
   // un mensaje enorme corta la conexión pero no la sala
   const before = owner.state.members.size;
   guest.send('in', { i: [[2, 0, 0, 0, 0, -1]], basura: 'x'.repeat(40000) });
@@ -186,8 +188,10 @@ test('el ritmo normal del navegador (60 mensajes por segundo) no suma faltas', a
   const l = serverRoom(owner.roomId).limits.get(owner.sessionId);
   // un mensaje por fotograma durante 3 s, como js/net/online.js (antes, a partir de 2 s, eran faltas)
   const t0 = performance.now();
-  for (let seq = 1, next = t0; performance.now() - t0 < 3000; seq++) {
-    owner.send('in', { i: [[seq, 0.5, 0, 0, 0, -1]] });
+  const handle = owner.input({ mode: 'reliable' });
+  for (let next = t0; performance.now() - t0 < 3000; ) {
+    handle.data.mx = 0.5;
+    handle.send();
     next += 1000 / 60;
     await sleep(Math.max(0, next - performance.now()));
   }

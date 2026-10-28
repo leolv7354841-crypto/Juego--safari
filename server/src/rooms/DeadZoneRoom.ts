@@ -6,7 +6,8 @@ import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core
 import { LobbyState, Member, type MemberT, type LobbyStateT } from './state.ts';
 import { ServerSim } from '../sim/ServerSim.ts';
 import { CONFIG, originAllowed } from '../config.ts';
-import { cleanName, cleanLookCode, cleanClass, cleanCmd, cleanAct, cleanView, Bucket, type Cmd } from '../validate.ts';
+import { cleanName, cleanLookCode, cleanClass, cleanAct, cleanView, Bucket, type Cmd } from '../validate.ts';
+import { MoveInput, MOVE_SANITIZE, type MoveInputT } from '../input.ts';
 import { STATS, countTick } from '../stats.ts';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -28,7 +29,6 @@ function newCode() {
 
 // strikes: faltas recientes (se olvidan a STRIKE_FORGET por segundo); bad: faltas en total
 type Limits = {
-  inp: Bucket;
   cmds: Bucket;
   adm: Bucket;
   shop: Bucket;
@@ -41,8 +41,11 @@ type Limits = {
 const STRIKE_FORGET = 10;
 const STRIKE_KICK = 200;
 
-export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
+export class DeadZoneRoom extends Room<{ state: LobbyStateT; input: MoveInputT }> {
   maxClients = CONFIG.maxPlayers;
+  // entradas por el canal de Colyseus (room.input() en el cliente); el SDK ya valida el formato
+  // y aquí se acotan los valores (sanitize). Se vacían en cada paso de update().
+  inputs = this.defineInput(MoveInput, { sanitize: MOVE_SANITIZE, bufferMaxSize: 64 });
   sim: ServerSim | null = null;
   seed = 0;
   // mundo de la próxima partida, armado durante la carga
@@ -132,7 +135,6 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
       if (!a) return this.strike(c, 'acción mal formada');
       this.sim.act(c.sessionId, a);
     });
-    this.onMessage('in', (c, m) => this.input(c, m));
     this.onMessage('p', (c, m) => {
       const l = this.limits.get(c.sessionId);
       if (!l || !l.ping.take()) return;
@@ -190,7 +192,6 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     if (!this.state.ownerId) this.state.ownerId = client.sessionId;
     this.limits.set(client.sessionId, {
       // mensajes de entrada por segundo: el navegador manda uno por fotograma con entradas (~60)
-      inp: new Bucket(90, 60),
       cmds: new Bucket(80, 40), // entradas sueltas por segundo (60 Hz + margen)
       adm: new Bucket(3, 6), // listo, iniciar, siguiente…
       shop: new Bucket(8, 16), // compras y mejoras (clics seguidos en la tienda)
@@ -285,33 +286,34 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     fn();
   }
 
-  input(c: Client, m: any) {
-    const l = this.limits.get(c.sessionId);
-    if (!l || !this.sim || this.phase !== 'playing') return;
-    if (!l.inp.take()) return this.strike(c, 'demasiadas entradas');
-    if (!m || !Array.isArray(m.i) || m.i.length === 0 || m.i.length > 10) return this.strike(c, 'entrada mal formada');
-    const slot = this.sim.slots.get(c.sessionId);
-    if (!slot) return;
-    const cmds: Cmd[] = [];
-    for (const raw of m.i) {
-      const cmd = cleanCmd(raw);
-      if (!cmd) {
-        this.strike(c, 'entrada inválida');
-        continue;
+  // Pasa a la simulación las entradas que llegaron por el canal de Colyseus desde el último paso.
+  drainInputs(sim: ServerSim) {
+    for (const id of sim.slots.keys()) {
+      const l = this.limits.get(id);
+      const c = this.clients.getById(id);
+      if (!l || !c) continue;
+      const cmds: Cmd[] = [];
+      const acc = this.inputs.get(id);
+      const got = acc.drain();
+      // secuencia = entradas consumidas desde que entró (la misma cuenta que lleva el SDK al enviar)
+      const first = acc.consumedCount - got.length;
+      for (const [i, inp] of got.entries()) {
+        const s = first + i + 1;
+        if (!l.cmds.take()) {
+          this.strike(c, 'demasiadas entradas');
+          continue;
+        }
+        let mx = inp.mx;
+        let my = inp.my;
+        const m = Math.hypot(mx, my);
+        if (m > 1) {
+          mx /= m;
+          my /= m;
+        }
+        cmds.push({ s, mx, my, f: inp.f, a: Math.atan2(Math.sin(inp.a), Math.cos(inp.a)), w: inp.w });
       }
-      // demasiado adelantada respecto a lo ya recibido: se rechaza
-      const top = slot.queue.length ? slot.queue[slot.queue.length - 1].s : slot.ack;
-      if (cmd.s > top + 240) {
-        this.strike(c, 'secuencia adelantada');
-        continue;
-      }
-      if (!l.cmds.take()) {
-        this.strike(c, 'demasiadas entradas');
-        break;
-      }
-      cmds.push(cmd);
+      if (cmds.length) sim.push(id, cmds);
     }
-    if (cmds.length) this.sim.push(c.sessionId, cmds);
   }
 
   /* ---------- fases ---------- */
@@ -427,6 +429,7 @@ export class DeadZoneRoom extends Room<{ state: LobbyStateT }> {
     let n = 0;
     while (this.acc >= step && n < CONFIG.maxCatchup) {
       const t0 = performance.now();
+      this.drainInputs(sim);
       sim.step();
       countTick(performance.now() - t0);
       this.acc -= step;
