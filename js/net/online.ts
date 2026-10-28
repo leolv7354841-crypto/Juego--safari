@@ -13,6 +13,7 @@ import { UPGRADES } from '../sim/upgrades.ts';
 import { Abilities } from '../sim/abilities.ts';
 import { applyCombo } from '../sim/combo.ts';
 import { OnlineClient, Solo } from './mode.ts';
+import type { LobbyMember, Snapshot } from '../core/types.d.ts';
 
 const SAVE = 'dz-online';
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,16}$/u;
@@ -493,7 +494,7 @@ export class Online {
 
   /* ---------- fotos del servidor ---------- */
 
-  applySnap(s) {
+  applySnap(s: Snapshot) {
     const g = this.game;
     if (!this.playing || !s || typeof s !== 'object') return;
     const now = performance.now();
@@ -540,7 +541,7 @@ export class Online {
   // Nombre y aspecto de un jugador de la sala (viven en el estado compartido del servidor).
   identify(idx) {
     const ms = this.room && this.room.state && this.room.state.members;
-    let found: { name?: string; look?: string } | null = null;
+    let found: LobbyMember | null = null;
     if (ms) ms.forEach((m) => m.idx === idx && (found = m));
     return { name: (found && found.name) || 'Jugador', code: (found && found.look) || '' };
   }

@@ -36,6 +36,7 @@ import * as Rules from '../../../js/sim/rules.ts';
 import { comboBreak, comboKill, comboTick, packCombo } from '../../../js/sim/combo.ts';
 import { TAU } from '../../../js/core/util.ts';
 import type { Cmd, Act } from '../validate.ts';
+import type { Snapshot } from '../../../js/core/types.d.ts';
 
 const FX_MAX = 300;
 // entradas que se guardan como mucho por jugador (las más viejas se tiran)
@@ -774,7 +775,7 @@ export class ServerSim {
   }
 
   // Lo que ve un jugador: su estado confirmado, los demás, los zombis y objetos cercanos.
-  snapshot(id: string, now: number) {
+  snapshot(id: string, now: number): Snapshot | null {
     const s = this.slots.get(id);
     if (!s) return null;
     const me = s.p;
