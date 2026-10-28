@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { WAVES } from '../js/core/config.ts';
+import { EVENT_ORDER, EVENTS, WAVES } from '../js/core/config.ts';
 import { Director } from '../js/sim/director.ts';
 import { fakeGame } from './helpers.js';
+
+// Las pruebas de la composición de cada oleada van sin rondas especiales (salen al azar).
+const sinRondas = () => Object.assign(new Director(), { events: false });
+
+// Math.random fijo mientras corre f (para forzar el sorteo de las rondas especiales).
+function azar(v, f) {
+  const r = Math.random;
+  Math.random = () => v;
+  try {
+    return f();
+  } finally {
+    Math.random = r;
+  }
+}
 
 const count = (q) =>
   q.reduce((m, t) => {
@@ -11,7 +25,7 @@ const count = (q) =>
   }, {});
 
 test('la oleada 1 solo trae normales, SWAT y velocistas', () => {
-  const d = new Director();
+  const d = sinRondas();
   d.startWave(fakeGame());
   assert.equal(d.wave, 1);
   assert.equal(d.state, 'active');
@@ -28,7 +42,7 @@ test('la oleada 1 solo trae normales, SWAT y velocistas', () => {
 test('el tamaño de la cola es determinista y crece con la oleada', () => {
   const sizes = [];
   for (let i = 0; i < 2; i++) {
-    const d = new Director();
+    const d = sinRondas();
     const row = [];
     for (let w = 0; w < 6; w++) {
       d.startWave(fakeGame());
@@ -44,7 +58,7 @@ test('el tamaño de la cola es determinista y crece con la oleada', () => {
 });
 
 test('toros desde la oleada 3, gordos desde la 2, blindados tras la 10', () => {
-  const d = new Director();
+  const d = sinRondas();
   const seen = [];
   for (let w = 1; w <= 11; w++) {
     d.startWave(fakeGame());
@@ -58,13 +72,13 @@ test('toros desde la oleada 3, gordos desde la 2, blindados tras la 10', () => {
 });
 
 test('en grupo la cola se reduce a la mitad y online usa crowd', () => {
-  const solo = new Director();
+  const solo = sinRondas();
   solo.startWave(fakeGame());
-  const grupo = new Director();
+  const grupo = sinRondas();
   grupo.coop = true;
   grupo.startWave(fakeGame());
   assert.ok(grupo.queue.length < solo.queue.length * 0.6);
-  const on = new Director();
+  const on = sinRondas();
   on.coop = true;
   on.crowd = 1;
   on.startWave(fakeGame());
@@ -72,11 +86,109 @@ test('en grupo la cola se reduce a la mitad y online usa crowd', () => {
 });
 
 test('nextRound solo arranca desde "waiting"', () => {
-  const d = new Director();
+  const d = sinRondas();
   assert.equal(d.nextRound(fakeGame()), false);
   assert.equal(d.wave, 0);
   d.state = 'waiting';
   assert.equal(d.nextRound(fakeGame()), true);
   assert.equal(d.wave, 1);
   assert.equal(d.state, 'active');
+});
+
+test('rondas especiales: nunca en la oleada 1 ni dos seguidas, ni el mismo tipo de las últimas', () => {
+  const d = new Director();
+  azar(0, () => d.startWave(fakeGame()));
+  assert.equal(d.event, '', 'la oleada 1 es normal');
+  const seen = [];
+  for (let w = 2; w <= 30; w++) {
+    azar(0, () => d.startWave(fakeGame()));
+    seen.push(d.event);
+  }
+  for (let i = 1; i < seen.length; i++) assert.ok(!(seen[i] && seen[i - 1]), 'nunca dos seguidas');
+  const evs = seen.filter(Boolean);
+  assert.ok(evs.length >= 10, 'con el azar a favor sale una de cada dos');
+  for (let i = 1; i < evs.length; i++)
+    for (let k = 1; k <= EVENTS.gap && i - k >= 0; k++) assert.notEqual(evs[i], evs[i - k], 'no repite tipo');
+  // con azar de verdad salen todos los tipos y más o menos en la proporción esperada
+  const r = new Director();
+  const all = [];
+  for (let w = 2; w <= 2001; w++) all.push(r.rollEvent(w));
+  assert.deepEqual(new Set(all.filter(Boolean)), new Set(EVENT_ORDER), 'salen todos los tipos');
+  const share = all.filter(Boolean).length / all.length;
+  assert.ok(share > 0.2 && share < 0.32, `una de cada 4 oleadas, más o menos (${share})`);
+  // sin suerte no hay ronda especial
+  const e = new Director();
+  for (let w = 1; w <= 10; w++) azar(0.99, () => e.startWave(fakeGame()));
+  assert.equal(e.event, '');
+});
+
+// Fuerza que la próxima oleada de d sea la ronda especial id.
+function forzar(d, id) {
+  const otros = EVENT_ORDER.filter((x) => x !== id);
+  d.recent = otros.slice(0, EVENTS.gap);
+  d.lastEvent = '';
+  const k = EVENT_ORDER.filter((x) => !d.recent.includes(x)).indexOf(id);
+  const pool = EVENT_ORDER.filter((x) => !d.recent.includes(x)).length;
+  // el sorteo es Math.random() < chance y luego randInt sobre los que quedan
+  let n = 0;
+  const vals = [0, (k + 0.5) / pool];
+  const r = Math.random;
+  Math.random = () => vals[n++] ?? 0.5;
+  try {
+    d.startWave(fakeGame());
+  } finally {
+    Math.random = r;
+  }
+  assert.equal(d.event, id);
+}
+
+test('estampida: solo velocistas y toros, y menos zombis', () => {
+  const normal = sinRondas();
+  for (let w = 1; w <= 5; w++) normal.startWave(fakeGame());
+  const d = sinRondas();
+  for (let w = 1; w <= 4; w++) d.startWave(fakeGame());
+  d.events = true;
+  forzar(d, 'stampede');
+  const c = count(d.queue);
+  assert.deepEqual(Object.keys(c).sort(), ['bull', 'sprinter']);
+  assert.ok(c.bull >= 2);
+  assert.ok(Math.abs(d.queue.length - normal.queue.length * EVENTS.types.stampede.size) < normal.queue.length * 0.05);
+});
+
+test('asedio blindado: la mitad de los normales llega como SWAT; luna de sangre: más rápidos', () => {
+  const d = sinRondas();
+  d.startWave(fakeGame());
+  const base = d.speedMult;
+  d.events = true;
+  forzar(d, 'siege');
+  const c = count(d.queue);
+  assert.ok(Math.abs(c.swat / (c.swat + c.normal) - EVENTS.types.siege.swat) < 0.01);
+  const b = sinRondas();
+  b.startWave(fakeGame());
+  b.events = true;
+  forzar(b, 'blood');
+  assert.ok(Math.abs(b.speedMult / base - EVENTS.types.blood.speed) < 0.05);
+});
+
+test('la ronda especial se anuncia y termina con la oleada', () => {
+  const d = sinRondas();
+  d.startWave(fakeGame());
+  d.events = true;
+  const game = fakeGame();
+  const r = Math.random;
+  let n = 0;
+  Math.random = () => [0, 0][n++] ?? 0.5;
+  try {
+    d.startWave(game);
+  } finally {
+    Math.random = r;
+  }
+  const def = EVENTS.types[d.event];
+  assert.ok(def);
+  assert.deepEqual(game.calls.banner.at(-1), [`Oleada 2 · ${def.name}`, def.desc]);
+  // se acaba la oleada: sin cola ni zombis vivos
+  d.queue.length = 0;
+  d.update(0.1, { ...game, horde: { list: [] }, onGoldenExpired() {}, onWaveCleared() {} });
+  assert.equal(d.state, 'waiting');
+  assert.equal(d.event, '');
 });

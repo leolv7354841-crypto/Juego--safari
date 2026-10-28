@@ -227,6 +227,8 @@ export interface WorldSnap {
   w: number;
   ds: string;
   tm: number;
+  /** Ronda especial: su lugar en EVENT_ORDER + 1 (0 = ninguna). */
+  ev: number;
   /** Cada cierto tiempo: barricadas, trampas y quemaduras del suelo (encodeStatic). */
   blk?: number[][];
   wir?: number[][];

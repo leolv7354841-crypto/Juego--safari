@@ -1,5 +1,7 @@
 // Capa de oscuridad a media resolución: se "recortan" las zonas iluminadas
 // (linterna, farolas, fuegos, fogonazos) y luego se compone sobre la escena.
+// Las rondas especiales la cambian: niebla (otra capa con un claro alrededor del jugador),
+// apagón (sin farolas y más oscuro) y luna de sangre (noche rojiza).
 import { makeCanvas } from '../core/util.ts';
 import { lightSprite, coneSprite } from './sprites.js';
 
@@ -16,11 +18,13 @@ export class Lighting {
     this.cool = lightSprite('255,220,170', 128);
     this.cone = coneSprite();
     this.ambient = 0.58;
+    this.fogCanvas = makeCanvas(2, 2);
+    this.fogCtx = this.fogCanvas.getContext('2d');
   }
 
   resize(w, h) {
-    this.canvas.width = Math.max(2, Math.ceil(w * SCALE));
-    this.canvas.height = Math.max(2, Math.ceil(h * SCALE));
+    this.canvas.width = this.fogCanvas.width = Math.max(2, Math.ceil(w * SCALE));
+    this.canvas.height = this.fogCanvas.height = Math.max(2, Math.ceil(h * SCALE));
   }
 
   render(game, base, view) {
@@ -28,9 +32,11 @@ export class Lighting {
     const W = this.canvas.width;
     const H = this.canvas.height;
     const t = game.time;
+    const ev = game.director.event;
+    const def = game.director.eventDef;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = 'source-over';
-    g.fillStyle = `rgba(6,8,12,${this.ambient})`;
+    g.fillStyle = ev === 'blood' ? `rgba(40,5,8,${this.ambient})` : `rgba(6,8,12,${def?.ambient ?? this.ambient})`;
     g.clearRect(0, 0, W, H);
     g.fillRect(0, 0, W, H);
     g.globalCompositeOperation = 'destination-out';
@@ -51,7 +57,8 @@ export class Lighting {
       g.globalAlpha = 0.6;
       g.drawImage(this.soft, game.camera.x - 320, game.camera.y - 320, 640, 640);
     }
-    for (const l of game.world.lights) {
+    // apagón: las farolas no alumbran
+    for (const l of ev === 'blackout' ? [] : game.world.lights) {
       if (l.x + l.r < view.x0 || l.x - l.r > view.x1 || l.y + l.r < view.y0 || l.y - l.r > view.y1) continue;
       l.cur = this.flicker(l, t);
       g.globalAlpha = l.cur;
@@ -72,11 +79,45 @@ export class Lighting {
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
+    if (ev === 'fog') this.fog(game, base, def);
+    // luna de sangre: todo, también lo iluminado, se tiñe de rojo
+    if (ev === 'blood') {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = 'rgba(150,10,14,0.14)';
+      g.fillRect(0, 0, W, H);
+    }
     // la viñeta va en la misma capa: una pasada de pantalla completa menos
     if (this.vignette) {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.drawImage(this.vignette, 0, 0, W, H);
     }
+  }
+
+  // Niebla: una capa gris que lo tapa todo salvo un claro alrededor del jugador (o de la cámara),
+  // que respira despacio. Se pinta sobre la oscuridad.
+  fog(game, base, def) {
+    const f = this.fogCtx;
+    const W = this.fogCanvas.width;
+    const H = this.fogCanvas.height;
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, W, H);
+    f.fillStyle = `rgba(84,90,96,${def.thick})`;
+    f.fillRect(0, 0, W, H);
+    const p = game.player;
+    const c = p && p.alive ? p : game.camera;
+    const s = base.z * SCALE;
+    f.setTransform(s, 0, 0, s, base.tx * SCALE, base.ty * SCALE);
+    const r = def.clear * (1 + Math.sin(game.time * 0.7) * 0.06);
+    const gr = f.createRadialGradient(c.x, c.y, r * 0.55, c.x, c.y, r * 1.5);
+    gr.addColorStop(0, 'rgba(0,0,0,1)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    f.globalCompositeOperation = 'destination-out';
+    f.fillStyle = gr;
+    f.fillRect(c.x - r * 1.5, c.y - r * 1.5, r * 3, r * 3);
+    const g = this.ctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(this.fogCanvas, 0, 0);
   }
 
   flicker(l, t) {
@@ -92,7 +133,7 @@ export class Lighting {
     // brillo cálido aditivo de fuegos y farolas
     ctx.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
     ctx.globalCompositeOperation = 'lighter';
-    for (const l of game.world.lights) {
+    for (const l of game.director.event === 'blackout' ? [] : game.world.lights) {
       if (l.x + l.r < view.x0 || l.x - l.r > view.x1 || l.y + l.r < view.y0 || l.y - l.r > view.y1) continue;
       const r = l.r * 0.75;
       ctx.globalAlpha = (l.cur ?? l.i) * (l.flicker > 0.1 ? 0.32 : 0.16);

@@ -1,5 +1,6 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { MAX_ALIVE, WORLD_SIZE, WAVES } from '../core/config.ts';
+import { EVENT_ORDER, EVENTS, MAX_ALIVE, WORLD_SIZE, WAVES } from '../core/config.ts';
+import type { EventDef } from '../core/config.ts';
 import { rand, randInt } from '../core/util.ts';
 import type { GameHost, Vec } from '../core/types.d.ts';
 
@@ -24,6 +25,14 @@ export class Director {
   declare crowd?: number;
   declare waveT: number;
   declare straggleT: number;
+  /** ronda especial en curso (una clave de EVENTS.types) o '' */
+  declare event: string;
+  /** false: sin rondas especiales (pruebas) */
+  declare events: boolean;
+  /** las últimas rondas especiales, para no repetir tipo (ver EVENTS.gap) */
+  declare recent: string[];
+  /** la oleada anterior fue especial: esta no puede serlo */
+  declare lastEvent: string;
   constructor() {
     this.wave = 0;
     this.state = 'break';
@@ -31,6 +40,28 @@ export class Director {
     this.queue = [];
     this.spawnT = 0;
     this.waveSize = 0;
+    this.event = '';
+    this.events = true;
+    this.recent = [];
+    this.lastEvent = '';
+  }
+
+  /** Datos de la ronda especial en curso, o null. */
+  get eventDef(): EventDef | null {
+    return (this.event && EVENTS.types[this.event]) || null;
+  }
+
+  // ¿Será especial la oleada w? Nunca dos seguidas ni un tipo de las últimas EVENTS.gap.
+  rollEvent(w: number) {
+    const last = this.lastEvent;
+    this.lastEvent = '';
+    if (!this.events || w < EVENTS.from || last || Math.random() >= EVENTS.chance) return '';
+    const pool = EVENT_ORDER.filter((id) => !this.recent.includes(id));
+    const id = pool[randInt(0, pool.length - 1)];
+    this.recent.push(id);
+    if (this.recent.length > EVENTS.gap) this.recent.shift();
+    this.lastEvent = id;
+    return id;
   }
 
   get hpMult() {
@@ -38,7 +69,8 @@ export class Director {
     return WAVES.hp * (1 + Math.max(0, this.wave - 4) * 0.07) * (this.coop ? 1.4 : 1);
   }
   get speedMult() {
-    return WAVES.speed * (1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02));
+    const ev = this.eventDef;
+    return WAVES.speed * (1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02)) * (ev?.speed ?? 1);
   }
 
   startWave(game: GameHost) {
@@ -51,15 +83,25 @@ export class Director {
     // WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno
     const m = (this.coop ? this.crowd || 0.5 : 1) * WAVES.count;
     const few = (n: number) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
+    this.event = this.rollEvent(w);
+    const ev = this.eventDef;
     const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
-    const swats = Math.round(normalTotal * 0.2);
-    const normals = normalTotal - swats;
-    const sprinters = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
-    const fats = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
+    // asedio blindado: más policías SWAT entre los normales
+    let swats = Math.round(normalTotal * (ev?.swat ?? 0.2));
+    let normals = normalTotal - swats;
+    let sprinters = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
+    let fats = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
     // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
-    const heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
+    let heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
     // toros desde la oleada 3: pocos, pero embisten
-    const bulls = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
+    let bulls = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
+    if (ev?.size) {
+      // estampida: una horda más chica, toda de velocistas y toros
+      const total = Math.round((normalTotal + sprinters + fats + bulls) * ev.size);
+      bulls = Math.max(few(2), Math.round(total * (ev.bulls ?? 0)));
+      sprinters = total - bulls;
+      normals = swats = fats = heavies = 0;
+    }
     const q: string[] = [];
     for (let i = 0; i < normals - heavies; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
@@ -74,18 +116,20 @@ export class Director {
     this.state = 'active';
     this.straggleT = 0;
     game.banner(
-      `Oleada ${w}`,
-      w === 3
-        ? 'Llegan los toros: esquiva sus embestidas'
-        : w === 11
-          ? 'Llegan los super blindados'
-          : heavies
-            ? 'Super blindados en la horda'
-            : w === 1
-              ? 'Velocistas y policías SWAT'
-              : fats
-                ? 'Cuidado con los gordos'
-                : 'Sobrevive',
+      ev ? `Oleada ${w} · ${ev.name}` : `Oleada ${w}`,
+      ev
+        ? ev.desc
+        : w === 3
+          ? 'Llegan los toros: esquiva sus embestidas'
+          : w === 11
+            ? 'Llegan los super blindados'
+            : heavies
+              ? 'Super blindados en la horda'
+              : w === 1
+                ? 'Velocistas y policías SWAT'
+                : fats
+                  ? 'Cuidado con los gordos'
+                  : 'Sobrevive',
     );
     game.sfx.wave();
   }
@@ -119,6 +163,8 @@ export class Director {
     if (!this.queue.length && !game.horde.list.some((z) => z.type !== 'golden' && !z.dead)) {
       // el dorado que quede escapa con la oleada
       for (const z of game.horde.list) if (z.type === 'golden' && !z.dead) game.onGoldenExpired(z);
+      // la ronda especial termina con la oleada (la niebla se va, vuelven las farolas)
+      this.event = '';
       this.state = 'waiting';
       game.onWaveCleared();
       return;

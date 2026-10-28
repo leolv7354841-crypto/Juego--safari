@@ -28,6 +28,19 @@ seguidas cada zombi da **×1,5** de dinero y experiencia, con 25 **×2**, con 50
 golpe de zombi (fuera del robot) o caer la corta. La mejor racha de la partida sale en el resumen final.
 La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
 
+**Rondas especiales:** desde la oleada 2, cada oleada tiene un 35 % de probabilidad de ser especial (nunca
+dos seguidas). Se anuncian en el cartel y su nombre sale en el contador de oleada, y todas sus bajas pagan
+×1,5 (la luna de sangre, ×2):
+
+| Ronda | Qué pasa |
+|-------|----------|
+| Niebla | Solo ves un claro alrededor tuyo; la horda llega de entre la niebla |
+| Apagón | Las farolas se apagan: solo alumbran tu linterna, los disparos y el fuego |
+| Estampida | Una horda más chica (60 %) solo de velocistas y toros |
+| Lluvia dorada | Un zombi dorado tras otro, cada 7 a 11 s |
+| Asedio blindado | La mitad de los normales llegan como policías SWAT |
+| Luna de sangre | Noche roja: los zombis van un 20 % más rápido y pagan el doble |
+
 ### Cuentas y clasificación
 
 Al entrar escribes un **nombre y un PIN de 4 números**: si la cuenta no existe se crea, y si existe entras

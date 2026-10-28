@@ -6,7 +6,7 @@
 //   en línea     lo mismo + ack, me, st, wp, ec, ps, iv, ab, hv, up, fx, tt, dg, kl, ml, lft, blk, wir, sc (cada jugador)
 // Todo son listas planas de números (poco peso); las posiciones de los zombis van relativas a `o`.
 // El contrato de tipos está en js/core/types.d.ts (WorldSnap). No importa nada del navegador.
-import { ABILITY, GOLDEN, NET, WEAPON_ORDER } from '../core/config.ts';
+import { ABILITY, EVENT_ORDER, GOLDEN, NET, WEAPON_ORDER } from '../core/config.ts';
 import { TAU } from '../core/util.ts';
 import { PICKS, TYPES } from './protocol.ts';
 import type { Bullet, Zombie } from '../core/types.d.ts';
@@ -26,7 +26,25 @@ export const PEER_N = 19;
 export const ROBOT_N = 8;
 
 /** Claves de la parte del mundo (encodeWorld): están en toda foto del servidor. */
-export const WORLD_KEYS = ['o', 'z', 'zx', 'zh', 'pl', 'rb', 'pk', 'b', 'gr', 'fi', 'so', 'ms', 'bl', 'w', 'ds', 'tm'];
+export const WORLD_KEYS = [
+  'o',
+  'z',
+  'zx',
+  'zh',
+  'pl',
+  'rb',
+  'pk',
+  'b',
+  'gr',
+  'fi',
+  'so',
+  'ms',
+  'bl',
+  'w',
+  'ds',
+  'tm',
+  'ev',
+];
 
 const r100 = (v: number) => Math.round(v * 100);
 
@@ -45,7 +63,7 @@ export type WorldSource = {
   pickups: Pick<Pickups, 'list'>;
   bullets: Pick<Bullets, 'list'>;
   structures: SceneStructures;
-  director: Pick<Director, 'wave' | 'state'>;
+  director: Pick<Director, 'wave' | 'state' | 'event'>;
   time: number;
 };
 
@@ -209,6 +227,8 @@ export function encodeWorld(
     w: d.wave,
     ds: d.state,
     tm: Math.round(src.time),
+    // ronda especial: su lugar en EVENT_ORDER + 1 (0 = ninguna)
+    ev: EVENT_ORDER.indexOf(d.event) + 1,
   };
 }
 

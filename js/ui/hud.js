@@ -155,6 +155,13 @@ export function updateHud(game, force) {
   set(game, 'kills', $('kills'), 'text', String(game.totalKills()));
   updateCombo(game, p.combo);
   set(game, 'wave', $('wave'), 'text', String(Math.max(1, game.director.wave)));
+  // ronda especial: su nombre en lugar de «Oleada», del color de la ronda
+  const ev = game.director.event;
+  if (game.cache.wev !== ev) {
+    game.cache.wev = ev;
+    $('wave-lbl').textContent = ev ? game.director.eventDef.tag : 'Oleada';
+    $('wave-stat').className = ev ? `stat ev ev-${ev}` : 'stat';
+  }
   // montado en la torreta pesada se ven sus balas
   const w = p.manned ? { def: WEAPONS.heavy, mag: p.heavyAmmo, reserve: 0 } : p.weapon;
   set(game, 'wname', $('wname'), 'text', w.def.name);

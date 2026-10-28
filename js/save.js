@@ -1,5 +1,14 @@
 // Progreso guardado de la partida en solitario: guardar, cargar y reanudar una ronda a medias.
-import { xpForLevel, SHOP, WEAPONS, WEAPON_ORDER, START_WEAPON, WAVES, ZOMBIE_VARIANTS } from './core/config.ts';
+import {
+  xpForLevel,
+  SHOP,
+  WEAPONS,
+  WEAPON_ORDER,
+  START_WEAPON,
+  WAVES,
+  ZOMBIE_VARIANTS,
+  EVENTS,
+} from './core/config.ts';
 import { storage } from './core/util.ts';
 import { isClass } from './sim/abilities.ts';
 
@@ -30,6 +39,7 @@ export function saveProgress(game) {
         : [],
     seed: game.world.seedBase,
     wave: game.director.wave,
+    ev: ds === 'active' ? game.director.event : '',
     time: game.time,
     kills: game.kills,
     level: game.level,
@@ -139,6 +149,8 @@ export function loadProgress(game, kind = 'save') {
   if (d.dstate === 'active') {
     // reanudar la ronda a medias: los zombis vuelven donde estaban y el resto sigue en cola
     dir.state = 'active';
+    dir.event = EVENTS.types[d.ev] ? d.ev : '';
+    dir.lastEvent = dir.event;
     const q = [];
     for (const [t, n] of Object.entries(d.queue || {})) for (let i = 0; i < n; i++) q.push(t);
     for (let i = q.length - 1; i > 0; i--) {

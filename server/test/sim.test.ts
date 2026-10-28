@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.ts';
 import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.ts';
-import { ABILITY, BOUNTY, COMBO, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import { ABILITY, BOUNTY, COMBO, EVENT_ORDER, EVENTS, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
 import { UPGRADES } from '../../js/sim/upgrades.ts';
 import { cooldownOf } from '../../js/sim/abilities.ts';
 import { comboBreak, comboMult } from '../../js/sim/combo.ts';
@@ -629,4 +629,20 @@ test('torreta pesada: cada bala estalla en el primer zombi y daña a los de alre
   for (const z of group as any[]) z.hp = 1;
   sim.game.heavyBlast(cx, cy, 'a');
   assert.ok(a.money > m0, 'la explosión paga a quien disparó');
+});
+
+test('ronda especial en línea: va en la foto de todos y sus bajas pagan más', () => {
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
+  const a = sim.slots.get('a')!;
+  assert.equal(sim.snapshot('a', 0)!.ev, 0, 'sin ronda especial');
+  sim.director.event = 'blood';
+  for (const id of ['a', 'b']) assert.equal(sim.snapshot(id, 0)!.ev, EVENT_ORDER.indexOf('blood') + 1);
+  const z = sim.horde.spawn('normal', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
+  z.lastOwner = 'a';
+  const m0 = a.money;
+  sim.killZombie(z);
+  assert.equal(a.money - m0, Math.round(BOUNTY.normal * EVENTS.types.blood.pay));
 });

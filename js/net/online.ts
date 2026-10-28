@@ -5,7 +5,17 @@
 // respondan al instante, el movimiento propio se predice con las mismas reglas que usa el
 // servidor y se corrige al llegar el estado confirmado (js/net/netcode.js). Los demás jugadores y
 // los zombis se dibujan un poco en diferido, interpolando entre las fotos del servidor.
-import { NET, WEAPONS, GOLDEN, SHOP_ORDER, BUILD_ORDER, ROBOT, PLAYER_BASE, CLASS_ORDER } from '../core/config.ts';
+import {
+  NET,
+  WEAPONS,
+  GOLDEN,
+  SHOP_ORDER,
+  BUILD_ORDER,
+  ROBOT,
+  PLAYER_BASE,
+  CLASS_ORDER,
+  EVENT_ORDER,
+} from '../core/config.ts';
 import { Predictor, ServerClock, unpackBody, TICK } from './netcode.ts';
 import { IN_RUN, IN_FIRE, IN_RELOAD } from './protocol.ts';
 import { lookCode } from '../render/sprites.js';
@@ -582,6 +592,7 @@ export class Online {
     const d = g.director;
     d.wave = s.w | 0;
     d.state = s.ds;
+    d.event = EVENT_ORDER[(s.ev | 0) - 1] || '';
     this.applyInventory(s);
     this.applyEconomy(s);
     // el reloj local avanza solo (animaciones); sólo se corrige si se aleja del servidor

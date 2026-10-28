@@ -379,6 +379,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .round-key { margin: 5px 0 0; font-size: 11px; color: var(--dim); }
 .touch .round-key { display: none; }
 
+/* ---------- Ronda especial (en el contador de oleada) ---------- */
+
+.stat.ev small { color: var(--accent); white-space: nowrap; }
+.stat.ev-golden small { color: #f0c040; }
+.stat.ev-blood small { color: #e05a48; }
+.stat.ev-fog small { color: #b8c2cc; }
+
 /* ---------- Racha ---------- */
 
 .combo {

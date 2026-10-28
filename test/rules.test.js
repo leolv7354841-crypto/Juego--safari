@@ -1,10 +1,11 @@
 // Reglas de combate compartidas (js/sim/rules.js): las usan el juego local y el servidor.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOUNTY, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.ts';
+import { BOUNTY, EVENTS, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.ts';
 import { ACID } from '../js/sim/build.ts';
 import { OnlineClient, ServerMode, Solo } from '../js/net/mode.ts';
 import * as Rules from '../js/sim/rules.ts';
+import { Director } from '../js/sim/director.ts';
 import { bullet, fakeGame, silent, zombie } from './helpers.js';
 
 // Un juego mínimo con lo que toca la baja de un zombi, y ganchos que anotan lo que pasa.
@@ -269,7 +270,7 @@ test('robotHit aguanta golpes y, al romperse, explota y expulsa al piloto', () =
 });
 
 test('goldenTick espera, y no hace aparecer un segundo dorado', () => {
-  const game = fakeGame({ horde: { list: [{ type: 'golden', dead: false }] } });
+  const game = fakeGame({ horde: { list: [{ type: 'golden', dead: false }] }, director: new Director() });
   assert.equal(
     Rules.goldenTick(game, 10, 1, () => {}),
     9,
@@ -278,5 +279,24 @@ test('goldenTick espera, y no hace aparecer un segundo dorado', () => {
   assert.equal(
     Rules.goldenTick(game, 0.5, 1, () => assert.fail('no debe avisar')),
     5,
+  );
+});
+
+test('las rondas especiales pagan más y la lluvia dorada no espera el reloj normal', () => {
+  const d = new Director();
+  const game = fakeGame({ horde: { list: [] }, director: d });
+  assert.equal(Rules.bountyNow(game, 'swat', 1), BOUNTY.swat);
+  assert.equal(Rules.bountyNow(game, 'swat', 2), BOUNTY.swat * 2, 'la racha multiplica');
+  d.event = 'fog';
+  assert.equal(Rules.bountyNow(game, 'swat', 1), Math.round(BOUNTY.swat * EVENTS.types.fog.pay));
+  d.event = 'blood';
+  assert.equal(Rules.bountyNow(game, 'swat', 2), Math.round(BOUNTY.swat * 2 * EVENTS.types.blood.pay));
+  // el reloj normal del dorado es largo; en la lluvia dorada se acorta en el acto
+  d.event = 'golden';
+  const [, max] = EVENTS.types.golden.every;
+  assert.ok(GOLDEN.every[1] > max);
+  assert.equal(
+    Rules.goldenTick(game, GOLDEN.every[1], 1, () => {}),
+    max - 1,
   );
 });

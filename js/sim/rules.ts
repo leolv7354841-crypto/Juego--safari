@@ -38,6 +38,10 @@ export const goldenReward = () => randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
 /** Recompensa por matar a un zombi de ese tipo. */
 export const bountyOf = (type: string) => (BOUNTY as Record<string, number>)[type] || 0;
 
+/** Lo que paga una baja de ese tipo ahora: la recompensa por la racha y por la ronda especial. */
+export const bountyNow = (game: GameHost, type: string, combo: number) =>
+  Math.round(bountyOf(type) * combo * (game.director.eventDef?.pay ?? 1));
+
 /** Dinero que cuesta un golpe de zombi: nunca más del que se tiene. */
 export const hitLoss = (money: number) => Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
 
@@ -134,10 +138,12 @@ export function spawnGolden(game: GameHost, toast: (msg: string) => void) {
  * Devuelve los segundos que faltan para el siguiente intento.
  */
 export function goldenTick(game: GameHost, t: number, dt: number, toast: (msg: string) => void) {
-  t -= dt;
+  // lluvia dorada: uno tras otro, sin esperar el reloj normal
+  const every = game.director.eventDef?.every ?? GOLDEN.every;
+  t = Math.min(t, every[1]) - dt;
   if (t > 0) return t;
   const alive = game.horde.list.some((z: Zombie) => z.type === 'golden' && !z.dead);
-  if (!alive && spawnGolden(game, toast)) return rand(GOLDEN.every[0], GOLDEN.every[1]);
+  if (!alive && spawnGolden(game, toast)) return rand(every[0], every[1]);
   return 5;
 }
 

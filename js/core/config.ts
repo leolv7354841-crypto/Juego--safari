@@ -478,6 +478,76 @@ export const COMBO = {
   ],
 };
 
+// Rondas especiales: desde la oleada `from`, cada oleada tiene `chance` de serlo; nunca dos
+// seguidas ni un tipo que salió en las `gap` especiales anteriores. Cada tipo lleva su cartel
+// (name, desc), tag: su nombre corto en el contador de oleada, y pay: multiplicador del dinero
+// de las bajas de esa ronda.
+//   fog: niebla que deja ver hasta clear px (thick: opacidad de la niebla)
+//   blackout: farolas apagadas y oscuridad ambient · stampede: solo velocistas y toros, size de
+//   la horda normal y bulls de ella toros · golden: un dorado cada every s · siege: swat de los
+//   normales con escudo · blood: zombis speed veces más rápidos
+export interface EventDef {
+  name: string;
+  tag: string;
+  desc: string;
+  pay: number;
+  clear?: number;
+  thick?: number;
+  ambient?: number;
+  size?: number;
+  bulls?: number;
+  every?: [number, number];
+  swat?: number;
+  speed?: number;
+}
+export const EVENTS: { from: number; chance: number; gap: number; types: Record<string, EventDef> } = {
+  from: 2,
+  chance: 0.35,
+  gap: 2,
+  types: {
+    fog: {
+      name: 'Niebla',
+      tag: 'Niebla',
+      desc: 'No ves más allá de unos pasos: escucha a la horda',
+      pay: 1.5,
+      clear: 230,
+      thick: 0.9,
+    },
+    blackout: {
+      name: 'Apagón',
+      tag: 'Apagón',
+      desc: 'Se apagaron las farolas: solo queda tu linterna',
+      pay: 1.5,
+      ambient: 0.82,
+    },
+    stampede: {
+      name: 'Estampida',
+      tag: 'Estampida',
+      desc: 'Velocistas y toros a toda carrera',
+      pay: 1.5,
+      size: 0.6,
+      bulls: 0.1,
+    },
+    golden: {
+      name: 'Lluvia dorada',
+      tag: 'Dorados',
+      desc: 'Zombis dorados por todas partes: atrápalos',
+      pay: 1.5,
+      every: [7, 11],
+    },
+    siege: {
+      name: 'Asedio blindado',
+      tag: 'Asedio',
+      desc: 'La mitad de la horda llega con escudo',
+      pay: 1.5,
+      swat: 0.5,
+    },
+    blood: { name: 'Luna de sangre', tag: 'Sangre', desc: 'Más rápidos y pagan el doble', pay: 2, speed: 1.2 },
+  },
+};
+// Orden fijo de los tipos: la foto manda la ronda especial por su lugar aquí (0 = ninguna).
+export const EVENT_ORDER = ['fog', 'blackout', 'stampede', 'golden', 'siege', 'blood'];
+
 // Dinero que pierdes con cada golpe de zombi (siempre más de $15).
 export const MONEY_LOSS = { min: 16, max: 40 };
 
