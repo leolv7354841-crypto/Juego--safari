@@ -1,2 +1,2 @@
-# los scripts del servidor se ejecutan en Linux
-*.sh text eol=lf
+# Todo el texto con saltos LF (Biome y el hash de versión los esperan así; los .sh corren en Linux).
+* text=auto eol=lf

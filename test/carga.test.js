@@ -3,10 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const JS = new URL('../js/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const JS = fileURLToPath(new URL('../js/', import.meta.url));
 const DEL_SERVIDOR = [
   ...['core', 'sim'].flatMap((d) => readdirSync(join(JS, d)).map((f) => `${d}/${f}`)),
   'net/protocol.js',

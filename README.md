@@ -150,9 +150,8 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 Los módulos de JavaScript necesitan un servidor (no funciona abriendo el archivo con doble clic):
 
 ```bash
+npm ci               # una vez: dependencias
 npm run dev          # http://localhost:8080
-# o bien
-python3 -m http.server 8080
 ```
 
 Para probar en tu celular, conéctalo a la misma red Wi-Fi y abre `http://IP-DE-TU-PC:8080`.
@@ -164,7 +163,7 @@ Flujo actual:
 1. **Push a `main`** (la rama principal) → el proyecto `deadzone` de Vercel publica en producción
    (`deadzone-five-red.vercel.app`). Las demás ramas del repositorio generan una vista previa.
 2. Vercel no publica la carpeta tal cual: ejecuta `npm run build` (Vite, lo pide `vercel.json`) y publica `dist/`. El servidor, la documentación y los scripts no quedan públicos.
-3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request que Biome, el build de Vite y que pasan las pruebas del servidor.
+3. GitHub Actions (`.github/workflows/ci.yml`) comprueba en cada push y pull request Biome, los tipos (`checkJs`), las pruebas del núcleo, los tipos y pruebas del servidor, y Playwright (Chromium y WebKit).
 4. Si cambió código que usa el servidor (`server/`, `js/`, `deploy/`),
    `.github/workflows/servidor.yml` actualiza la máquina de Vultr en cuanto no hay salas
    abiertas (ver «Publicación automática» en [`deploy/README.md`](deploy/README.md)).
@@ -327,34 +326,12 @@ muestra es de aplicación (ida y vuelta de un mensaje), no el ping de red ni el 
 respuesta (que suma el retraso de dibujo y los fotogramas). Las pérdidas de paquetes no se miden:
 WebSocket va sobre TCP, que las oculta reenviando.
 
-### Publicar el servidor gratis en Render
+### Render (histórico)
 
-> Para la capacidad actual (5 salas de 4) se recomienda la máquina virtual de
-> [`deploy/README.md`](deploy/README.md): el plan gratis no da abasto ni está siempre encendido.
-
-Condiciones actuales del plan gratis de Render (revisadas en octubre de 2026,
-[documentación](https://render.com/docs/free)): 512 MB de RAM y **0,1 CPU**; se duerme tras 15
-minutos sin tráfico (cuentan las peticiones HTTP y los mensajes WebSocket) y tarda **cerca de un
-minuto** en despertar con la siguiente conexión; 750 horas gratis al mes; Render puede reiniciarlo
-en cualquier momento. **Al reiniciarse o dormirse se pierden las partidas en curso** (todo vive en
-memoria).
-
-1. Sube el repositorio a GitHub.
-2. En [render.com](https://render.com): **New → Blueprint**, elige el repositorio (usa
-   `render.yaml`). O bien **New → Web Service** con:
-   - Build Command: `npm ci --prefix server && npm run build --prefix server`
-   - Start Command: `npm start --prefix server`
-   - Health Check Path: `/health`
-   - Variables: `NODE_VERSION=24`, `ALLOWED_ORIGINS=https://tu-juego.vercel.app` (las páginas desde
-     las que se juega, separadas por comas) y `SNAP_HZ=10`.
-3. Cuando esté en marcha, copia su dirección y ponla en `NET.server` de `js/core/config.js` con `wss://`
-   (por ejemplo `wss://dead-zone-server.onrender.com`), y publica el juego.
-   También se puede probar sin publicar abriendo el juego con `?servidor=wss://…`.
-
-Con 0,1 CPU, una sala de 10 (o 5 de 4) a 60 pasos y 20 fotos por segundo **probablemente no da abasto** (en
-este PC usó un 26 % de un núcleo). Por eso `render.yaml` baja las fotos a 10 por segundo; aun así,
-en el plan gratis conviene probar primero con pocos jugadores y mirar el diagnóstico (pasos/s y
-CPU). Para 5 salas de 4 fluidas hace falta más CPU: la máquina virtual de
+El servidor empezó en el plan gratis de Render; `render.yaml` sigue en el repo como respaldo
+(**New → Blueprint** en [render.com](https://render.com) y apuntar `NET.server` a su URL). No sirve
+para la capacidad actual: 0,1 CPU, se duerme a los 15 minutos sin tráfico, tarda cerca de un minuto
+en despertar y al dormirse se pierden las partidas. Producción es la máquina virtual de
 [`deploy/README.md`](deploy/README.md).
 
 ### Alternativa: una máquina virtual Linux (también ARM)
@@ -412,38 +389,54 @@ Vite genera archivos con hash en `dist/assets/` (se guardan en caché para siemp
 ```
 index.html            Interfaz: HUD, controles táctiles y pantallas
 css/style.css         Estilos y diseño adaptable
-js/main.js            Bucle principal, cámara, HUD y menús
-js/core/config.js     Equilibrio: armas, zombis, experiencia
+js/main.js            Game: construye los módulos, guarda la partida y corre el bucle (sólo coordina)
+js/states.js          Máquina de estados como tabla (menú, partida, pausa, tienda, nivel, fin…)
+js/events.js          Eventos de combate del jugador local
+js/actions.js         Acciones de tecla y botón (habilidad, robot, construir, lanzar)
+js/save.js            Guardado y carga del progreso
+js/core/config.js     Equilibrio: armas, zombis, tienda, experiencia, red
 js/core/util.js       Utilidades (azar, geometría, almacenamiento)
 js/core/version.js    Versión del código (la inyecta Vite al compilar)
+js/core/types.d.ts    Tipos compartidos (GameHost, Cmd…)
 js/sim/               Lógica del juego; también la ejecuta el servidor (sin document)
-  world.js            Ciudad procedural (solo datos), colisiones y campo de flujo
+  world.js            Ciudad procedural (sólo datos), colisiones y campo de flujo
   player.js           Movimiento, estamina, armas, recarga y retroceso
   zombies.js          Horda, tácticas (directo, flanco, espalda), rejilla espacial y ataques
   bullets.js          Balas con colisión segmento-círculo y perforación
   director.js         Oleadas y aparición de zombis
+  rules.js            Reglas de combate compartidas con el servidor (bajas, botín, dorado, ácido)
+  combat.js           Reglas de impacto de bala (compartidas con el servidor)
+  combo.js            Racha de bajas
   upgrades.js         Mejoras al subir de nivel
   abilities.js        Clases y habilidades
-  build.js            Barricadas, alambre de púas, torreta pesada y granadas
+  build.js            Barricadas, alambre de púas, torretas, granadas y molotov
   pickups.js          Munición, botiquines y cajas de armas
   robot.js            Robot de combate pilotable
-  combat.js           Reglas de impacto de bala (compartidas con el servidor)
 js/render/            Todo el dibujo (una pieza por módulo de sim/ que se ve)
+  scene.js            El fotograma completo, el tamaño del lienzo y la calidad adaptable
+  camera.js           Cámara con sacudida y retroceso
   sprites.js          Todo el arte, generado por código
   world.js            Suelo por trozos, árboles, fuegos y postes
-  zombies.js · bullets.js · pickups.js · build.js · robot.js
+  zombies.js · bullets.js · pickups.js · build.js · robot.js · remote.js
   lighting.js         Oscuridad, linterna, farolas y fuegos
   particles.js        Partículas y restos en el suelo
 js/net/
+  mode.js             game.mode: Solo, CoopHost, CoopGuest, OnlineClient, ServerMode
   protocol.js         Tablas y bits del protocolo (cliente y servidor)
   netcode.js          Predicción/reconciliación e interpolación (compartido con el servidor)
+  snapshot.js         Codificador de la foto del mundo (anfitrión del cooperativo y servidor)
+  remote.js           Lo que llega por la red: jugadores, zombis y balas de adorno
   net.js              Conexión entre 2 celulares (código de sala + WebRTC)
   coop.js             Modo cooperativo: anfitrión, invitado y sincronización
   online.js           Modo en línea: sala, predicción, interpolación y diagnóstico
-js/ui/                Teclado y táctil (input.js), sonido (audio.js), música (music.js), cuentas (accounts.js)
+js/ui/                Entrada (input.js), sonido (audio.js), música (music.js), cuentas (accounts.js)
+                      y una pieza por pantalla: hud, shop, class, look, levelup, over, menu, account, board, lobby
+public/               Manifiesto e íconos de la PWA
+test/                 Pruebas del núcleo (node:test) · e2e/: pruebas de navegador (Playwright)
 server/               Servidor autoritativo en línea (Node, TypeScript, Colyseus); pruebas y carga
 deploy/               Servidor en una máquina virtual: Docker, Caddy (HTTPS), instalación y guía
-render.yaml           Despliegue del servidor en Render
+docs/                 Documentación técnica y plan de refactorización
+render.yaml           Despliegue del servidor en Render (histórico, respaldo)
 ```
 
 Todo el arte y el sonido se generan por código: el proyecto no usa recursos de terceros.
