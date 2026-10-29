@@ -405,7 +405,8 @@ test('bomber: el misil cae donde apunta y arrasa en su radio; berserker: tres ca
   sim.horde.list.length = 0;
   const tx = p.x + 400;
   const ty = p.y;
-  for (let i = 0; i < 5; i++) sim.horde.spawn('swat', tx - 250 + i * 100, ty, 1, 1);
+  // casi quietos: si caminan hacia Ana mientras cae el misil, alguno sale del radio y la prueba falla al azar
+  for (let i = 0; i < 5; i++) sim.horde.spawn('swat', tx - 250 + i * 100, ty, 1, 0.001);
   sim.act('a', { s: seq.n + 1, k: 'ab', kind: '', tx, ty });
   idle(sim, 'a', seq, 1);
   assert.equal(sim.structures.missiles.length, 1, 'misil en el aire');
