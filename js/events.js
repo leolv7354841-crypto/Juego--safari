@@ -18,7 +18,7 @@ export function killZombie(game, z) {
     kills: game.kills,
     xp: (zb) => addXp(game, Math.round(zb.def.xp * mult)),
     bounty: (zb) => {
-      const n = Rules.bountyNow(game, zb.type, mult);
+      const n = Rules.bountyNow(game, game.player, zb.type, mult);
       game.money += n;
       game.moneyEarned += n;
     },

@@ -285,12 +285,20 @@ test('goldenTick espera, y no hace aparecer un segundo dorado', () => {
 test('las rondas especiales pagan más y la lluvia dorada no espera el reloj normal', () => {
   const d = new Director();
   const game = fakeGame({ horde: { list: [] }, director: d });
-  assert.equal(Rules.bountyNow(game, 'swat', 1), BOUNTY.swat);
-  assert.equal(Rules.bountyNow(game, 'swat', 2), BOUNTY.swat * 2, 'la racha multiplica');
+  const p = { cash: 0 };
+  assert.equal(Rules.bountyNow(game, p, 'swat', 1), BOUNTY.swat);
+  assert.equal(Rules.bountyNow(game, p, 'swat', 2), BOUNTY.swat * 2, 'la racha multiplica');
+  // las fracciones se juntan hasta completar un dólar
+  let total = 0;
+  for (let i = 0; i < 8; i++) total += Rules.bountyNow(game, p, 'normal', 1);
+  assert.equal(total + p.cash, BOUNTY.normal * 8);
+  assert.ok(p.cash >= 0 && p.cash < 1);
+  p.cash = 0;
   d.event = 'fog';
-  assert.equal(Rules.bountyNow(game, 'swat', 1), Math.round(BOUNTY.swat * EVENTS.types.fog.pay));
+  assert.equal(Rules.bountyNow(game, p, 'swat', 1) + p.cash, BOUNTY.swat * EVENTS.types.fog.pay);
+  p.cash = 0;
   d.event = 'blood';
-  assert.equal(Rules.bountyNow(game, 'swat', 2), Math.round(BOUNTY.swat * 2 * EVENTS.types.blood.pay));
+  assert.equal(Rules.bountyNow(game, p, 'swat', 2), BOUNTY.swat * 2 * EVENTS.types.blood.pay);
   // el reloj normal del dorado es largo; en la lluvia dorada se acorta en el acto
   d.event = 'golden';
   const [, max] = EVENTS.types.golden.every;

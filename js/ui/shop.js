@@ -295,10 +295,11 @@ export function repairRobot(game) {
 
 // Botones de la tienda y del panel de ronda que la abre.
 export function bindShop(game) {
-  // lo que paga cada zombi, tal como está en BOUNTY
+  // lo que paga cada zombi, tal como está en BOUNTY (con coma decimal: $0,5)
+  const b = (t) => `$${String(BOUNTY[t]).replace('.', ',')}`;
   game.$('shop-bounty').textContent =
-    `Zombi normal $${BOUNTY.normal} · velocista $${BOUNTY.sprinter} · gordo $${BOUNTY.fat} · ` +
-    `SWAT $${BOUNTY.swat} · toro $${BOUNTY.bull} · super blindado $${BOUNTY.heavy}.`;
+    `Zombi normal ${b('normal')} · velocista ${b('sprinter')} · gordo ${b('fat')} · ` +
+    `SWAT ${b('swat')} · toro ${b('bull')} · super blindado ${b('heavy')}.`;
   on(game, 'btn-shop-done', () => closeShop(game));
   on(game, 'btn-round-shop', () => {
     if (game.state === 'play' && game.director.state === 'waiting') openShop(game);

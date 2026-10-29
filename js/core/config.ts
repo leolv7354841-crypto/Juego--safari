@@ -283,15 +283,15 @@ export const ROCKET = {
 };
 // Habilidad de clase (se elige al empezar cada partida). cooldown en s; cada mejora la baja
 // cdStep (x0,85) hasta minCooldown.
-// bomber: misil balístico que cae donde apuntas tras fall s (3 veces el radio y 2 veces el
-// daño del cohete); berserker: 3 ametralladoras vacían 3 cargadores en time s, con su propio
+// bomber: misil balístico que cae donde apuntas tras fall s (1,5 veces el radio y el daño
+// del cohete); berserker: 3 ametralladoras vacían 3 cargadores en time s, con su propio
 // daño y perforación (no cambia si se ajusta la ametralladora de la tienda);
 // booster: inmune y speed veces más rápido durante time s.
 export const ABILITY = {
   cooldown: 60,
   minCooldown: 20,
   cdStep: 0.85,
-  bomber: { radius: ROCKET.radius * 3, power: ROCKET.power * 2, fall: 1.4, range: 700 },
+  bomber: { radius: ROCKET.radius * 1.5, power: ROCKET.power * 1.5, fall: 1.4, range: 700 },
   berserker: { time: 3, mags: 3, guns: 3, weapon: 'lmg', damage: 22, pierce: 1 },
   booster: { time: 2, speed: 3 },
 };
@@ -416,9 +416,18 @@ export const ZOMBIES = {
 //   nv1 51 · nv2 89 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
 export const xpForLevel = (lvl: number) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
 
-// Dinero por cada zombi eliminado. El doble que el original (y doble xp en ZOMBIES): con las
-// oleadas de WAVES.count = 0,75 por ronda se gana 1,5 veces lo de las oleadas originales.
-export const BOUNTY = { normal: 2, sprinter: 6, swat: 20, fat: 10, heavy: 50, bull: 30, giant: 10, golden: 0 };
+// Dinero por cada zombi eliminado: la cuarta parte de lo que era (se ganaba demasiado rápido).
+// Hay fracciones: lo que sobra de cada baja se junta en Player.cash hasta completar un dólar.
+export const BOUNTY = {
+  normal: 0.5,
+  sprinter: 1.5,
+  swat: 5,
+  fat: 2.5,
+  heavy: 12.5,
+  bull: 7.5,
+  giant: 2.5,
+  golden: 0,
+};
 
 // Tamaño y ritmo de las oleadas: rondas cortas.
 // count: fracción de zombis por oleada (se aplica igual en solitario y en línea, ver NET.crowd)
@@ -461,7 +470,7 @@ export const WOUND = { bleed: 3, pace: 0.5 };
 export const MOLOTOV = { radius: 82, life: 6.5, burn: 4, dps: 24 };
 
 // Zombi dorado: recompensa al matarlo y cuánto vive antes de desaparecer.
-export const GOLDEN = { rewardMin: 100, rewardMax: 250, life: 26, warnAt: 7, firstAfter: 12, every: [35, 65] };
+export const GOLDEN = { rewardMin: 25, rewardMax: 63, life: 26, warnAt: 7, firstAfter: 12, every: [35, 65] };
 
 // Racha: bajas seguidas sin dejar pasar window s entre una y otra ni recibir un golpe de zombi.
 // tiers: [bajas, multiplicador] del dinero y la experiencia de cada baja · golden: bajas que suma

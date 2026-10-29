@@ -98,6 +98,7 @@ export class Player {
   declare hp: number;
   declare stamina: number;
   declare combo: Combo;
+  declare cash: number;
   declare exhausted: boolean;
   declare running: boolean;
   declare sinceRun: number;
@@ -179,6 +180,8 @@ export class Player {
     this.stamina = this.stats.maxStamina;
     // racha de bajas (ver combo.js)
     this.combo = newCombo();
+    // centavos de las recompensas que aún no suman un dólar (ver Rules.bountyNow)
+    this.cash = 0;
     this.exhausted = false;
     this.running = false;
     this.sinceRun = 10;

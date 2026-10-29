@@ -38,9 +38,16 @@ export const goldenReward = () => randInt(GOLDEN.rewardMin, GOLDEN.rewardMax);
 /** Recompensa por matar a un zombi de ese tipo. */
 export const bountyOf = (type: string) => (BOUNTY as Record<string, number>)[type] || 0;
 
-/** Lo que paga una baja de ese tipo ahora: la recompensa por la racha y por la ronda especial. */
-export const bountyNow = (game: GameHost, type: string, combo: number) =>
-  Math.round(bountyOf(type) * combo * (game.director.eventDef?.pay ?? 1));
+/**
+ * Lo que paga ahora a p una baja de ese tipo: la recompensa por la racha y por la ronda especial.
+ * Las recompensas tienen fracciones: se paga en dólares enteros y lo que sobra queda en p.cash.
+ */
+export function bountyNow(game: GameHost, p: Pick<Player, 'cash'>, type: string, combo: number) {
+  const v = (p.cash || 0) + bountyOf(type) * combo * (game.director.eventDef?.pay ?? 1);
+  const n = Math.floor(v + 1e-9);
+  p.cash = Math.max(0, v - n);
+  return n;
+}
 
 /** Dinero que cuesta un golpe de zombi: nunca más del que se tiene. */
 export const hitLoss = (money: number) => Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));

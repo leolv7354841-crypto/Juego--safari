@@ -9,7 +9,7 @@ const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="ro
 export const CLASSES = {
   bomber: {
     name: 'Bomber',
-    desc: 'Misil balístico: cae donde apuntas con el triple de radio y el doble de daño que la bazuca.',
+    desc: 'Misil balístico: cae donde apuntas con 1,5 veces el radio y el daño de la bazuca.',
     icon: `<svg viewBox="0 0 24 24" ${P}><path d="M12 2c2 2 3 5 3 8v6H9v-6c0-3 1-6 3-8z"/><path d="M9 13l-3 3v3l3-2M15 13l3 3v3l-3-2M10 19l2 3 2-3"/></svg>`,
   },
   berserker: {

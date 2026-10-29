@@ -84,11 +84,12 @@ test('las bajas dan dinero a quien disparó y los zombis heridos mandan su vida'
   assert.ok(a.kills > 0, 'mató zombis');
   // (los golpes que recibió le quitan dinero: se comprueba la recompensa de una baja suelta, sin racha)
   comboBreak(a.p.combo);
+  a.p.cash = 0;
   const m0 = a.money;
   const z = sim.horde.list.find((o: any) => o.type === 'normal' && !o.dead);
   z.lastOwner = 'a';
   sim.killZombie(z);
-  assert.equal(a.money, m0 + BOUNTY.normal, 'la baja le da dinero a quien disparó');
+  assert.equal(a.money + a.p.cash, m0 + BOUNTY.normal, 'la baja le da dinero a quien disparó');
   assert.equal(sim.snapshot('a', 0)!.st[7], a.money, 'el dinero va en la foto');
   // un gordo herido cerca: su vida en % va en zh para dibujar la barra
   const p = a.p;
@@ -109,7 +110,7 @@ test('cada jugador elige sus mejoras (también a mitad de oleada) y compra con s
   const a = sim.slots.get('a')!;
   const b = sim.slots.get('b')!;
   // una baja de Ana: experiencia para los dos, dinero sólo para ella
-  const z = sim.horde.spawn('normal', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
+  const z = sim.horde.spawn('swat', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
   z.lastOwner = 'a';
   sim.killZombie(z);
   assert.ok(a.money > 0, 'Ana cobra la baja');
@@ -497,10 +498,10 @@ test('la racha es de quien mata: multiplica su dinero, la corta un golpe y va en
   };
   const [n1, m1] = COMBO.tiers[0];
   for (let i = 0; i < n1 - 1; i++) kill();
-  assert.equal(a.money, BOUNTY.normal * (n1 - 1), 'sin multiplicador antes del primer nivel');
-  const m0 = a.money;
+  assert.equal(a.money + a.p.cash, BOUNTY.normal * (n1 - 1), 'sin multiplicador antes del primer nivel');
+  const m0 = a.money + a.p.cash;
   kill();
-  assert.equal(a.money, m0 + Math.round(BOUNTY.normal * m1), 'la baja que llega al nivel cobra ×' + m1);
+  assert.equal(a.money + a.p.cash, m0 + BOUNTY.normal * m1, 'la baja que llega al nivel cobra ×' + m1);
   assert.equal(b.p.combo.n, 0, 'la racha no es del equipo');
   assert.deepEqual(sim.snapshot('a', 0)!.cb, [n1, COMBO.window * 10]);
   sim.onZombieHit(a.p);
@@ -642,7 +643,8 @@ test('ronda especial en línea: va en la foto de todos y sus bajas pagan más', 
   for (const id of ['a', 'b']) assert.equal(sim.snapshot(id, 0)!.ev, EVENT_ORDER.indexOf('blood') + 1);
   const z = sim.horde.spawn('normal', a.p.x + 300, a.p.y, 1, 1) || sim.horde.list[sim.horde.list.length - 1];
   z.lastOwner = 'a';
+  a.p.cash = 0;
   const m0 = a.money;
   sim.killZombie(z);
-  assert.equal(a.money - m0, Math.round(BOUNTY.normal * EVENTS.types.blood.pay));
+  assert.equal(a.money + a.p.cash - m0, BOUNTY.normal * EVENTS.types.blood.pay);
 });

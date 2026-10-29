@@ -365,7 +365,7 @@ export class ServerSim {
       bounty: (zb: any) => {
         if (!by) return;
         by.kills++;
-        by.money += Rules.bountyNow(this.game, zb.type, mult);
+        by.money += Rules.bountyNow(this.game, by.p, zb.type, mult);
       },
       // recompensa única del zombi dorado para quien lo mató (como en solitario)
       golden: (_zb: any, reward: number) => {
