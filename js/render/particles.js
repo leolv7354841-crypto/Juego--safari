@@ -169,7 +169,17 @@ export class Particles {
       );
       const a = rand(0, TAU);
       const s = rand(90, 200) * k;
-      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.25, 0.5), rand(1.5, 2.6), pick(['#2a2722', '#3a352d']), 5);
+      this.add(
+        DOT,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.25, 0.5),
+        rand(1.5, 2.6),
+        pick(['#2a2722', '#3a352d']),
+        5,
+      );
     }
     for (let i = 0; i < 2; i++)
       this.add(
@@ -550,8 +560,7 @@ export class Particles {
   }
 
   update(dt) {
-    for (let i = this.lights.length - 1; i >= 0; i--)
-      if ((this.lights[i].t -= dt) <= 0) this.lights.splice(i, 1);
+    for (let i = this.lights.length - 1; i >= 0; i--) if ((this.lights[i].t -= dt) <= 0) this.lights.splice(i, 1);
     for (const q of this.p) {
       if (q.life <= 0) continue;
       if (q.delay > 0) {

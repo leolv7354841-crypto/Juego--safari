@@ -596,9 +596,24 @@ export interface HeavyUpDef {
   range?: number;
 }
 export const HEAVY_UP: Record<string, HeavyUpDef> = {
-  cal: { name: 'Calibre', desc: 'Balas más pesadas: más daño al pegar y al estallar.', price: [1000, 2500, 5000], dmg: [1, 1.2, 1.4, 1.6] },
-  rate: { name: 'Cadencia', desc: 'Alimentador más rápido: más balas por segundo.', price: [1000, 2500, 5000], rate: [9, 11, 13, 15] },
-  blast: { name: 'Carga explosiva', desc: 'Cada bala estalla en un radio más grande.', price: [1200, 3000, 6000], r: [60, 75, 90, 105] },
+  cal: {
+    name: 'Calibre',
+    desc: 'Balas más pesadas: más daño al pegar y al estallar.',
+    price: [1000, 2500, 5000],
+    dmg: [1, 1.2, 1.4, 1.6],
+  },
+  rate: {
+    name: 'Cadencia',
+    desc: 'Alimentador más rápido: más balas por segundo.',
+    price: [1000, 2500, 5000],
+    rate: [9, 11, 13, 15],
+  },
+  blast: {
+    name: 'Carga explosiva',
+    desc: 'Cada bala estalla en un radio más grande.',
+    price: [1200, 3000, 6000],
+    r: [60, 75, 90, 105],
+  },
   armor: {
     name: 'Blindaje',
     desc: 'Placas y sacos de arena: más vida, y se repara sola al acabar cada oleada.',
@@ -606,7 +621,13 @@ export const HEAVY_UP: Record<string, HeavyUpDef> = {
     hp: [4000, 6000, 8000, 10000],
     repair: [0, 0.15, 0.25, 0.35],
   },
-  auto: { name: 'Piloto automático', desc: 'Sin nadie a los mandos, dispara sola a los zombis con tus balas.', price: [6000], rate: [0, 0.5], range: 520 },
+  auto: {
+    name: 'Piloto automático',
+    desc: 'Sin nadie a los mandos, dispara sola a los zombis con tus balas.',
+    price: [6000],
+    rate: [0, 0.5],
+    range: 520,
+  },
 };
 export const HEAVY_UP_ORDER = ['cal', 'rate', 'blast', 'armor', 'auto'];
 

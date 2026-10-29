@@ -4,7 +4,17 @@ import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.ts';
 import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.ts';
-import { ABILITY, BOUNTY, COMBO, EVENT_ORDER, EVENTS, HEAVY, HEAVY_UP, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import {
+  ABILITY,
+  BOUNTY,
+  COMBO,
+  EVENT_ORDER,
+  EVENTS,
+  HEAVY,
+  HEAVY_UP,
+  PLAYER_BASE,
+  WEAPONS,
+} from '../../js/core/config.ts';
 import { heavyLevel } from '../../js/sim/heavy.ts';
 import { UPGRADES } from '../../js/sim/upgrades.ts';
 import { cooldownOf } from '../../js/sim/abilities.ts';
