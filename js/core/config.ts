@@ -570,10 +570,14 @@ export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 10000, repairPerH
 // microexplosión de cada bala (radio en px y daño en el centro; la granada es 140 y 330).
 export const HEAVY = { pack: 100, price: 200, turn: 4.5, shield: 0.5, reach: 60, blastR: 60, blastPower: 55 };
 
-// Clasificación mundial (Firebase Realtime Database, sin librerías: API REST).
-// Pega aquí la URL de tu base de datos, p. ej. 'https://mi-juego-default-rtdb.firebaseio.com'.
-// Vacía = sólo clasificación de este dispositivo (y la de Claude si se abre como Artifact).
-export const ONLINE = { url: 'https://dead-zone-73dcc-default-rtdb.firebaseio.com' };
+// Clasificación mundial y estadísticas de uso (Supabase, sin librerías: API REST; ver supabase/esquema.sql).
+// url: la del proyecto ('https://xxxx.supabase.co'); key: la clave publicable (sb_publishable_…), que es
+// pública por diseño: las tablas sólo se escriben a través de las funciones dz_* y sólo `scores` se lee.
+// Vacías = sólo clasificación de este dispositivo (y la de Claude si se abre como Artifact), sin estadísticas.
+export const ONLINE = {
+  url: 'https://pftrqgbronbiqzydylfd.supabase.co',
+  key: 'sb_publishable_pSzagBZQ-Qj7tgvCeojedA_Y0IEOuIV',
+};
 
 // Multijugador en línea con servidor autoritativo (carpeta server/).
 // server: dirección del servidor (wss://…). Vacía: en localhost se usa ws://<equipo>:2567.

@@ -46,6 +46,7 @@ export function start(game, freshWorld) {
   if (freshWorld) game.newWorld();
   game.resetRun();
   game.player.cls = game.classPick;
+  game.analitica.iniciar('solo');
   game.input.reset();
   game.input.setRun(false);
   game.setState('play');

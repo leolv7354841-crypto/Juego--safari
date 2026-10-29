@@ -14,12 +14,26 @@
       "source": "/deadzone",
       "destination": "/deadzone/",
       "permanent": false
+    },
+    {
+      "source": "/deadzone/stats",
+      "destination": "/deadzone/stats/",
+      "permanent": false
+    },
+    {
+      "source": "/stats",
+      "destination": "/stats/",
+      "permanent": false
     }
   ],
   "rewrites": [
     {
       "source": "/deadzone/",
       "destination": "/index.html"
+    },
+    {
+      "source": "/deadzone/stats/",
+      "destination": "/stats/index.html"
     },
     {
       "source": "/deadzone/:path+",
@@ -33,6 +47,19 @@
         {
           "key": "Cache-Control",
           "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/stats/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     },

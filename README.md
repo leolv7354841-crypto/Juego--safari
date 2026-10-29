@@ -47,8 +47,9 @@ Al entrar escribes un **nombre y un PIN de 4 números**: si la cuenta no existe 
 con su progreso. Cada cuenta tiene su propia partida guardada y su mejor marca (oleada más alta y bajas).
 El **Salón de la fama** del menú principal (podio con los 3 mejores) y la insignia **Top #N** junto a tu nombre muestran los récords de las cuentas de ese dispositivo. Abierto como Artifact
 de Claude, el progreso se copia también a la nube de tu cuenta de Claude y hay una clasificación global.
-Para la **clasificación mundial** (todos los celulares en la misma lista) crea una Realtime Database
-gratuita en Firebase y pega su URL en `ONLINE.url` de `js/core/config.ts` (ver «Clasificación mundial» abajo).
+Para la **clasificación mundial** (todos los celulares en la misma lista) crea un proyecto gratuito en
+Supabase y pega su URL y su clave publicable en `ONLINE` de `js/core/config.ts` (ver «Clasificación
+mundial y estadísticas» abajo).
 
 ### Progreso guardado
 
@@ -193,35 +194,41 @@ al proyecto `deadzone`, así que muestra siempre la última versión publicada:
 
 En el iPhone, abre la URL en Safari → Compartir → **Añadir a pantalla de inicio** para jugar a pantalla completa.
 
-## Clasificación mundial (Firebase)
+## Clasificación mundial y estadísticas (Supabase)
 
-1. En https://console.firebase.google.com crea un proyecto (gratis, sin Analytics).
-2. *Compilación → Realtime Database → Crear base de datos* (cualquier región).
-3. En la pestaña *Reglas* pega esto y publica:
+Un solo proyecto de Supabase guarda la clasificación mundial (`scores`) y las estadísticas de uso. No hace
+falta para jugar con amigos: las partidas de 2 a 4 pasan por el servidor en línea, que no toca la base.
 
-```json
-{
-  "rules": {
-    "scores": {
-      ".read": true,
-      "$uid": {
-        ".write": true,
-        ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('wave').isNumber() && newData.child('wave').val() <= 999 && newData.child('kills').isNumber()"
-      }
-    }
-  }
-}
+1. En https://supabase.com crea un proyecto (el plan gratuito basta; región `us-east-1`).
+2. En *SQL Editor* pega entero [`supabase/esquema.sql`](supabase/esquema.sql) y ejecútalo (se puede repetir:
+   crea tablas, políticas, vistas y funciones sólo si faltan).
+3. Elige la clave de la página de estadísticas y fíjala en el mismo editor (nunca va en el código):
+
+```sql
+select fijar_clave('tu clave');
 ```
 
-Firebase sólo guarda la clasificación mundial (`scores`). Ya **no hace falta** para jugar con amigos:
-el cooperativo directo (P2P, WebRTC) desapareció y las partidas de 2 a 4 pasan por el servidor en línea.
-Si tu base todavía tiene una regla `rooms` de antes, puedes borrarla.
+4. En *Project Settings → API* copia la **URL del proyecto** y la **clave publicable** (`sb_publishable_…`)
+   en `ONLINE` de `js/core/config.ts`. El juego usa la API REST, sin librería; la clave es pública por
+   diseño: las tablas sólo se escriben a través de las funciones `dz_*` y sólo `scores` se lee.
 
-4. Copia la URL de la base (`https://…firebaseio.com` o `…firebasedatabase.app`) en `ONLINE.url` de
-   `js/core/config.ts`. El juego usa la API REST: no hace falta ninguna librería ni clave.
+Cualquiera que tenga el juego puede subir su récord; es una clasificación para jugar entre amigos, no a
+prueba de trampas. Las pruebas de navegador (Playwright) no escriben en ella.
 
-Cualquiera que tenga el juego puede escribir en la lista; es una clasificación para jugar entre amigos,
-no a prueba de trampas.
+### Qué se mide y dónde se ve
+
+Todo es **anónimo**: un identificador aleatorio por navegador (sin nombre de cuenta, sin PIN, sin IP
+guardada por el juego), por eso no hay aviso de cookies. Se guarda una **sesión** por cada apertura del
+juego (inicio, último latido cada minuto, versión, táctil o no, por dónde entró) y una **partida** por cada
+run (modo, clase, oleada, duración, nivel, bajas por tipo, cómo acabó, causa de la muerte con la oleada y
+el arma en mano), más cada **mejora** elegida con las que se ofrecieron y cada **compra** con su oleada.
+No se manda nada desde `npm run dev`, desde Playwright ni si abres el juego una vez con `?sinstats`
+(queda recordado en ese navegador: sirve para excluir tus propios dispositivos).
+
+La página **`/stats/`** (en producción, `yeyo.games/deadzone/stats/`; no está enlazada desde el juego) pide
+la clave y muestra visitas por día, dispositivos que regresan, ronda promedio y distribución por clase,
+duración de sesiones y partidas, tasa de elección de cada mejora, compras y causas de muerte, por 7 días,
+30 días o todo. Las vistas `v_*` del esquema dan lo mismo en el panel de Supabase.
 
 ## Multijugador en línea (servidor, de 2 a 4 por sala y 8 salas)
 
@@ -229,7 +236,7 @@ El botón **En línea · 2 a 4** usa un servidor propio (carpeta `server/`). Cap
 jugadores por sala** (`MIN_PLAYERS`, `MAX_PLAYERS`) **y 8 salas a la vez** (`MAX_ROOMS`); con todas las
 salas ocupadas el juego avisa de que el servidor está lleno. **Cómo
 publicarlo en una máquina virtual y qué comprar: [`deploy/README.md`](deploy/README.md).** Todos se conectan a él por WebSocket, así que funciona en cualquier red
-(sin conexión directa entre celulares ni Firebase de por medio).
+(sin conexión directa entre celulares ni base de datos de por medio).
 
 **Cómo funciona.** El servidor (Node + TypeScript + [Colyseus](https://colyseus.io) 0.18) simula la
 partida completa a 60 pasos por segundo con los mismos módulos del juego (`js/sim/world.ts`,

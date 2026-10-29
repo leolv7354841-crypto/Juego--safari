@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dead Zone · Estadísticas</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0c0e0b">
+  <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Teko:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="../css/stats.css">
+  <script type="module" src="../js/stats/pagina.js"></script>
+</head>
+<body>
+  <header class="top">
+    <h1>Dead Zone <span>· Estadísticas</span></h1>
+    <nav class="periodo" id="periodo" aria-label="Periodo">
+      <button type="button" data-dias="7">7 días</button>
+      <button type="button" data-dias="30" class="on">30 días</button>
+      <button type="button" data-dias="0">Todo</button>
+    </nav>
+    <div class="acciones">
+      <button type="button" id="btn-refrescar" title="Volver a pedir los datos">Actualizar</button>
+      <button type="button" id="btn-salir" title="Olvidar la clave en este navegador">Salir</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <form id="clave-form" class="clave" hidden>
+      <h2>Clave de acceso</h2>
+      <p>Las estadísticas son privadas. Escribe la clave fijada en Supabase con <code>select fijar_clave('…')</code>.</p>
+      <label>Clave <input id="clave-in" type="password" autocomplete="current-password" required></label>
+      <button type="submit" class="primary">Entrar</button>
+      <p class="err" id="clave-err" hidden></p>
+    </form>
+
+    <p id="estado" class="estado" hidden></p>
+
+    <div id="panel" hidden>
+      <section class="tiles" id="tiles"></section>
+
+      <section class="bloque">
+        <h2>Visitas <small>Cada apertura del juego cuenta, aunque no se juegue</small></h2>
+        <div class="grafica" id="g-visitas"></div>
+        <p class="leyenda"><span><i></i>Visitas</span><span><i class="xp"></i>Dispositivos distintos</span></p>
+        <div class="dos">
+          <div><h3>Por dónde entran</h3><table id="t-origenes"></table></div>
+          <div><h3>Pantalla</h3><table id="t-tactil"></table></div>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <h2>¿Regresan? <small>Un dispositivo que vuelve otro día cuenta como que regresó</small></h2>
+        <div class="tiles chicos" id="t-retencion"></div>
+        <h3>Días distintos por dispositivo</h3>
+        <div class="grafica" id="g-dias"></div>
+      </section>
+
+      <section class="bloque">
+        <h2>Rondas <small>Sólo partidas terminadas (muerte, fin de sala o abandono)</small></h2>
+        <div class="grafica" id="g-rondas"></div>
+        <div class="dos">
+          <div><h3>Por clase</h3><table id="t-clases"></table></div>
+          <div><h3>Por modo</h3><table id="t-modos"></table></div>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <h2>Mejoras <small>Tasa = veces elegida entre veces ofrecida</small></h2>
+        <table id="t-mejoras"></table>
+      </section>
+
+      <section class="bloque">
+        <h2>Tienda <small>Qué se compra y en qué oleada</small></h2>
+        <table id="t-compras"></table>
+      </section>
+
+      <section class="bloque">
+        <h2>Muertes <small>Causa de la muerte y arma que llevaba</small></h2>
+        <div class="dos">
+          <div><h3>Causa</h3><table id="t-muertes"></table></div>
+          <div><h3>Arma en mano</h3><table id="t-armas"></table></div>
+        </div>
+        <h3>Cómo acaban las partidas</h3>
+        <table id="t-finales"></table>
+      </section>
+
+      <p class="pie" id="pie"></p>
+    </div>
+  </main>
+</body>
+</html>

@@ -31,6 +31,11 @@ export function chooseUpgrade(game, i) {
   if (game.state !== 'levelup' || performance.now() < game.levelReadyAt) return;
   const u = game.choices[i];
   if (!u) return;
+  game.analitica.eleccion(
+    game.level - game.pendingLevels + 1,
+    game.choices.map((c) => c.id),
+    u.id,
+  );
   if (game.mode.viaServer()) {
     // la siguiente tanda (si quedan niveles) llega con la próxima foto del servidor
     game.online.pickUpgrade(i);

@@ -3,6 +3,7 @@
 import { clamp, storage } from './core/util.ts';
 import * as Rules from './sim/rules.ts';
 import { comboBreak, comboKill, comboTick } from './sim/combo.ts';
+import { causaDe } from './analitica.js';
 
 export function hitZombie(game, z, b, hx, hy) {
   // cliente en línea: sus balas son de adorno, el daño real lo calcula el servidor
@@ -122,6 +123,7 @@ export function addXp(game, n) {
 }
 
 export function onPlayerDeath(game) {
+  game.analitica.muerte(causaDe(game.player));
   // la partida venía de una sala en línea (te fuiste): se pierde sólo esa
   if (!game.mode.savesProgress()) {
     recordScore(game);
@@ -145,6 +147,7 @@ export function onWaveCleared(game) {
   game.sfx.level();
   game.saveProgress();
   recordScore(game);
+  game.analitica.guardar(false);
 }
 
 // Mejor marca de la cuenta: oleada alcanzada y bajas.

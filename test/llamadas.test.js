@@ -52,6 +52,7 @@ const OBJETOS = {
   camera: ['js/render/camera.js', 'Camera'],
   lighting: ['js/render/lighting.js', 'Lighting'],
   accounts: ['js/ui/accounts.js', 'Accounts'],
+  analitica: ['js/analitica.js', 'Analitica'],
   music: ['js/ui/music.js', 'Music'],
   input: ['js/ui/input.js', 'Input'],
 };

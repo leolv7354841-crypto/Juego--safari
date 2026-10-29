@@ -20,7 +20,12 @@ export default defineConfig({
   // relativo: el juego se sirve en yeyo.games/deadzone/ y en la raíz del dominio de Vercel
   base: './',
   define: { __DZ_VERSION__: JSON.stringify(VERSION) },
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    // dos páginas: el juego y las estadísticas (dist/stats/index.html, en yeyo.games/deadzone/stats/)
+    rollupOptions: { input: { main: 'index.html', stats: 'stats/index.html' } },
+  },
   server: { port: 8080, strictPort: true },
   preview: { port: 4173, host: '127.0.0.1', strictPort: true },
   plugins: [

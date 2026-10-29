@@ -1,10 +1,11 @@
 // Cuentas de jugador y clasificación.
 // - Siempre: cuentas con nombre + PIN guardadas en este navegador, cada una con su
 //   propio progreso y su mejor marca; clasificación de las cuentas de este dispositivo.
+// - Con Supabase configurado (ONLINE en config.ts): clasificación mundial de todos los dispositivos.
 // - Abierto como Artifact de Claude con base de datos: el progreso se copia también a
 //   la nube de tu cuenta de Claude y los récords van a una clasificación global.
 import { storage } from '../core/util.ts';
-import { ONLINE } from '../core/config.ts';
+import { activo, explicar, rpc, select } from '../net/supabase.ts';
 
 const ACC_KEY = 'dz-accounts';
 const ACTIVE_KEY = 'dz-active';
@@ -42,20 +43,6 @@ function cleanRow(d, uid) {
     time: num(d.time, 1e6),
     level: num(d.level, 999),
   };
-}
-
-// Explica un error de Firebase en palabras simples (se muestra en el Salón de la fama).
-async function describe(r) {
-  let msg = '';
-  try {
-    msg = (await r.json()).error || '';
-  } catch {
-    /* sin cuerpo */
-  }
-  if (r.status === 401 || r.status === 403 || /permission/i.test(msg))
-    return 'Firebase no da permiso: revisa la pestaña Reglas de tu Realtime Database.';
-  if (r.status === 404) return 'No se encontró la base de datos de Firebase: revisa la URL.';
-  return `Error del servidor de la clasificación (${r.status}${msg ? ': ' + msg : ''}).`;
 }
 
 const keyOf = (name) =>
@@ -147,9 +134,9 @@ export class Accounts {
     return true;
   }
 
-  // ¿Hay clasificación compartida? (mundial por Firebase o la del Artifact de Claude)
+  // ¿Hay clasificación compartida? (mundial por Supabase o la del Artifact de Claude)
   get hasGlobal() {
-    return !!ONLINE.url || !!this.cloud;
+    return activo() || !!this.cloud;
   }
 
   // ¿Esta fila es de la cuenta activa?
@@ -159,10 +146,11 @@ export class Accounts {
     return row.uid ? row.uid === acc.uid : row.name === acc.name;
   }
 
-  /* ---------- clasificación mundial (Firebase) ---------- */
+  /* ---------- clasificación mundial (Supabase, tabla scores) ---------- */
 
   pushOnline(acc) {
-    if (!ONLINE.url || !acc || !acc.best) return Promise.resolve();
+    // las pruebas de navegador (Playwright) no ensucian la clasificación real
+    if (!activo() || !acc || !acc.best || navigator.webdriver) return Promise.resolve();
     // la lista se pide después de subir tu récord, para que salgas en ella
     this.pushing = this.sendOnline(acc);
     return this.pushing;
@@ -171,18 +159,17 @@ export class Accounts {
   async sendOnline(acc) {
     const b = acc.best;
     try {
-      const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores/${acc.uid}.json`, {
-        method: 'PUT',
-        body: JSON.stringify({
+      const r = await rpc('dz_record', {
+        r: {
+          uid: acc.uid,
           name: acc.name.slice(0, 16),
           wave: b.wave,
           kills: b.kills,
           time: b.time || 0,
           level: b.level || 1,
-          at: Date.now(),
-        }),
+        },
       });
-      this.onlineError = r.ok ? null : await describe(r);
+      this.onlineError = r.ok ? null : await explicar(r);
     } catch {
       /* sin conexión: se vuelve a intentar con el siguiente récord o al abrir el juego */
       this.onlineError = 'Sin conexión con el servidor de la clasificación.';
@@ -192,15 +179,13 @@ export class Accounts {
   async onlineBoard() {
     if (this.pushing) await this.pushing;
     try {
-      const r = await window.fetch(`${ONLINE.url.replace(/\/$/, '')}/scores.json`);
+      const r = await select('scores', 'select=uid,name,wave,kills,time,level&order=wave.desc,kills.desc&limit=50');
       if (!r.ok) {
-        this.onlineError = await describe(r);
+        this.onlineError = await explicar(r);
         return null;
       }
-      const all = (await r.json()) || {};
-      const rows = Object.entries(all)
-        .map(([uid, d]) => cleanRow(d, uid))
-        .filter(Boolean);
+      const all = await r.json();
+      const rows = (Array.isArray(all) ? all : []).map((d) => cleanRow(d, String(d.uid || ''))).filter(Boolean);
       // tu mejor marca siempre aparece, aunque todavía no haya llegado al servidor
       const acc = this.current;
       if (acc && acc.best && !rows.some((r) => r.uid === acc.uid))
@@ -304,8 +289,8 @@ export class Accounts {
   }
 
   async globalBoard() {
-    if (ONLINE.url) {
-      // si la página no puede llegar a Firebase (p. ej. dentro de Claude), usa la de Claude
+    if (activo()) {
+      // si la página no puede llegar a Supabase (p. ej. dentro de Claude), usa la de Claude
       const rows = await this.onlineBoard();
       if (rows || !this.cloud) return rows;
     }

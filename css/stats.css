@@ -1,0 +1,235 @@
+/* Dead Zone — página de estadísticas (/stats/). Misma paleta y tipografía que el juego. */
+:root {
+  --bg: #0c0e0b;
+  --ink: #e6e0d2;
+  --dim: #9c968a;
+  --panel: #15170f;
+  --line: rgba(230, 224, 210, 0.14);
+  --hp: #b5463a;
+  --st: #c7a24a;
+  --xp: #86a892;
+  --accent: #d9783a;
+  --accent-ink: #1a0f08;
+  --display: 'Teko', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --ui: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+button:hover { border-color: var(--ink); }
+button.on, button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+[hidden] { display: none !important; }
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: rgba(12, 14, 11, 0.92);
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+.top h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: 0.04em;
+  margin: 0;
+  line-height: 1;
+}
+.top h1 span { color: var(--dim); font-weight: 500; }
+.periodo, .acciones { display: flex; gap: 6px; }
+.acciones { margin-left: auto; }
+
+#main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+.clave {
+  max-width: 420px;
+  margin: 60px auto;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.clave h2 { margin: 0 0 8px; font-family: var(--display); font-size: 30px; font-weight: 600; }
+.clave p { color: var(--dim); margin: 0 0 16px; }
+.clave code { color: var(--ink); }
+.clave label { display: block; margin-bottom: 14px; font-weight: 600; text-transform: uppercase; font-size: 14px; letter-spacing: 0.06em; color: var(--dim); }
+.clave input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 20px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.clave .err { color: var(--hp); margin: 12px 0 0; }
+
+.estado { color: var(--dim); text-align: center; padding: 40px 0; }
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.tiles.chicos { margin-bottom: 16px; }
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.tile b {
+  display: block;
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+}
+.tile b small { font-size: 22px; color: var(--dim); margin-left: 2px; }
+.tile span { color: var(--dim); font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.bloque {
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.bloque h2 {
+  margin: 0 0 12px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+.bloque h2 small { display: block; font-family: var(--ui); font-size: 14px; font-weight: 500; color: var(--dim); letter-spacing: 0.02em; margin-top: 4px; }
+.bloque h3 { margin: 16px 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); font-weight: 600; }
+.dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
+
+/* barras verticales (visitas por día, rondas) */
+.grafica {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 160px;
+  padding-bottom: 22px;
+  position: relative;
+  overflow-x: auto;
+}
+.grafica .col {
+  flex: 1 0 14px;
+  min-width: 14px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+}
+.grafica .bar {
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s;
+}
+.grafica .bar.dim {
+  /* segunda serie (dispositivos): barra ancha detrás; la principal va encima, más angosta */
+  background: var(--xp);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.grafica .col.doble .bar:not(.dim) { width: 56%; margin: 0 auto; position: relative; }
+.leyenda { display: flex; gap: 16px; font-size: 13px; color: var(--dim); margin: 4px 0 0; }
+.leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--accent); }
+.leyenda i.xp { background: var(--xp); }
+.grafica .col i {
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.grafica .col b {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink);
+  font-weight: 600;
+  transform: translateY(-100%);
+}
+.grafica .col:hover .bar { filter: brightness(1.2); }
+.grafica .vacio { color: var(--dim); align-self: center; width: 100%; text-align: center; }
+
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); font-weight: 600; }
+td.n, th.n { text-align: right; }
+td.vacio { color: var(--dim); text-align: center; padding: 16px; }
+/* barra horizontal dentro de una celda */
+td .w {
+  display: block;
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+td .w i { display: block; height: 100%; background: var(--accent); width: var(--w, 0%); }
+td .w i.xp { background: var(--xp); }
+td .w i.hp { background: var(--hp); }
+td .w i.st { background: var(--st); }
+td small { color: var(--dim); }
+
+.pie { color: var(--dim); font-size: 14px; text-align: center; margin: 20px 0 40px; }
+
+@media (max-width: 600px) {
+  html, body { font-size: 16px; }
+  .top { padding: 12px 16px; gap: 10px 16px; }
+  .top h1 { font-size: 28px; }
+  #main { padding: 16px; }
+  .tile b { font-size: 32px; }
+}
