@@ -356,7 +356,7 @@ export class Online {
     this.forget();
     const r = this.room;
     this.room = null;
-    if (this.playing) this.stopPlay();
+    if (this.playing) this.stopPlay('abandono');
     r.leave(true).catch(() => {});
   }
 
@@ -425,7 +425,7 @@ export class Online {
   onResults(r: ResultsMsg) {
     const g = this.game;
     this.results = r;
-    if (this.playing) this.stopPlay();
+    if (this.playing) this.stopPlay('fin');
     g.newWorld();
     g.setupMenu();
     g.showOnline(true);
@@ -444,6 +444,7 @@ export class Online {
     const p = g.player;
     // la clase la confirma el servidor en cada foto (ab)
     p.cls = g.classPick;
+    g.analitica.iniciar('online');
     this.rec = null;
     this.predict?.dispose();
     this.predict = null;
@@ -466,9 +467,11 @@ export class Online {
     g.toast('¡En línea! Sobrevivan juntos');
   }
 
-  stopPlay() {
+  // `fin`: 'fin' si la sala terminó, 'abandono' si se salió o se cayó (para las estadísticas).
+  stopPlay(fin: 'fin' | 'abandono' = 'abandono') {
     const g = this.game;
     this.playing = false;
+    g.analitica.terminar(fin);
     g.mode = new Solo(g, true);
     g.remote.stop();
     this.up = null;
@@ -724,6 +727,8 @@ export class Online {
     if (p.alive && !alive) {
       g.camera.shake(0.6);
       g.input.reset();
+      // el servidor no manda la causa: sólo se distingue la quemadura de ácido
+      g.analitica.muerte(acid > 0 ? 'acid' : 'desconocida');
     }
     // al revivir aparece junto a un compañero: el salto lo absorbe el reconciliador (opción snap)
     p.hp = hp;

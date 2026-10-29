@@ -169,6 +169,7 @@ export function acidStep(game: GameHost, p: Player, h: AcidState, dt: number, on
   while (h.acidTick >= 1 && p.alive) {
     h.acidTick -= 1;
     // daño directo y fijo: 2 de vida por segundo
+    p.lastHit = 'acid';
     p.hp -= ACID.dps;
     p.damageTaken += ACID.dps;
     p.hurtT = 0.2;

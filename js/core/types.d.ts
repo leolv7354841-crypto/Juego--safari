@@ -185,6 +185,8 @@ export interface GameHost {
 declare global {
   interface Window {
     __deadzone?: unknown;
+    /** Página de estadísticas (js/stats/pagina.js): pintar datos a mano al depurar. */
+    __dzStats?: { pintar: (d: any) => void; cargar: () => Promise<void> };
     DZ_VERSION?: string;
     /** Safari antiguo: el contexto de audio con prefijo (js/ui/audio.js). */
     webkitAudioContext?: typeof AudioContext;

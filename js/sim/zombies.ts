@@ -515,6 +515,7 @@ export class Horde {
         if (z.atk <= 0) {
           z.atk = 1 / def.attackRate;
           z.lunge = 1;
+          p.lastHit = z.type;
           p.hurt(def.damage, game);
           game.onZombieHit(z, p);
           const push = def.punch || 40 * Math.sqrt(z.mass);
@@ -702,6 +703,7 @@ export class Horde {
       }
       if (z.bs === 'charge' && p.alive && d < z.r + p.r + 6) {
         // cornada: te lanza por los aires y te quita 40
+        p.lastHit = 'bull_charge';
         p.hurt(BULL.hit, game);
         game.onZombieHit(z, p);
         p.kx += z.cdx * BULL.throw;

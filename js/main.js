@@ -10,6 +10,7 @@ import { Solo } from './net/mode.ts';
 import { Remote } from './net/remote.ts';
 import { VERSION, hayVersionNueva } from './core/version.ts';
 import { Accounts } from './ui/accounts.js';
+import { Analitica } from './analitica.js';
 import { Structures } from './sim/build.ts';
 import { rand, storage, TAU } from './core/util.ts';
 import { World } from './sim/world.ts';
@@ -50,6 +51,8 @@ class Game {
     this.input.onModeChange = (m) => this.root.classList.toggle('touch', m === 'touch');
     this.root.classList.toggle('touch', this.input.mode === 'touch');
     this.accounts = new Accounts();
+    // estadísticas de uso anónimas (js/analitica.js); apagadas en desarrollo y en las pruebas
+    this.analitica = new Analitica(this);
     this.sfx = new Sfx();
     this.music = new Music(this.sfx);
     this.sfx.onReady = () => this.music.start();

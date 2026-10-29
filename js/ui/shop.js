@@ -152,6 +152,7 @@ export function buyWeapon(game, id) {
   const d = WEAPONS[id];
   const p = game.player;
   if (!d || !d.price || p.has(id) || game.money < d.price) return;
+  game.analitica.compra('arma', id, d.price);
   if (game.mode.viaServer()) return game.online.buy('gun', id);
   game.money -= d.price;
   p.unlock(id);
@@ -179,6 +180,7 @@ export function buyAmmo(game, id, n) {
   if (!w || w.reserve === Infinity) return;
   const cost = w.def.ammoPrice * n;
   if (game.money < cost) return;
+  game.analitica.compra('municion', id, cost, n);
   if (game.mode.viaServer()) return game.online.buy('ammo', id, n);
   game.money -= cost;
   w.reserve += p.magSize(w.def) * n;
@@ -246,6 +248,7 @@ export function drawShopIcon(game, c, k) {
 export function buy(game, k) {
   const it = SHOP[k];
   if (!it || game.money < it.price) return;
+  game.analitica.compra('objeto', k, it.price);
   if (game.mode.viaServer()) return game.online.buy('item', k);
   game.money -= it.price;
   game.inv[k]++;
@@ -257,6 +260,7 @@ export function buy(game, k) {
 export function buyHeavyAmmo(game, n) {
   const cost = HEAVY.price * n;
   if (game.money < cost) return;
+  game.analitica.compra('municion_pesada', 'heavy', cost, n);
   if (game.mode.viaServer()) return game.online.buy('heavy', 'ammo', n);
   game.money -= cost;
   game.player.heavyAmmo += HEAVY.pack * n;
@@ -267,6 +271,7 @@ export function buyHeavyAmmo(game, n) {
 export function buyRobot(game) {
   const rb = game.robot;
   if (rb.owned || game.money < ROBOT.price) return;
+  game.analitica.compra('robot', 'robot', ROBOT.price);
   if (game.mode.viaServer()) return game.online.buy('robot', 'buy');
   game.money -= ROBOT.price;
   rb.deploy(game.player, game.world);
@@ -279,6 +284,7 @@ export function repairRobot(game) {
   const rb = game.robot;
   const cost = rb.repairCost;
   if (!rb.owned || cost <= 0 || game.money < cost) return;
+  game.analitica.compra('reparacion', 'robot', cost);
   if (game.mode.viaServer()) return game.online.buy('robot', 'repair');
   game.money -= cost;
   rb.hp = ROBOT.hp;

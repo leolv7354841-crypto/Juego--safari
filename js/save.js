@@ -67,6 +67,8 @@ export function saveProgress(game) {
     blocks: s.blocks.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
     wires: s.wires.map((b) => ({ kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp })),
     robot: { ...game.robot.serialize(), piloted: game.robot.piloted },
+    // la misma partida sigue en las estadísticas al continuarla
+    partida: game.analitica.partida ? game.analitica.partida.id : null,
   };
   storage.set(game.accounts.saveKey(), data);
   if (ds === 'waiting') storage.set(game.accounts.checkKey(), data);
@@ -119,6 +121,7 @@ export function loadProgress(game, kind = 'save') {
   p.cls = isClass(sp.cls) ? sp.cls : game.classPick;
   p.abCd = Math.max(0, Number(sp.abCd) || 0);
   p.heavyAmmo = Math.max(0, Number(sp.heavyAmmo) || 0);
+  game.analitica.iniciar('solo', typeof d.partida === 'string' ? d.partida : null);
   for (const b of d.blocks) {
     if (!SHOP[b.kind]) continue;
     const o = {

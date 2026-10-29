@@ -115,6 +115,8 @@ export class Player {
   declare shotsFired: number;
   declare shotsHit: number;
   declare damageTaken: number;
+  /** Qué fue lo último que le pegó (tipo de zombi, 'bull_charge' o 'acid'): la causa si muere. */
+  declare lastHit?: string;
   declare cls: string | null;
   declare abCd: number;
   declare boostT: number;
