@@ -502,7 +502,7 @@ export interface EventDef {
 }
 export const EVENTS: { from: number; chance: number; gap: number; types: Record<string, EventDef> } = {
   from: 2,
-  chance: 0.35,
+  chance: 0.65,
   gap: 2,
   types: {
     fog: {

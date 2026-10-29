@@ -115,7 +115,7 @@ test('rondas especiales: nunca en la oleada 1 ni dos seguidas, ni el mismo tipo 
   for (let w = 2; w <= 2001; w++) all.push(r.rollEvent(w));
   assert.deepEqual(new Set(all.filter(Boolean)), new Set(EVENT_ORDER), 'salen todos los tipos');
   const share = all.filter(Boolean).length / all.length;
-  assert.ok(share > 0.2 && share < 0.32, `una de cada 4 oleadas, más o menos (${share})`);
+  assert.ok(share > 0.33 && share < 0.45, `dos de cada 5 oleadas, más o menos (${share})`);
   // sin suerte no hay ronda especial
   const e = new Director();
   for (let w = 1; w <= 10; w++) azar(0.99, () => e.startWave(fakeGame()));

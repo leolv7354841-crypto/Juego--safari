@@ -28,7 +28,7 @@ seguidas cada zombi da **×1,5** de dinero y experiencia, con 25 **×2**, con 50
 golpe de zombi (fuera del robot) o caer la corta. La mejor racha de la partida sale en el resumen final.
 La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
 
-**Rondas especiales:** desde la oleada 2, cada oleada tiene un 35 % de probabilidad de ser especial (nunca
+**Rondas especiales:** desde la oleada 2, cada oleada tiene un 65 % de probabilidad de ser especial (nunca
 dos seguidas). Se anuncian en el cartel y su nombre sale en el contador de oleada, y todas sus bajas pagan
 ×1,5 (la luna de sangre, ×2):
 
