@@ -1,7 +1,7 @@
 // Estadísticas de uso: cuántos entran, cuánto se quedan, si vuelven, qué eligen y de qué mueren.
 // Todo anónimo: un identificador aleatorio por navegador (sin nombre de cuenta ni PIN), una sesión por
 // apertura del juego y una partida por run; mejoras y compras se anotan en el momento. Se escribe en
-// Supabase a través de las funciones dz_* (supabase/esquema.sql) y se lee en /stats/.
+// Supabase a través de las funciones dz_* (supabase/esquema.sql) y se lee en /stats (stats.html).
 // No se manda nada en desarrollo (localhost o VERSION 'dev'), desde Playwright ni si se abrió el juego con ?sinstats.
 import { VERSION } from './core/version.ts';
 import { storage } from './core/util.ts';

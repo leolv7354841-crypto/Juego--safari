@@ -23,8 +23,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    // dos páginas: el juego y las estadísticas (dist/stats/index.html, en yeyo.games/deadzone/stats/)
-    rollupOptions: { input: { main: 'index.html', stats: 'stats/index.html' } },
+    // dos páginas: el juego y las estadísticas (dist/stats.html, servida en yeyo.games/deadzone/stats)
+    rollupOptions: { input: { main: 'index.html', stats: 'stats.html' } },
   },
   server: { port: 8080, strictPort: true },
   preview: { port: 4173, host: '127.0.0.1', strictPort: true },

@@ -225,7 +225,7 @@ el arma en mano), más cada **mejora** elegida con las que se ofrecieron y cada 
 No se manda nada desde `npm run dev`, desde Playwright ni si abres el juego una vez con `?sinstats`
 (queda recordado en ese navegador: sirve para excluir tus propios dispositivos).
 
-La página **`/stats/`** (en producción, `yeyo.games/deadzone/stats/`; no está enlazada desde el juego) pide
+La página **`/stats`** (en producción, `yeyo.games/deadzone/stats`, sin barra final porque el hub no la pasa; no está enlazada desde el juego) pide
 la clave y muestra visitas por día, dispositivos que regresan, ronda promedio y distribución por clase,
 duración de sesiones y partidas, tasa de elección de cada mejora, compras y causas de muerte, por 7 días,
 30 días o todo. Las vistas `v_*` del esquema dan lo mismo en el panel de Supabase.

@@ -16,13 +16,13 @@
       "permanent": false
     },
     {
-      "source": "/deadzone/stats",
-      "destination": "/deadzone/stats/",
+      "source": "/deadzone/stats/",
+      "destination": "/deadzone/stats",
       "permanent": false
     },
     {
-      "source": "/stats",
-      "destination": "/stats/",
+      "source": "/stats/",
+      "destination": "/stats",
       "permanent": false
     }
   ],
@@ -32,8 +32,12 @@
       "destination": "/index.html"
     },
     {
-      "source": "/deadzone/stats/",
-      "destination": "/stats/index.html"
+      "source": "/deadzone/stats",
+      "destination": "/stats.html"
+    },
+    {
+      "source": "/stats",
+      "destination": "/stats.html"
     },
     {
       "source": "/deadzone/:path+",
@@ -51,7 +55,7 @@
       ]
     },
     {
-      "source": "/stats/(.*)",
+      "source": "/stats.html",
       "headers": [
         {
           "key": "Cache-Control",
