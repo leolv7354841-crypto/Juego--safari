@@ -14,7 +14,7 @@ import { Structures } from '../../../js/sim/build.ts';
 import { Robot } from '../../../js/sim/robot.ts';
 import { applyMove, TICK } from '../../../js/net/netcode.ts';
 import { ServerMode } from '../../../js/net/mode.ts';
-import { encodeWorld } from '../../../js/net/snapshot.ts';
+import { encodeStatic, encodeWorld } from '../../../js/net/snapshot.ts';
 import { IN_RELOAD, IN_FIRE, IN_RUN, PARTICLE_SKIP, SFX_SYNC, DECAL_SYNC } from '../../../js/net/protocol.ts';
 import {
   GOLDEN,
@@ -33,6 +33,7 @@ import {
 import { rollUpgrades, UPGRADES } from '../../../js/sim/upgrades.ts';
 import { Abilities, isClass } from '../../../js/sim/abilities.ts';
 import * as Rules from '../../../js/sim/rules.ts';
+import { heavyAuto, heavyPrice, upgradeHeavy } from '../../../js/sim/heavy.ts';
 import { comboBreak, comboKill, comboTick, packCombo } from '../../../js/sim/combo.ts';
 import { TAU } from '../../../js/core/util.ts';
 import type { Cmd, Act } from '../validate.ts';
@@ -261,7 +262,9 @@ export class ServerSim {
       applyAcid: (p: any) => this.applyAcid(p),
       rocketHit: (z: any, x: number, y: number, b: any) => Rules.rocketHit(g, z, x, y, b),
       rocketBlast: (x: number, y: number, owner: string | null = null) => Rules.rocketBlast(g, x, y, owner),
-      heavyBlast: (x: number, y: number, owner: string | null = null) => Rules.heavyBlast(g, x, y, owner),
+      heavyBlast: (x: number, y: number, owner: string | null = null, R?: number, power?: number) =>
+        Rules.heavyBlast(g, x, y, owner, R, power),
+      ownerOf: (id: string | null) => (id ? (this.slots.get(id)?.p ?? null) : null),
       updateHud: noop,
       onSuperPunch: (_z: any, x: number, y: number) => Rules.superPunch(g, x, y),
       onGiantStep: (z: any) => {
@@ -414,7 +417,10 @@ export class ServerSim {
   // Compra o venta en la tienda: sólo entre oleadas y con el dinero que lleva el servidor.
   shop(id: string, k: string, wid: string, n: number) {
     const s = this.slots.get(id);
-    if (!s || !s.p.alive || this.director.state !== 'waiting') return false;
+    if (!s || !s.p.alive) return false;
+    // las mejoras de la torreta pesada se compran junto a ella, también a mitad de oleada
+    if (k === 'tup') return this.buyHeavyUp(s, wid);
+    if (this.director.state !== 'waiting') return false;
     if (k === 'item') return this.buyItem(s, wid);
     if (k === 'robot') return this.buyRobot(s, wid);
     if (k === 'heavy') return this.buyHeavyAmmo(s, n);
@@ -457,6 +463,18 @@ export class ServerSim {
     if ((n !== 1 && n !== 5) || s.money < cost) return false;
     s.money -= cost;
     s.p.heavyAmmo += HEAVY.pack * n;
+    return true;
+  }
+
+  // Mejora de la torreta pesada que maneja o que tiene al lado (la paga quien la compra).
+  buyHeavyUp(s: Slot, up: string) {
+    const b = this.structures.heavyFor(s.p);
+    if (!b) return false;
+    const price = heavyPrice(b, up);
+    if (!price || s.money < price) return false;
+    s.money -= price;
+    upgradeHeavy(b, up);
+    this.game.sfx.build();
     return true;
   }
 
@@ -627,6 +645,7 @@ export class ServerSim {
   }
 
   onWaveCleared() {
+    this.structures.waveRepair();
     // al terminar la oleada revive quien haya caído, junto a un compañero vivo
     const alive = [...this.slots.values()].filter((s) => s.p.alive && !s.away);
     for (const s of this.slots.values()) {
@@ -795,7 +814,8 @@ export class ServerSim {
         players: [...this.slots.values()].filter((q) => q !== s).map((q) => ({ idx: q.idx, p: q.p, away: q.away })),
         robots: [...this.slots.values()].map((q) => ({ idx: q.idx, r: q.robot })),
         // lo que disparó él ya lo vio en su pantalla; las torretas se repiten como efecto
-        skipBullet: (b: any) => b.owner === id || !!b.turret,
+        // las del piloto automático de su torreta no las predijo: también le llegan
+        skipBullet: (b: any) => (b.owner === id && !b.auto) || !!b.turret,
       },
     );
     const st = this.structures;
@@ -835,10 +855,13 @@ export class ServerSim {
       ec: [s.level, Math.round(s.xp), s.xpNeed, s.pending],
       ps: STAT_KEYS.map((k) => Math.round(me.stats[k] * 1000) / 1000),
       iv: SHOP_ORDER.map((k: string) => s.inv[k]),
-      // torretas pesadas que manejan los demás: dónde, ángulo del cañón, quién y cañón que disparó
+      // torretas pesadas que manejan los demás o que disparan solas (piloto automático, quien 0):
+      // dónde, ángulo del cañón, quién y cañón que disparó
       hv: st.blocks.flatMap((b: any) => {
-        const q = b.kind === 'heavy' && b.manned && b.manned !== me && near(b.x, b.y) ? this.slotOf(b.manned) : null;
-        return q ? [b.x, b.y, r100(b.ang), q.idx, b.flash > 0 ? b.side : 0] : [];
+        if (b.kind !== 'heavy' || !near(b.x, b.y)) return [];
+        const q = b.manned && b.manned !== me ? this.slotOf(b.manned) : null;
+        if (!q && (b.manned || !heavyAuto(b))) return [];
+        return [b.x, b.y, r100(b.ang), q ? q.idx : 0, b.flash > 0 ? b.side : 0];
       }),
       // habilidad propia: clase, espera (décimas) y megarráfaga en curso
       ab: [CLASS_ORDER.indexOf(me.cls), Math.ceil((me.abCd || 0) * 10), r100(me.rageT || 0)],
@@ -874,7 +897,7 @@ export class ServerSim {
     const full =
       geo +
       '|' +
-      st.blocks.map((b: any) => Math.round(b.hp)).join() +
+      st.blocks.map((b: any) => `${Math.round(b.hp)}${b.up ? `+${b.up}` : ''}`).join() +
       '|' +
       st.wires.map((w: any) => Math.round(w.hp)).join();
     s.stN++;
@@ -882,9 +905,7 @@ export class ServerSim {
     s.stGeo = geo;
     s.stSent = full;
     s.stN = 0;
-    snap.blk = st.blocks.map((b: any) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]);
-    snap.wir = st.wires.map((w: any) => [w.kind, w.x, w.y, w.w, w.h, Math.round(w.hp)]);
-    snap.sc = st.scorches.map((c: any) => [Math.round(c.x), Math.round(c.y), r100(c.a), Math.round(c.t), c.life]);
+    Object.assign(snap, encodeStatic(st));
   }
 
   // Después de mandar las fotos de esta ronda, los efectos ya enviados se olvidan.

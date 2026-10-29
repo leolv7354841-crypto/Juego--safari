@@ -96,6 +96,9 @@
         </button>
         <button class="tbtn small ability gone" id="btn-ab-touch" aria-label="Usar habilidad"></button>
         <button class="tbtn small robot gone" id="btn-robot" aria-label="Subir o bajar del robot">Robot</button>
+        <button class="tbtn small gone" id="btn-tup" aria-label="Mejorar la torreta pesada">
+          <svg viewBox="0 0 24 24"><path d="M14.5 5.5a4 4 0 0 0-5 5L4 16l4 4 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2.5-.5-.5-2.5z"/></svg>
+        </button>
         <button class="tbtn small off" id="btn-build" aria-label="Construir">
           <svg viewBox="0 0 24 24"><rect x="3" y="12" width="8" height="8"/><rect x="13" y="12" width="8" height="8"/><rect x="8" y="4" width="8" height="8"/></svg>
           <span class="badge" id="build-count">0</span>
@@ -237,7 +240,8 @@
               <dt><kbd>V</kbd></dt><dd>Cambiar estructura</dd>
               <dt><kbd>G</kbd></dt><dd>Lanzar granada</dd>
               <dt><kbd>T</kbd></dt><dd>Lanzar molotov</dd>
-              <dt><kbd>E</kbd></dt><dd>Subir / bajar del robot</dd>
+              <dt><kbd>E</kbd></dt><dd>Subir / bajar del robot o de la torreta pesada</dd>
+              <dt><kbd>M</kbd></dt><dd>Mejorar la torreta pesada (junto a ella)</dd>
               <dt><kbd>X</kbd></dt><dd>Habilidad de tu clase (misil, megarráfaga o impulso)</dd>
               <dt><kbd>U</kbd></dt><dd>Elegir mejora a mitad de oleada (en línea)</dd>
               <dt><kbd>Enter</kbd></dt><dd>Iniciar siguiente ronda</dd>
@@ -254,6 +258,7 @@
               <dt>Granada</dt><dd>Lanzar granada</dd>
               <dt>Botella</dt><dd>Lanzar molotov</dd>
               <dt>Robot</dt><dd>Subir / bajar del robot</dd>
+              <dt>Llave</dt><dd>Mejorar la torreta pesada (junto a ella)</dd>
             </dl>
           </div>
         </div>
@@ -337,6 +342,23 @@
         <p class="shop-note"><span id="shop-bounty"></span> Las barricadas se colocan delante de ti y las balas pasan por encima.</p>
         <div class="shop-items" id="shop-items"></div>
         <button class="btn primary" id="btn-shop-done">Continuar</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-turret" hidden>
+      <div class="panel wide shop tup">
+        <p class="kicker" id="tup-kicker">Taller</p>
+        <div class="shop-head">
+          <h2>Torreta pesada</h2>
+          <div class="shop-money" id="tup-money">$0</div>
+        </div>
+        <div class="tup-top">
+          <canvas class="tup-view" id="tup-view" width="300" height="300" aria-label="Vista de la torreta"></canvas>
+          <dl class="tup-stats" id="tup-stats"></dl>
+        </div>
+        <div class="tup-list" id="tup-list"></div>
+        <p class="shop-note" id="tup-note"></p>
+        <button class="btn primary" id="btn-tup-done">Volver</button>
       </div>
     </section>
 

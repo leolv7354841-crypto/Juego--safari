@@ -14,6 +14,7 @@ import {
 } from '../core/config.ts';
 import { clamp, rand, angleTo } from '../core/util.ts';
 import { newCombo } from './combo.ts';
+import { fireHeavy, heavyRate } from './heavy.ts';
 import type { GameHost, Vec, Weapon, Zombie } from '../core/types.d.ts';
 import type { Block } from './build.ts';
 import type { Combo } from './combo.ts';
@@ -485,43 +486,18 @@ export class Player {
       return;
     }
     this.heavyAmmo--;
-    this.fireCd = 1 / (d.rate * this.stats.rateMult);
-    // los dos cañones disparan alternados
-    b.side = b.side === 1 ? -1 : 1;
-    const ca = Math.cos(b.ang);
-    const sa = Math.sin(b.ang);
-    const sx = cx + ca * 40 - sa * b.side * 7;
-    const sy = cy + sa * 40 + ca * b.side * 7;
-    const a = b.ang + rand(-1, 1) * (d.spread + this.bloom);
-    game.bullets.spawn({
-      x: sx,
-      y: sy,
-      dx: Math.cos(a),
-      dy: Math.sin(a),
-      speed: d.speed * rand(0.97, 1.03),
-      life: d.range,
-      dmg: d.damage * this.stats.dmgMult,
-      pierce: d.pierce,
-      knock: d.knock,
-      shot: { hit: false },
-      hits: null,
-      rocket: false,
-      blast: !!d.blast,
-    });
+    // la cadencia, el daño y la explosión dependen de las mejoras de la torreta (ver heavy.ts)
+    this.fireCd = 1 / (heavyRate(b) * this.stats.rateMult);
+    const m = fireHeavy(game, b, this.stats.dmgMult, this.bloom);
     this.shotsFired++;
     this.bloom = Math.min(0.12, this.bloom + d.bloom);
-    b.recoil = 1;
-    b.flash = 0.05;
     if (this === game.player) {
       game.camera.shake(d.shake);
-      game.camera.kick(-ca * d.shake * 22, -sa * d.shake * 22);
+      game.camera.kick(-Math.cos(b.ang) * d.shake * 22, -Math.sin(b.ang) * d.shake * 22);
     }
     game.muzzle = 1;
-    game.muzzleX = sx;
-    game.muzzleY = sy;
-    game.particles.casing(cx - sa * b.side * 12, cy + ca * b.side * 12, b.ang + (Math.PI / 2) * b.side);
-    game.particles.muzzleSmoke(sx, sy, b.ang);
-    game.sfx.shot('heavy');
+    game.muzzleX = m.x;
+    game.muzzleY = m.y;
   }
 
   tryFire(game: GameHost) {

@@ -3,6 +3,7 @@ import { ABILITY } from '../core/config.ts';
 import { TAU, roundRect } from '../core/util.ts';
 import { OUT, flameSprite } from './sprites.js';
 import { drawRocket } from './bullets.js';
+import { heavyLevel, heavyLevels } from '../sim/heavy.ts';
 
 // Mira roja en el suelo que se cierra y el misil cayendo en picada sobre ella.
 export function drawMissiles(ctx, st, time) {
@@ -238,18 +239,22 @@ export function drawBars(ctx, st, v) {
 }
 
 // Torreta pesada (inspirada en la torreta de Gears of War 4): trípode y cañón doble blindado.
+// Las mejoras se ven: sacos de arena y placas (blindaje), cañones más gruesos (calibre), aletas
+// de cobre (cadencia), cajas de munición rojas (carga explosiva) y un sensor con láser (piloto).
 function drawHeavy(ctx, b) {
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
+  const armor = heavyLevel(b, 'armor');
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.beginPath();
-  ctx.ellipse(cx + 4, cy + 6, 24, 20, 0, 0, TAU);
+  ctx.ellipse(cx + 4, cy + 6, 24 + armor * 3, 20 + armor * 3, 0, 0, TAU);
   ctx.fill();
+  if (armor) drawSandbags(ctx, cx, cy, armor);
   // patas del trípode
   ctx.lineCap = 'round';
   for (const [lw, col] of [
     [7, OUT],
-    [4, '#4a5056'],
+    [4, armor >= 2 ? '#5d646b' : '#4a5056'],
   ]) {
     ctx.lineWidth = lw;
     ctx.strokeStyle = col;
@@ -263,9 +268,10 @@ function drawHeavy(ctx, b) {
   }
   ctx.lineCap = 'butt';
   ctx.fillStyle = '#2a2e32';
+  const foot = 7 + (armor >= 3 ? 3 : 0);
   for (let k = 0; k < 3; k++) {
     const a = (k * TAU) / 3 - Math.PI / 2;
-    ctx.fillRect(cx + Math.cos(a) * 21 - 3.5, cy + Math.sin(a) * 21 - 3.5, 7, 7);
+    ctx.fillRect(cx + Math.cos(a) * 21 - foot / 2, cy + Math.sin(a) * 21 - foot / 2, foot, foot);
   }
   // anillo de giro
   ctx.fillStyle = b.hitT > 0 ? '#8a9096' : '#3a3f44';
@@ -275,42 +281,94 @@ function drawHeavy(ctx, b) {
   ctx.lineWidth = 2;
   ctx.strokeStyle = OUT;
   ctx.stroke();
-  drawHeavyGun(ctx, b);
+  if (!b.manned) drawHeavyGun(ctx, b);
 }
 
+// Parapeto de sacos de arena alrededor del trípode: más sacos con cada nivel de blindaje.
+function drawSandbags(ctx, cx, cy, lv) {
+  const n = [0, 5, 8, 11][lv];
+  const R = 29;
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < n; i++) {
+    // empiezan detrás y rodean hacia delante (la boca del cañón queda libre en el nivel 3)
+    const a = Math.PI + ((i - (n - 1) / 2) * TAU) / 13;
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    ctx.rotate(a + Math.PI / 2);
+    ctx.fillStyle = i % 2 ? '#8b7a52' : '#7a6a46';
+    roundRect(ctx, -7.5, -4.5, 15, 9, 4);
+    ctx.fill();
+    ctx.strokeStyle = OUT;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(40,30,15,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(-3, -3.5);
+    ctx.lineTo(-3, 3.5);
+    ctx.moveTo(3, -3.5);
+    ctx.lineTo(3, 3.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+const FIN = ['#4c5258', '#6e5a44', '#8d6236', '#b0702a'];
+const STRIPE = ['#c9a54a', '#d98a3a', '#d9603a', '#e8402c'];
+
 function drawHeavyGun(ctx, b) {
+  const lv = heavyLevels(b);
+  const now = performance.now() / 1000;
   ctx.save();
   ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
   ctx.rotate(b.ang || 0);
   ctx.strokeStyle = OUT;
-  // dos cañones con camisa de aletas y freno de boca; retrocede el que acaba de disparar
+  // láser del piloto automático: sólo cuando nadie la maneja
+  if (lv.auto && !b.manned) {
+    const gr = ctx.createLinearGradient(44, 0, 190, 0);
+    gr.addColorStop(0, 'rgba(255,70,50,0.55)');
+    gr.addColorStop(1, 'rgba(255,70,50,0)');
+    ctx.strokeStyle = gr;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(44, 0);
+    ctx.lineTo(190, 0);
+    ctx.stroke();
+    ctx.strokeStyle = OUT;
+  }
+  // dos cañones con camisa de aletas y freno de boca; retrocede el que acaba de disparar.
+  // El calibre los hace más largos y gruesos; la cadencia, más aletas y de cobre.
+  const len = 32 + lv.cal * 3;
+  const th = 5.2 + lv.cal * 0.9;
+  const fins = 4 + lv.rate;
+  const brake = 7 + lv.cal * 1.2;
   for (const s of [-1, 1]) {
     const k = b.side === s ? (b.recoil || 0) * 4 : 0;
     const y = s * 7;
     ctx.lineWidth = 1.2;
     ctx.fillStyle = '#25282b';
-    ctx.fillRect(6 - k, y - 2.6, 32, 5.2);
-    ctx.strokeRect(6 - k, y - 2.6, 32, 5.2);
-    ctx.fillStyle = '#4c5258';
-    for (let i = 0; i < 4; i++) ctx.fillRect(14 + i * 4.5 - k, y - 3.6, 2.2, 7.2);
+    ctx.fillRect(6 - k, y - th / 2, len, th);
+    ctx.strokeRect(6 - k, y - th / 2, len, th);
+    ctx.fillStyle = FIN[lv.rate];
+    const gap = Math.min(4.5, 18 / fins);
+    for (let i = 0; i < fins; i++) ctx.fillRect(14 + i * gap - k, y - th / 2 - 1, 2.2, th + 2);
     ctx.fillStyle = '#3b4045';
-    ctx.fillRect(36 - k, y - 3.8, 7, 7.6);
-    ctx.strokeRect(36 - k, y - 3.8, 7, 7.6);
+    const bx = 4 + len - k;
+    ctx.fillRect(bx, y - brake / 2, 7, brake);
+    ctx.strokeRect(bx, y - brake / 2, 7, brake);
     ctx.fillStyle = '#0e0f10';
-    ctx.fillRect(41.5 - k, y - 1.2, 1.5, 2.4);
+    ctx.fillRect(bx + 5.5, y - 1.2, 1.5, 2.4);
     if (b.flash > 0 && b.side === s) {
       ctx.fillStyle = 'rgba(255,214,140,0.95)';
       ctx.beginPath();
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * TAU;
         const d = i % 2 ? 3 : 9 + Math.random() * 6;
-        ctx.lineTo(46 + Math.cos(a) * d * 1.4, y + Math.sin(a) * d * 0.7);
+        ctx.lineTo(bx + 10 + Math.cos(a) * d * 1.4, y + Math.sin(a) * d * 0.7);
       }
       ctx.closePath();
       ctx.fill();
     }
   }
-  // cajas blindadas de cada cañón, con franja amarilla y remaches
+  // cajas blindadas de cada cañón, con franja (más roja con la carga explosiva) y remaches
   ctx.lineWidth = 1.6;
   for (const s of [-1, 1]) {
     const y = s < 0 ? -14 : 2;
@@ -318,36 +376,63 @@ function drawHeavyGun(ctx, b) {
     ctx.fillStyle = b.hitT > 0 ? '#b8bec4' : '#7b838a';
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#c9a54a';
+    ctx.fillStyle = STRIPE[lv.blast];
     ctx.fillRect(-10, s < 0 ? y + 1.5 : y + 8.5, 17, 2);
+    if (lv.blast) {
+      // munición explosiva: rombo de peligro que brilla en el nivel máximo
+      const gx = -1;
+      const gy = y + 6;
+      if (lv.blast >= 3) {
+        ctx.fillStyle = `rgba(255,90,50,${0.25 + 0.2 * Math.sin(now * 6)})`;
+        ctx.beginPath();
+        ctx.arc(gx, gy, 5, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = STRIPE[lv.blast];
+      ctx.beginPath();
+      ctx.moveTo(gx, gy - 3);
+      ctx.lineTo(gx + 3, gy);
+      ctx.lineTo(gx, gy + 3);
+      ctx.lineTo(gx - 3, gy);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.fillStyle = '#3a3f44';
     ctx.fillRect(-10, y + 5, 2, 2);
     ctx.fillRect(5, y + 5, 2, 2);
   }
-  // escudo frontal en ángulo
+  // escudo frontal en ángulo: más ancho y con alas con el blindaje
+  const w = 19 + lv.armor * 2.5;
   ctx.beginPath();
-  ctx.moveTo(8, -19);
-  ctx.lineTo(13, -16);
-  ctx.lineTo(13, -10);
+  ctx.moveTo(8, -w);
+  ctx.lineTo(13 + lv.armor, -w + 3);
+  ctx.lineTo(13 + lv.armor, -10);
   ctx.lineTo(10, -10);
   ctx.lineTo(10, 10);
-  ctx.lineTo(13, 10);
-  ctx.lineTo(13, 16);
-  ctx.lineTo(8, 19);
+  ctx.lineTo(13 + lv.armor, 10);
+  ctx.lineTo(13 + lv.armor, w - 3);
+  ctx.lineTo(8, w);
   ctx.closePath();
-  ctx.fillStyle = '#9aa2a8';
+  ctx.fillStyle = ['#9aa2a8', '#a7afb5', '#b4bcc2', '#c3cad0'][lv.armor];
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#c9a54a';
-  ctx.fillRect(11, -15, 1.6, 4);
-  ctx.fillRect(11, 11, 1.6, 4);
+  ctx.fillRect(11, -w + 4, 1.6, 4);
+  ctx.fillRect(11, w - 8, 1.6, 4);
+  if (lv.armor >= 2) {
+    // remaches de las placas añadidas
+    ctx.fillStyle = '#5a6066';
+    for (const yy of [-w + 10, -14, 13, w - 11]) ctx.fillRect(10.5, yy, 2, 2);
+  }
   // núcleo y asas de atrás (donde se agarra quien la maneja)
   ctx.fillStyle = '#2e3236';
   ctx.beginPath();
   ctx.arc(-2, 0, 5.5, 0, TAU);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = b.manned ? '#7fe07a' : '#b5463a';
+  // luz: verde si la manejan, ámbar parpadeando con el piloto automático, roja si está sola
+  const blink = Math.sin(now * 7) > 0;
+  ctx.fillStyle = b.manned ? '#7fe07a' : lv.auto ? (blink ? '#ffb040' : '#6a4a1a') : '#b5463a';
   ctx.fillRect(-3, -1, 2, 2);
   ctx.lineWidth = 3;
   ctx.strokeStyle = '#2a2e32';
@@ -357,7 +442,104 @@ function drawHeavyGun(ctx, b) {
   ctx.moveTo(-13, 9);
   ctx.lineTo(-19, 11);
   ctx.stroke();
+  if (lv.auto) {
+    // sensor del piloto automático: caja con lente y antena con la punta que parpadea
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = OUT;
+    roundRect(ctx, -11, -4, 8, 8, 2);
+    ctx.fillStyle = '#3d4348';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = b.manned ? '#2a5a2a' : '#ff4a36';
+    ctx.beginPath();
+    ctx.arc(-7, 0, 2.2, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#2a2e32';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-9, -4);
+    ctx.lineTo(-15, -16);
+    ctx.stroke();
+    ctx.fillStyle = blink ? '#ff6a50' : '#5a1a14';
+    ctx.fillRect(-16.5, -17.5, 3, 3);
+  }
   ctx.restore();
+}
+
+// Vista previa del taller: la torreta (con sus mejoras) girando despacio y disparando de vez en cuando;
+// pulse > 0 justo después de comprar una mejora (un destello que se abre).
+export function drawHeavyPreview(ctx, b, W, H, t, pulse) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  // el cañón apunta hacia arriba: el centro va un poco abajo para que quepa entero
+  const s = Math.min(W, H) / 95;
+  ctx.setTransform(s, 0, 0, s, W / 2, H * 0.6);
+  const ph = (t * 2.2) % 1;
+  const shot = Math.floor(t * 2.2);
+  const v = {
+    ...b,
+    x: -20,
+    y: -20,
+    ang: -Math.PI / 2 + Math.sin(t * 0.6) * 0.9,
+    manned: null,
+    hitT: 0,
+    side: shot % 2 ? 1 : -1,
+    recoil: Math.max(0, 1 - ph * 5),
+    flash: ph < 0.08 ? 1 : 0,
+  };
+  drawHeavy(ctx, v);
+  if (pulse > 0) {
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = '#c7a24a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 30 + (1 - pulse) * 30, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Aviso sobre la torreta pesada que tienes al lado (con teclado): montar y mejorar.
+export function drawHeavyPrompt(ctx, game) {
+  const p = game.player;
+  // montado y disparando no estorba la vista
+  if (game.input.mode !== 'mouse' || !p.alive || p.inRobot || (p.manned && game.input.firing)) return;
+  const b = game.structures.heavyFor(p);
+  if (!b) return;
+  const parts = p.manned
+    ? [
+        ['M', 'mejorar'],
+        ['E', 'bajar'],
+      ]
+    : [
+        ['E', 'montar'],
+        ['M', 'mejorar'],
+      ];
+  ctx.font = '600 12px "Barlow Condensed", "Arial Narrow", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  // ancho total: [tecla] palabra  [tecla] palabra
+  const widths = parts.map(([, t]) => 14 + 4 + ctx.measureText(t).width);
+  const w = widths.reduce((a, q) => a + q, 0) + 12 * (parts.length - 1) + 14;
+  const x0 = b.x + b.w / 2 - w / 2;
+  const y = b.y - 24;
+  ctx.fillStyle = 'rgba(15,17,13,0.8)';
+  ctx.fillRect(x0, y - 11, w, 22);
+  ctx.strokeStyle = 'rgba(199,162,74,0.6)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x0 + 0.5, y - 10.5, w - 1, 21);
+  let x = x0 + 7;
+  parts.forEach(([k, t], i) => {
+    ctx.fillStyle = '#c7a24a';
+    ctx.fillRect(x, y - 7, 14, 14);
+    ctx.fillStyle = '#1d1607';
+    ctx.textAlign = 'center';
+    ctx.fillText(k, x + 7, y + 1);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#e6e0d2';
+    ctx.fillText(t, x + 18, y + 1);
+    x += widths[i] + 12;
+  });
 }
 
 function drawBlock(ctx, b) {

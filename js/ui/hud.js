@@ -116,6 +116,12 @@ export function updateHud(game, force) {
     set(game, 'rbv', $('rb-val'), 'text', rb.broken ? 'ROTO' : String(Math.ceil(rb.hp)));
   }
   set(game, 'rbon', $('btn-robot'), 'text', rb.piloted || p.manned ? 'Bajar' : heavy ? 'Torreta' : 'Robot');
+  // junto a una torreta pesada (o montado en ella): el botón de la llave abre su taller
+  const tup = p.alive && !p.inRobot && !!(p.manned || heavy);
+  if (game.cache.tup !== tup) {
+    game.cache.tup = tup;
+    $('btn-tup').classList.toggle('gone', !tup);
+  }
   // habilidad de clase: icono, segundos que faltan y arco de espera en el botón táctil
   const cls = p.cls;
   if (game.cache.cls !== cls) {

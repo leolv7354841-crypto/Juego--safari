@@ -10,6 +10,7 @@ import { saveProgress } from './save.js';
 import { updateAcid, updateCombo } from './events.js';
 import { gameOver } from './ui/over.js';
 import { openShop } from './ui/shop.js';
+import { openTurret, updateTurret } from './ui/turret.js';
 import { chooseClass } from './ui/class.js';
 import { openLevelUp, chooseUpgrade } from './ui/levelup.js';
 import { drawLookPreview } from './ui/look.js';
@@ -65,6 +66,7 @@ export function updatePlay(game, dt) {
     if (game.input.consume('grenade')) Act.tryGrenade(game);
     if (game.input.consume('molotov')) Act.tryGrenade(game, 'molotov');
     if (game.input.consume('robot')) Act.toggleRobot(game);
+    if (game.input.consume('turret')) return openTurret(game);
     game.robot.update(dt, p, game);
     if (game.input.consume('nextRound')) Act.startNextRound(game);
   }
@@ -149,6 +151,8 @@ export const STATES = {
     },
   },
   shop: { screen: 'screen-shop', enter: quieto },
+  // taller de la torreta pesada (en línea el mundo sigue: lo mueve el servidor)
+  turret: { screen: 'screen-turret', enter: quieto, update: updateTurret },
   over: { screen: 'screen-over' },
   account: { screen: 'screen-account' },
   board: { screen: 'screen-board' },

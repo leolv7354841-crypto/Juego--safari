@@ -235,7 +235,8 @@ export function encodeWorld(
 /** Barricadas, trampas y quemaduras del suelo (son de todo el mapa: se mandan cuando cambian o cada cierto tiempo). */
 export function encodeStatic(st: StaticStructures) {
   return {
-    blk: st.blocks.map((b) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0)]),
+    // el último: niveles de las mejoras de la torreta pesada (ver heavy.ts; 0 en el resto)
+    blk: st.blocks.map((b) => [b.kind, b.x, b.y, b.w, b.h, Math.round(b.hp), r100(b.ang || 0), b.up || 0]),
     wir: st.wires.map((w) => [w.kind, w.x, w.y, w.w, w.h, Math.round(w.hp)]),
     sc: st.scorches.map((c) => [Math.round(c.x), Math.round(c.y), r100(c.a), Math.round(c.t), c.life]),
   };

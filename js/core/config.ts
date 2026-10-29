@@ -579,6 +579,37 @@ export const ROBOT = { hp: 10000, radius: 42, mass: 40, price: 10000, repairPerH
 // microexplosión de cada bala (radio en px y daño en el centro; la granada es 140 y 330).
 export const HEAVY = { pack: 100, price: 200, turn: 4.5, shield: 0.5, reach: 60, blastR: 60, blastPower: 55 };
 
+// Mejoras de cada torreta pesada: se compran junto a ella (tecla M o el botón Mejorar) y son de esa
+// torreta. price: lo que cuesta cada nivel; los arreglos de efecto empiezan en el nivel 0 (de fábrica).
+//   cal: multiplica el daño de la bala y de su explosión · rate: disparos por segundo
+//   blast: radio de la explosión (px) · armor: vida, y la parte de la vida que repara al acabar la oleada
+//   auto: sin nadie a los mandos dispara sola (a rate de su cadencia, hasta range px) con las balas del dueño
+export interface HeavyUpDef {
+  name: string;
+  desc: string;
+  price: number[];
+  dmg?: number[];
+  rate?: number[];
+  r?: number[];
+  hp?: number[];
+  repair?: number[];
+  range?: number;
+}
+export const HEAVY_UP: Record<string, HeavyUpDef> = {
+  cal: { name: 'Calibre', desc: 'Balas más pesadas: más daño al pegar y al estallar.', price: [1000, 2500, 5000], dmg: [1, 1.2, 1.4, 1.6] },
+  rate: { name: 'Cadencia', desc: 'Alimentador más rápido: más balas por segundo.', price: [1000, 2500, 5000], rate: [9, 11, 13, 15] },
+  blast: { name: 'Carga explosiva', desc: 'Cada bala estalla en un radio más grande.', price: [1200, 3000, 6000], r: [60, 75, 90, 105] },
+  armor: {
+    name: 'Blindaje',
+    desc: 'Placas y sacos de arena: más vida, y se repara sola al acabar cada oleada.',
+    price: [800, 2000, 4000],
+    hp: [4000, 6000, 8000, 10000],
+    repair: [0, 0.15, 0.25, 0.35],
+  },
+  auto: { name: 'Piloto automático', desc: 'Sin nadie a los mandos, dispara sola a los zombis con tus balas.', price: [6000], rate: [0, 0.5], range: 520 },
+};
+export const HEAVY_UP_ORDER = ['cal', 'rate', 'blast', 'armor', 'auto'];
+
 // Clasificación mundial y estadísticas de uso (Supabase, sin librerías: API REST; ver supabase/esquema.sql).
 // url: la del proyecto ('https://xxxx.supabase.co'); key: la clave publicable (sb_publishable_…), que es
 // pública por diseño: las tablas sólo se escriben a través de las funciones dz_* y sólo `scores` se lee.

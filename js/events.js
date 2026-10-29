@@ -143,6 +143,7 @@ export function onPlayerDeath(game) {
 }
 
 export function onWaveCleared(game) {
+  game.structures.waveRepair();
   game.shopPending = true;
   game.sfx.level();
   game.saveProgress();

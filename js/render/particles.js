@@ -56,10 +56,18 @@ export class Particles {
     /** @type {Particle[]} */
     this.p = Array.from({ length: max }, () => ({ life: 0 }));
     this.idx = 0;
+    /** Destellos cortos que alumbran la noche (los dibuja lighting.js). @type {{ x: number, y: number, r: number, t: number, max: number }[]} */
+    this.lights = [];
   }
 
   clear() {
     for (const q of this.p) q.life = 0;
+    this.lights.length = 0;
+  }
+
+  flash(x, y, r, t) {
+    if (this.lights.length >= 24) this.lights.shift();
+    this.lights.push({ x, y, r, t, max: t });
   }
 
   add(type, x, y, vx, vy, life, size, color, drag = 4, grow = 0, delay = 0) {
@@ -110,17 +118,73 @@ export class Particles {
   }
 
   // Microexplosión de una bala de la torreta pesada: chispazo y un poco de humo, sin humareda.
+  // Destello que alumbra, bola de fuego con lenguas que salen, onda del tamaño del radio de daño,
+  // chispas, brasas que suben, esquirlas y una voluta de humo (todo crece con la carga explosiva).
   miniBlast(x, y, R) {
-    this.ring(x, y, R * 0.6, '255,190,120');
-    for (let i = 0; i < 7; i++) {
+    const k = R / 60;
+    this.flash(x, y, 140 * k, 0.16);
+    this.add(FIREBALL, x, y, 0, 0, 0.2, R * 0.36, '', 0);
+    for (let i = 0; i < 3; i++) {
       const a = rand(0, TAU);
-      const s = rand(120, 320);
-      this.add(SPARK, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.08, 0.18), 1, pick(['#ffd890', '#ffb060']), 6);
+      const s = rand(60, 130) * k;
+      this.add(
+        FIREBALL,
+        x + Math.cos(a) * R * 0.1,
+        y + Math.sin(a) * R * 0.1,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.12, 0.2),
+        R * rand(0.13, 0.2),
+        '',
+        6,
+      );
     }
-    for (let i = 0; i < 2; i++) {
+    this.add(RING, x, y, 0, 0, 0.22, R * 0.3, '255,226,170', 0, R * 3.4);
+    for (let i = 0; i < 9; i++) {
       const a = rand(0, TAU);
-      this.add(SMOKE, x, y, Math.cos(a) * 40, Math.sin(a) * 40, rand(0.4, 0.7), rand(6, 10), '90,84,76', 3, 24);
+      const s = rand(170, 430) * k;
+      this.add(
+        SPARK,
+        x,
+        y,
+        Math.cos(a) * s,
+        Math.sin(a) * s,
+        rand(0.1, 0.24),
+        1,
+        pick(['#fff2d0', '#ffd890', '#ffb060', '#ff8a40']),
+        6,
+      );
     }
+    for (let i = 0; i < 3; i++) {
+      this.add(
+        EMBER,
+        x + rand(-6, 6) * k,
+        y + rand(-6, 6) * k,
+        rand(-40, 40),
+        rand(-110, -50),
+        rand(0.4, 0.8),
+        rand(1.2, 2.2),
+        pick(['#ffcf80', '#ff9a40', '#ffe0a0']),
+        1.5,
+      );
+      const a = rand(0, TAU);
+      const s = rand(90, 200) * k;
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.25, 0.5), rand(1.5, 2.6), pick(['#2a2722', '#3a352d']), 5);
+    }
+    for (let i = 0; i < 2; i++)
+      this.add(
+        SMOKE,
+        x + rand(-5, 5) * k,
+        y + rand(-5, 5) * k,
+        rand(-14, 14),
+        rand(-36, -14),
+        rand(0.6, 1),
+        rand(5, 8) * k,
+        i ? '62,58,52' : '120,80,50',
+        1.6,
+        26 * k,
+        0.05 + i * 0.05,
+      );
   }
 
   // Impacto sobre un zombi: salpicadura de sangre estilizada en la dirección de la bala.
@@ -486,6 +550,8 @@ export class Particles {
   }
 
   update(dt) {
+    for (let i = this.lights.length - 1; i >= 0; i--)
+      if ((this.lights[i].t -= dt) <= 0) this.lights.splice(i, 1);
     for (const q of this.p) {
       if (q.life <= 0) continue;
       if (q.delay > 0) {

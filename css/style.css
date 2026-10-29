@@ -579,6 +579,64 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .btn.buy.sm { min-width: 0; font-size: 17px; padding: 7px 10px 4px; }
 .btn.buy.poor { background: rgba(230, 224, 210, 0.06); color: var(--dim); border-color: var(--line); cursor: not-allowed; }
 
+/* ---------- Taller de la torreta pesada ---------- */
+
+.tup-top { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; align-items: center; margin-bottom: 12px; }
+.tup-view {
+  width: 220px;
+  height: 220px;
+  background:
+    radial-gradient(circle at 50% 55%, rgba(217, 120, 58, 0.16), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(230, 224, 210, 0.04) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, rgba(230, 224, 210, 0.04) 0 1px, transparent 1px 22px),
+    #11130e;
+  border: 1px solid var(--line);
+}
+.tup-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.tup-stat { padding: 7px 10px 5px; background: rgba(230, 224, 210, 0.05); border: 1px solid var(--line); border-left: 3px solid var(--st); }
+.tup-stat dt { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.tup-stat dd { margin: 0; font-family: var(--display); font-size: 30px; line-height: 0.95; font-variant-numeric: tabular-nums; }
+.tup-stat dd small { font-size: 16px; color: var(--dim); margin-left: 2px; }
+.tup-stat.on { border-left-color: var(--xp); }
+.tup-stat.on dd { color: var(--xp); }
+.tup-stat.low { border-left-color: var(--hp); }
+.tup-stat.low dd { color: #e07a6a; }
+.tup-list { display: grid; gap: 6px; margin-bottom: 10px; }
+.tup-item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(230, 224, 210, 0.05);
+  border: 1px solid var(--line);
+}
+.tup-item.done { border-color: rgba(134, 168, 146, 0.35); }
+.tup-ic { display: grid; place-items: center; width: 48px; height: 48px; color: var(--st); background: rgba(199, 162, 74, 0.1); border: 1px solid rgba(199, 162, 74, 0.35); }
+.tup-item.done .tup-ic { color: var(--xp); background: rgba(134, 168, 146, 0.1); border-color: rgba(134, 168, 146, 0.35); }
+.tup-ic svg { width: 28px; height: 28px; }
+.tup-item .shop-txt b { display: flex; align-items: center; gap: 10px; }
+.tup-item .shop-txt small em { font-style: normal; color: var(--st); }
+.tup-item .key { color: var(--dim); }
+.touch .tup-item .key { display: none; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 14px; height: 6px; background: rgba(230, 224, 210, 0.14); transform: skewX(-20deg); }
+.pips i.on { background: var(--st); box-shadow: 0 0 6px rgba(199, 162, 74, 0.6); }
+.tup-item.done .pips i.on { background: var(--xp); box-shadow: 0 0 6px rgba(134, 168, 146, 0.6); }
+.tup-max { font-family: var(--display); font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--xp); padding: 0 6px; }
+#btn-tup { right: 100px; bottom: 216px; color: var(--st); border-color: rgba(201, 165, 74, 0.7); }
+@media (max-width: 640px) {
+  .tup-top { grid-template-columns: 130px minmax(0, 1fr); gap: 10px; }
+  .tup-view { width: 130px; height: 130px; }
+  .tup-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .tup-stat { padding: 4px 7px 3px; }
+  .tup-stat dd { font-size: 22px; }
+  .tup-item { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; padding: 7px 8px; }
+  .tup-ic { width: 38px; height: 38px; }
+  .tup-ic svg { width: 22px; height: 22px; }
+  .pips i { width: 10px; height: 5px; }
+}
+
 /* ---------- Controles táctiles ---------- */
 
 #touch { display: none; position: absolute; inset: 0; pointer-events: none; }

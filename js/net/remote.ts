@@ -8,6 +8,7 @@
 import { NET, PLAYER_BASE, ROBOT, SHOP, WEAPON_ORDER, WEAPONS, ZOMBIES } from '../core/config.ts';
 import { angleTo, rand, TAU } from '../core/util.ts';
 import { turretBullet } from '../sim/build.ts';
+import { heavyMaxHp } from '../sim/heavy.ts';
 import { Player } from '../sim/player.ts';
 import { Robot } from '../sim/robot.ts';
 import { lookFromCode, zombieSprites } from '../render/sprites.js';
@@ -43,7 +44,7 @@ export type RemoteZombie = Pick<
   fireFx: number;
   spawnT: number;
 };
-type Row = [string, number, number, number, number, number, number];
+type Row = [string, number, number, number, number, number, number, number?];
 /** Parte de una foto que usa applyStructures: las listas de barricadas y trampas llevan el tipo delante. */
 type StructSnap = Partial<Omit<WorldSnap, 'blk' | 'wir' | 'sc'>> & { blk?: Row[]; wir?: Row[]; sc?: number[][] };
 type ShopDef = { hp: number; ground?: boolean; consumable?: boolean };
@@ -489,8 +490,9 @@ export class Remote {
           w: q[3],
           h: q[4],
           hp: q[5],
-          max: shopDef(q[0])?.hp ?? 0,
+          max: q[0] === 'heavy' ? heavyMaxHp({ up: q[7] || 0 }) : (shopDef(q[0])?.hp ?? 0),
           ang: q[6] / 100,
+          up: q[7] || 0,
           low: true,
           block: true,
           hitT: 0,
@@ -503,6 +505,11 @@ export class Remote {
           const b = st.blocks[i];
           if (q[5] < b.hp) b.hitT = 0.12;
           b.hp = q[5];
+          // mejoras de la torreta pesada (el blindaje sube su vida máxima)
+          if ((q[7] || 0) !== (b.up || 0)) {
+            b.up = q[7] || 0;
+            if (b.kind === 'heavy') b.max = heavyMaxHp(b);
+          }
           // el cañón de la torreta pesada propia gira con la predicción, no con la foto
           if (b.manned !== g.player) b.ang = q[6] / 100;
         });
@@ -546,8 +553,8 @@ export class Remote {
     for (const b of st.blocks) {
       b.hitT -= dt;
       if (b.flash) b.flash = Math.max(0, b.flash - dt);
-      // torreta pesada de otro: el cañón se acerca al ángulo de la última foto
-      if (b.manned && b.manned !== g.player && b.ta !== undefined) {
+      // torreta pesada de otro (o con piloto automático): el cañón se acerca al ángulo de la última foto
+      if (b.manned !== g.player && b.ta !== undefined) {
         b.ang = angleTo(b.ang, b.ta, dt * 12);
         b.recoil = Math.max(0, (b.recoil || 0) - dt * 10);
       }

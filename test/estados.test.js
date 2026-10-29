@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { pause, resume, setState, STATES, stepState } from '../js/states.js';
 
-const ESTADOS = ['menu', 'play', 'pause', 'levelup', 'shop', 'over', 'account', 'board', 'look', 'online', 'class'];
+const ESTADOS = ['menu', 'play', 'pause', 'levelup', 'shop', 'turret', 'over', 'account', 'board', 'look', 'online', 'class'];
 
 // Un juego mínimo: pantallas falsas, música y entrada que anotan lo que les piden.
 function juego(over = {}) {
@@ -47,7 +47,7 @@ test('cada pantalla pertenece a un solo estado', () => {
     .map((s) => s.screen)
     .filter(Boolean);
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(ids.length, 9);
+  assert.equal(ids.length, 10);
 });
 
 test('setState enseña solo la pantalla del estado y pone su clase', () => {

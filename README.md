@@ -61,7 +61,8 @@ El guardado vive en el navegador de cada dispositivo (y en cada sitio web por se
 
 ### Dinero y tienda
 
-Cada zombi eliminado da dinero: **normal $1 · velocista $3 · gordo $5 · SWAT $10 · super blindado $25**. Al terminar cada oleada (después
+Cada zombi eliminado da dinero: **normal $0,5 · velocista $1,5 · gordo $2,5 · SWAT $5 · toro $7,5 · super blindado $12,5**
+(los centavos se juntan hasta completar un dólar). Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
 | Estructura | Precio | Efecto |
@@ -108,6 +109,21 @@ entre la horda apartando zombis, recibe él los golpes en vez de ti y usa tus ar
 derecho (puedes cambiarlas igual que siempre). No se cura solo: repáralo en la tienda después de cada
 oleada. Si su vida llega a 0 explota, sales despedido y hay que repararlo para volver a usarlo.
 
+### Torreta pesada y su taller
+
+La **torreta pesada** ($15 000) es un cañón doble que manejas tú (`E` junto a ella) con balas explosivas
+que se compran en la tienda. Junto a ella (o montado) pulsa `M` (botón de la **llave** en el celular)
+para abrir su **taller**: cada torreta tiene sus propias mejoras, se compran en cualquier momento y se
+ven en la torreta.
+
+| Mejora | Niveles | Efecto |
+|--------|---------|--------|
+| Calibre | $1000 · $2500 · $5000 | Daño ×1,2 · ×1,4 · ×1,6 (al pegar y al estallar) |
+| Cadencia | $1000 · $2500 · $5000 | 11 · 13 · 15 disparos por segundo (de 9) |
+| Carga explosiva | $1200 · $3000 · $6000 | Radio de la explosión 75 · 90 · 105 px (de 60) |
+| Blindaje | $800 · $2000 · $4000 | Vida 6000 · 8000 · 10 000 (de 4000) y repara 15 · 25 · 35 % al acabar cada oleada |
+| Piloto automático | $6000 | Sin nadie a los mandos dispara sola a media cadencia (hasta 520 px) con las balas de quien la puso |
+
 ### Armas y munición
 
 El subfusil, con el que empiezas, tiene balas infinitas. Las demás se compran en la tienda (la escopeta y
@@ -150,7 +166,8 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 | `R`: recargar | Botón de recarga |
 | `1`–`9`, `Q` o `Tab`: cambiar arma | Botón de cambio de arma |
 | `F`: construir · `V`: cambiar bloque | Botón **Construir** |
-| `G`: lanzar granada · `T`: molotov · `E`: robot | Botones **Granada** y **Molotov** (apuntan solos) |
+| `G`: lanzar granada · `T`: molotov · `E`: robot o torreta pesada | Botones **Granada** y **Molotov** (apuntan solos) |
+| `M`: taller de la torreta pesada (junto a ella) | Botón de la **llave** |
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
 | `Esc` / `P`: pausa | Botón de pausa |
 
@@ -419,6 +436,7 @@ js/sim/               Lógica del juego; también la ejecuta el servidor (sin do
   upgrades.js         Mejoras al subir de nivel
   abilities.js        Clases y habilidades
   build.js            Barricadas, alambre de púas, torretas, granadas y molotov
+  heavy.js            Mejoras y disparo de la torreta pesada (también el piloto automático)
   pickups.js          Munición, botiquines y cajas de armas
   robot.js            Robot de combate pilotable
 js/render/            Todo el dibujo (una pieza por módulo de sim/ que se ve)

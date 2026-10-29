@@ -9,6 +9,7 @@ import {
   drawGround,
   drawBlocks,
   drawMannedHeavy,
+  drawHeavyPrompt,
   drawGhost,
   drawGrenades,
   drawBars,
@@ -78,6 +79,7 @@ export function render(game) {
 
   ctx.setTransform(z, 0, 0, z, tx, ty);
   if (playing) drawWorldUi(game, ctx);
+  if (game.state === 'play') drawHeavyPrompt(ctx, game);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawAsh(game, ctx, W, H);

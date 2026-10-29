@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { ServerSim } from '../src/sim/ServerSim.ts';
 import { IN_FIRE } from '../../js/net/protocol.ts';
 import { PEER_N, WORLD_KEYS, ZOMBIE_N } from '../../js/net/snapshot.ts';
-import { ABILITY, BOUNTY, COMBO, EVENT_ORDER, EVENTS, HEAVY, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import { ABILITY, BOUNTY, COMBO, EVENT_ORDER, EVENTS, HEAVY, HEAVY_UP, PLAYER_BASE, WEAPONS } from '../../js/core/config.ts';
+import { heavyLevel } from '../../js/sim/heavy.ts';
 import { UPGRADES } from '../../js/sim/upgrades.ts';
 import { cooldownOf } from '../../js/sim/abilities.ts';
 import { comboBreak, comboMult } from '../../js/sim/combo.ts';
@@ -467,6 +468,62 @@ test('torreta pesada: se compra con sus balas, se monta y dispara en línea', ()
   a.p.alive = false;
   sim.onPlayerDeath();
   assert.equal(t.manned, null, 'libre al caer');
+});
+
+test('torreta pesada: mejoras junto a ella (también a mitad de oleada) y piloto automático con las balas del dueño', () => {
+  const sim = new ServerSim(5, [
+    { id: 'a', idx: 1, name: 'Ana' },
+    { id: 'b', idx: 2, name: 'Beto' },
+  ]);
+  const a = sim.slots.get('a')!;
+  const b = sim.slots.get('b')!;
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  a.money = 100000;
+  b.money = 100000;
+  sim.director.state = 'waiting';
+  assert.ok(sim.shop('a', 'item', 'heavy', 0));
+  assert.ok(sim.shop('a', 'heavy', 'ammo', 1));
+  for (let k = 0; k < 8 && !sim.structures.blocks.length; k++) {
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+    sim.act('a', { s: seq.n + 1, k: 'build', kind: 'heavy', tx: 0, ty: 0 });
+    idle(sim, 'a', seq, 1, (k * Math.PI) / 4);
+  }
+  const t = sim.structures.blocks[0];
+  assert.equal(t?.kind, 'heavy');
+  sim.director.state = 'active';
+  // a mitad de oleada, junto a ella: se compra y la paga quien la compra
+  const m0 = a.money;
+  assert.ok(sim.shop('a', 'tup', 'cal', 0));
+  assert.equal(heavyLevel(t, 'cal'), 1);
+  assert.equal(a.money, m0 - HEAVY_UP.cal.price[0]);
+  assert.equal(sim.shop('a', 'tup', 'no-existe', 0), false);
+  // lejos de la torreta no se puede
+  b.p.x = t.x + 2000;
+  assert.equal(sim.shop('b', 'tup', 'cal', 0), false);
+  assert.equal(b.money, 100000);
+  // el blindaje sube la vida máxima y viaja con la foto (último campo de blk)
+  assert.ok(sim.shop('a', 'tup', 'armor', 0));
+  assert.equal(t.max, HEAVY_UP.armor.hp[1]);
+  const blk = sim.snapshot('a', 0)!.blk;
+  assert.ok(Array.isArray(blk) && blk[0][7] === t.up, 'los niveles van en la foto');
+  // piloto automático: se aleja, llega un zombi y la torreta dispara sola con las balas de Ana
+  assert.ok(sim.shop('a', 'tup', 'auto', 0));
+  a.p.x = t.x + 1500;
+  sim.horde.list.length = 0;
+  sim.horde.spawn('normal', t.x + t.w / 2 + 250, t.y + t.h / 2, 1, 1);
+  const ammo = a.p.heavyAmmo;
+  const before = sim.bullets.list.length;
+  for (let i = 0; i < 90; i++) sim.step();
+  assert.ok(a.p.heavyAmmo < ammo, 'gastó balas de Ana');
+  const shots = sim.bullets.list.slice(before).filter((q: any) => q.auto);
+  assert.ok(shots.length === 0 || shots.every((q: any) => q.owner === 'a' && q.blast));
+  // Beto, junto a ella, la ve girar y disparar
+  b.p.x = t.x + 60;
+  b.p.y = t.y + 80;
+  const hv = sim.snapshot('b', 0)!.hv;
+  assert.deepEqual(hv.slice(0, 2), [t.x, t.y], 'la que dispara sola va en hv');
+  assert.equal(hv[3], 0, 'sin nadie a los mandos');
 });
 
 test('la foto del servidor lleva la parte del mundo y el jugador de otro entra con el mismo tamaño', () => {

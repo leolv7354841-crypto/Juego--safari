@@ -37,6 +37,7 @@ import { showOnline, onlineStatus, renderLobby, openInvite, bindLobby } from './
 import { showAccount, bindAccount } from './ui/account.js';
 import { refreshHall, bindBoard } from './ui/board.js';
 import { openShop, closeShop, renderShop, bindShop } from './ui/shop.js';
+import { openTurret, bindTurret } from './ui/turret.js';
 import { toast, banner, updateHud, updateNetStat, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
@@ -133,7 +134,8 @@ class Game {
   killZombie = (z) => Ev.killZombie(this, z);
   rocketHit = (z, x, y, b) => Ev.rocketHit(this, z, x, y, b);
   rocketBlast = (x, y, owner) => Ev.rocketBlast(this, x, y, owner);
-  heavyBlast = (x, y, owner) => Ev.heavyBlast(this, x, y, owner);
+  heavyBlast = (x, y, owner, R, power) => Ev.heavyBlast(this, x, y, owner, R, power);
+  ownerOf = () => this.player;
   onSuperPunch = (z, x, y) => Ev.onSuperPunch(this, z, x, y);
   applyAcid = () => Ev.applyAcid(this);
   onGoldenExpired = (z) => Ev.onGoldenExpired(this, z);
@@ -157,6 +159,7 @@ class Game {
   renderLobby = () => renderLobby(this);
   renderClassRows = () => renderClassRows(this);
   openLevelUp = () => openLevelUp(this);
+  openTurret = () => openTurret(this);
   setupMenu = () => setupMenu(this);
   start = (freshWorld) => start(this, freshWorld);
   gameOver = () => gameOver(this);
@@ -234,6 +237,7 @@ class Game {
     bindMenu(this);
     bindOver(this);
     bindShop(this);
+    bindTurret(this);
     bindClass(this);
     bindLook(this);
     bindAccount(this);

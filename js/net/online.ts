@@ -601,6 +601,7 @@ export class Online {
         if (inp.consume('grenade')) g.tryGrenade();
         if (inp.consume('molotov')) g.tryGrenade('molotov');
         if (inp.consume('robot')) g.toggleRobot();
+        if (inp.consume('turret')) return g.openTurret();
         if (inp.consume('ability')) g.useAbility();
         // a mitad de oleada la mejora se abre cuando él quiere (U o el botón)
         if (inp.consume('upgrade') && this.upReady) return g.openLevelUp();
@@ -866,10 +867,13 @@ export class Online {
     const hv = Array.isArray(s.hv) ? s.hv : [];
     for (let i = 0; i + 4 < hv.length; i += 5) {
       const b = at(hv[i], hv[i + 1]);
-      const q = g.remote.peers.get(hv[i + 3]);
-      if (!b || !q) continue;
-      b.manned = q;
-      q.manned = b;
+      // quien 0: nadie la maneja, dispara sola (piloto automático)
+      const q = hv[i + 3] ? g.remote.peers.get(hv[i + 3]) : null;
+      if (!b || (hv[i + 3] && !q)) continue;
+      if (q) {
+        b.manned = q;
+        q.manned = b;
+      }
       b.ta = hv[i + 2] / 100;
       if (hv[i + 4]) {
         b.side = hv[i + 4];

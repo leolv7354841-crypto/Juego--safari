@@ -202,11 +202,19 @@ export function rocketBlast(game: GameHost, x: number, y: number, owner: string 
 }
 
 /**
- * Microexplosión de una bala de la torreta pesada (no la calcula quien solo mira).
+ * Microexplosión de una bala de la torreta pesada (no la calcula quien solo mira). El radio y el
+ * daño los lleva la bala (dependen de las mejoras de la torreta).
  */
-export function heavyBlast(game: GameHost, x: number, y: number, owner: string | null = null) {
+export function heavyBlast(
+  game: GameHost,
+  x: number,
+  y: number,
+  owner: string | null = null,
+  R = HEAVY.blastR,
+  power = HEAVY.blastPower,
+) {
   if (!game.mode.authority()) return;
-  game.structures.explode(game, { x, y, owner }, HEAVY.blastR, HEAVY.blastPower, 0, true);
+  game.structures.explode(game, { x, y, owner }, R, power, 0, true);
 }
 
 /** Impacto de cohete: en gordos y super blindados se clava; en el resto estalla al instante. */

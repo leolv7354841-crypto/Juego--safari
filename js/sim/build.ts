@@ -3,6 +3,7 @@ import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.ts';
 import { TAU, rand, clamp } from '../core/util.ts';
 import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
 import type { Player } from './player.ts';
+import { repairHeavies, updateAutoHeavy } from './heavy.ts';
 
 // Ficha de la tienda: sólo los campos que usa este módulo; w/h/hp existen en todas las piezas que se construyen.
 interface ShopDef {
@@ -36,6 +37,9 @@ export interface Block {
   recoil?: number;
   side?: number;
   manned?: Player | null;
+  // torreta pesada: niveles de sus mejoras (ver heavy.ts) y zombi al que apunta el piloto automático
+  up?: number;
+  aim?: Zombie | null;
 }
 // Alambre, púas y minas (en el suelo).
 export interface Wire {
@@ -607,6 +611,7 @@ export class Structures {
     for (const b of this.blocks) {
       b.hitT -= dt;
       if (b.kind === 'turret') this.updateTurret(b, dt, game);
+      else if (b.kind === 'heavy' && !b.manned) updateAutoHeavy(b, dt, game, game.ownerOf?.(b.owner) ?? null);
     }
     for (const w of this.wires) w.hitT -= dt;
   }
@@ -669,6 +674,27 @@ export class Structures {
     b.manned = p;
     p.reloadT = 0;
     p.target = null;
+  }
+
+  // Al acabar la oleada: las torretas pesadas blindadas se reparan una parte.
+  waveRepair() {
+    repairHeavies(this.blocks);
+  }
+
+  // La torreta pesada que p puede mejorar: la que maneja o la más cercana a su alcance (aunque la maneje otro).
+  heavyFor(p: Player) {
+    if (p.manned) return p.manned;
+    let best = null;
+    let bd = HEAVY.reach + p.r;
+    for (const b of this.blocks) {
+      if (b.kind !== 'heavy') continue;
+      const d = Math.hypot(b.x + b.w / 2 - p.x, b.y + b.h / 2 - p.y);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
   }
 
   leaveHeavy(p: Player) {
