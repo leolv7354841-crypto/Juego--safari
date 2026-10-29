@@ -742,6 +742,7 @@ export class Online {
       if (money < g.money) g.sfx.buy();
     } else if (money > g.money) {
       g.moneyEarned += money - g.money;
+      g.floaters.add(p.x, p.y - 10, money - g.money, 'money');
       // como en solitario: sólo la recompensa del dorado salta en pantalla
       if (money - g.money >= GOLDEN.rewardMin) {
         g.moneyPop(`+$${money - g.money}`, 'gold');

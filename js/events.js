@@ -11,16 +11,25 @@ export function hitZombie(game, z, b, hx, hy) {
   if (Rules.hitZombie(game, z, b, hx, hy, () => game.player.shotsHit++)) killZombie(game, z);
 }
 
+// Bajas que congelan el mundo un instante por sí solas.
+const HEFTY = new Set(['bull', 'heavy', 'giant', 'golden']);
+
 export function killZombie(game, z) {
   // la baja alarga la racha de quien la hizo y su multiplicador sube el dinero y la experiencia
-  const mult = z.dead || game.state === 'menu' ? 1 : comboKill(game.player.combo, z.type);
+  const live = !z.dead && game.state !== 'menu';
+  const mult = live ? comboKill(game.player.combo, z.type) : 1;
   Rules.killZombie(game, z, {
     kills: game.kills,
-    xp: (zb) => addXp(game, Math.round(zb.def.xp * mult)),
+    xp: (zb) => {
+      const n = Math.round(zb.def.xp * mult);
+      addXp(game, n);
+      if (live) game.floaters.add(zb.x, zb.y, n, 'xp');
+    },
     bounty: (zb) => {
       const n = Rules.bountyNow(game, game.player, zb.type, mult);
       game.money += n;
       game.moneyEarned += n;
+      if (live) game.floaters.add(zb.x, zb.y, n, 'money');
     },
     // recompensa única del zombi dorado (para quien lo mató)
     golden: (_zb, reward) => {
@@ -32,6 +41,20 @@ export function killZombie(game, z) {
     },
     toast: game.toast,
   });
+  if (live) hitstop(game, z);
+}
+
+// Micro-congelado (solo en solitario, el grupo no puede detener el mundo): una baja grande o
+// cuatro bajas casi a la vez paran todo unas centésimas para que el golpe se sienta.
+function hitstop(game, z) {
+  if (!game.mode.authority() || game.mode.inGroup()) return;
+  const t = game.time;
+  game.killRun = t - game.lastKillT < 0.15 ? game.killRun + 1 : 1;
+  game.lastKillT = t;
+  const hefty = HEFTY.has(z.type);
+  if (game.hitstopCd > 0 || !(hefty || game.killRun === 4)) return;
+  game.hitstop = hefty ? 0.07 : 0.045;
+  game.hitstopCd = 1;
 }
 
 export const rocketHit = Rules.rocketHit;
@@ -92,7 +115,7 @@ export function onZombieHit(game) {
   if (game.state === 'menu' || game.player.inRobot || game.player.boostT > 0) return;
   // el golpe corta la racha
   if (game.mode.authority()) comboBreak(game.player.combo);
-  const loss = Rules.hitLoss(game.money);
+  const loss = Rules.hitLoss(game.money, game.director.wave);
   if (loss <= 0) return;
   game.money -= loss;
   game.moneyPop(`-$${loss}`, 'loss');
@@ -144,10 +167,17 @@ export function onPlayerDeath(game) {
 
 export function onWaveCleared(game) {
   game.structures.waveRepair();
+  // premio por superar la oleada
+  const bonus = Rules.waveBonus(game.director.wave);
+  game.money += bonus;
+  game.moneyEarned += bonus;
+  game.moneyPop(`+$${bonus}`, 'gold');
   game.shopPending = true;
   game.sfx.level();
   game.saveProgress();
   recordScore(game);
+  // después del récord, para que este aviso sea el que se lee
+  game.toast(`¡Oleada superada! +$${bonus}`);
   game.analitica.guardar(false);
 }
 

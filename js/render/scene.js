@@ -78,6 +78,7 @@ export function render(game) {
   game.lighting.composite(ctx, game, base, v, W, H);
 
   ctx.setTransform(z, 0, 0, z, tx, ty);
+  if (playing) game.floaters.draw(ctx);
   if (playing) drawWorldUi(game, ctx);
   if (game.state === 'play') drawHeavyPrompt(ctx, game);
 

@@ -21,12 +21,18 @@ de un cerco, no para pasear.
 | Dorado  | 126  | rápida        | Raro (uno cada 35–65 s de ronda). No ataca: huye y desaparece a los 26 s. Si lo matas, da **$100–$250** |
 
 Cuando un zombi te golpea **pierdes dinero** ($16–$40 al azar, nunca te deja en negativo) y lo ves en un
-indicador rojo junto a tu dinero. El zombi dorado parpadea cuando está por escaparse; si se va, no da nada.
+indicador rojo junto a tu dinero; en las oleadas 1 a 3 los golpes todavía no cuestan dinero. El zombi dorado parpadea cuando está por escaparse; si se va, no da nada.
 
 **Racha:** cada baja hecha antes de 2,5 s de la anterior alarga tu racha (un dorado suma 10). Con 10 bajas
 seguidas cada zombi da **×1,5** de dinero y experiencia, con 25 **×2**, con 50 **×3** y con 100 **×4**. Un
 golpe de zombi (fuera del robot) o caer la corta. La mejor racha de la partida sale en el resumen final.
 La experiencia para subir de nivel crece más suave en los primeros 10 niveles.
+
+**Arranque suave:** la oleada 1 trae menos de la mitad de zombis y ningún policía SWAT (llegan en la 2),
+la 2 trae dos tercios y la 3 un 85 %; desde la 4, la horda entera. Los niveles 1 y 2 piden menos
+experiencia (unas 12 y 30 bajas). Cada baja hace saltar en el sitio lo que te dio (**+$** y **+XP**; si caen
+varias juntas, se suman en un solo número) y, en solitario, una baja grande o cuatro casi a la vez detienen
+el mundo una fracción de segundo para que el golpe se sienta.
 
 **Rondas especiales:** desde la oleada 2, cada oleada tiene un 65 % de probabilidad de ser especial (nunca
 dos seguidas). Se anuncian en el cartel y su nombre sale en el contador de oleada, y todas sus bajas pagan
@@ -62,7 +68,8 @@ El guardado vive en el navegador de cada dispositivo (y en cada sitio web por se
 ### Dinero y tienda
 
 Cada zombi eliminado da dinero: **normal $0,5 · velocista $1,5 · gordo $2,5 · SWAT $5 · toro $7,5 · super blindado $12,5**
-(los centavos se juntan hasta completar un dólar). Al terminar cada oleada (después
+(los centavos se juntan hasta completar un dólar). Superar una oleada paga un premio de **$15 + $10 por
+oleada** ($25 la primera, $65 la quinta). Al terminar cada oleada (después
 de elegir tu mejora de nivel) se abre la tienda:
 
 | Estructura | Precio | Efecto |
@@ -492,6 +499,7 @@ js/render/            Todo el dibujo (una pieza por módulo de sim/ que se ve)
   zombies.js · bullets.js · pickups.js · build.js · robot.js · remote.js
   lighting.js         Oscuridad, linterna, farolas y fuegos
   particles.js        Partículas y restos en el suelo
+  floaters.js         Números +$ y +XP que saltan sobre las bajas
 js/net/
   mode.js             game.mode: Solo (con `detached`), OnlineClient, ServerMode
   protocol.js         Tablas y bits del protocolo (cliente y servidor)

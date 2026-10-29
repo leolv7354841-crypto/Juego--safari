@@ -1,7 +1,7 @@
 // Reglas de combate compartidas (js/sim/rules.js): las usan el juego local y el servidor.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOUNTY, EVENTS, GOLDEN, MONEY_LOSS, xpForLevel } from '../js/core/config.ts';
+import { BOUNTY, EVENTS, GOLDEN, MONEY_LOSS, START, xpForLevel } from '../js/core/config.ts';
 import { ACID } from '../js/sim/build.ts';
 import { OnlineClient, ServerMode, Solo } from '../js/net/mode.ts';
 import * as Rules from '../js/sim/rules.ts';
@@ -51,15 +51,25 @@ test('gainXp sube de nivel y deja el sobrante', () => {
 });
 
 test('hitLoss nunca cobra más dinero del que hay', () => {
-  assert.equal(Rules.hitLoss(0), 0);
+  const w = START.freeHits + 1;
+  assert.equal(Rules.hitLoss(0, w), 0);
   for (let i = 0; i < 50; i++) {
-    const n = Rules.hitLoss(3);
+    const n = Rules.hitLoss(3, w);
     assert.ok(n >= 0 && n <= 3);
   }
   for (let i = 0; i < 50; i++) {
-    const n = Rules.hitLoss(10000);
+    const n = Rules.hitLoss(10000, w);
     assert.ok(n >= MONEY_LOSS.min && n <= MONEY_LOSS.max);
   }
+});
+
+test('arranque suave: sin multa en las primeras oleadas, niveles 1 y 2 baratos y premio por oleada', () => {
+  for (let w = 1; w <= START.freeHits; w++) assert.equal(Rules.hitLoss(10000, w), 0);
+  assert.equal(xpForLevel(1), 24);
+  assert.equal(xpForLevel(2), 60);
+  assert.equal(xpForLevel(3), 139, 'del nivel 3 en adelante, la curva de siempre');
+  assert.equal(Rules.waveBonus(1), START.bonus.base + START.bonus.perWave);
+  assert.ok(Rules.waveBonus(5) > Rules.waveBonus(1));
 });
 
 test('goldenReward cae dentro del rango y bountyOf conoce todos los tipos', () => {

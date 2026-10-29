@@ -2,7 +2,7 @@
 // (js/main.js) y el servidor en línea (server/src/sim/ServerSim.ts). Aquí vive lo que es igual
 // en los dos lados (bajas, botín, zombi dorado, ácido, cohetes, golpes); lo que cambia
 // (de quién es el dinero, cómo se avisa, de quién es la experiencia) lo pone quien llama con ganchos.
-import { BOUNTY, DROPS, GOLDEN, HEAVY, MONEY_LOSS, ROCKET, WORLD_SIZE, xpForLevel } from '../core/config.ts';
+import { BOUNTY, DROPS, GOLDEN, HEAVY, MONEY_LOSS, ROCKET, START, WORLD_SIZE, xpForLevel } from '../core/config.ts';
 import { rand, randInt } from '../core/util.ts';
 import { ACID } from './build.ts';
 import { bulletHit } from './combat.ts';
@@ -49,8 +49,12 @@ export function bountyNow(game: GameHost, p: Pick<Player, 'cash'>, type: string,
   return n;
 }
 
-/** Dinero que cuesta un golpe de zombi: nunca más del que se tiene. */
-export const hitLoss = (money: number) => Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+/** Dinero que cuesta un golpe de zombi: nunca más del que se tiene, y nada en las primeras oleadas. */
+export const hitLoss = (money: number, wave: number) =>
+  wave <= START.freeHits ? 0 : Math.min(money, randInt(MONEY_LOSS.min, MONEY_LOSS.max));
+
+/** Premio por superar la oleada `wave`. */
+export const waveBonus = (wave: number) => START.bonus.base + START.bonus.perWave * wave;
 
 /**
  * Suma experiencia a quien tenga `xp`, `xpNeed` y `level`; devuelve cuántos niveles subió

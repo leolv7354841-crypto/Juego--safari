@@ -18,6 +18,7 @@ import { Player } from './sim/player.ts';
 import { Horde } from './sim/zombies.ts';
 import { Bullets } from './sim/bullets.ts';
 import { Particles, Decals } from './render/particles.js';
+import { Floaters } from './render/floaters.js';
 import { Pickups } from './sim/pickups.ts';
 import { setChunkView } from './render/world.js';
 import { Director } from './sim/director.ts';
@@ -62,6 +63,7 @@ class Game {
     this.camera = new Camera();
     this.particles = new Particles();
     this.decals = new Decals();
+    this.floaters = new Floaters();
     this.pickups = new Pickups();
     this.bullets = new Bullets();
     this.structures = new Structures();
@@ -202,6 +204,11 @@ class Game {
     this.director = new Director();
     this.particles.clear();
     this.decals.clear();
+    this.floaters.clear();
+    this.hitstop = 0;
+    this.hitstopCd = 0;
+    this.killRun = 0;
+    this.lastKillT = -1;
     this.pickups.clear();
     this.bullets.clear();
     this.time = 0;
@@ -268,6 +275,7 @@ class Game {
       // en línea el mundo sigue aunque haya otra pantalla encima (mejoras, tienda, pausa)
       if (this.mode.viaServer()) this.online.update(dt);
       stepState(this, dt);
+      this.floaters.update(dt);
       render(this);
     } catch (err) {
       console.error(err);

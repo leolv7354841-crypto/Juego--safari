@@ -13,6 +13,7 @@ import {
   HEAVY,
   HEAVY_UP,
   PLAYER_BASE,
+  START,
   WEAPONS,
 } from '../../js/core/config.ts';
 import { heavyLevel } from '../../js/sim/heavy.ts';
@@ -280,6 +281,11 @@ test('robot: se compra, se sube y aguanta los golpes por el piloto', () => {
   sim.act('a', { s: seq.n + 1, k: 'robot', kind: '', tx: 0, ty: 0 });
   idle(sim, 'a', seq, 1);
   assert.ok(!a.p.inRobot, 'bajó');
+  // en las primeras oleadas los golpes no cuestan dinero
+  const before = a.money;
+  sim.onZombieHit(a.p);
+  assert.equal(a.money, before);
+  sim.director.wave = START.freeHits + 1;
   sim.onZombieHit(a.p);
   assert.ok(a.money < 3000 - 10 && sim.snapshot('a', 0)!.ml > 0, 'fuera del robot el golpe cuesta dinero y se avisa');
 });

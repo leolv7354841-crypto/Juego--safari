@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EVENT_ORDER, EVENTS, WAVES } from '../js/core/config.ts';
+import { EVENT_ORDER, EVENTS, START, WAVES } from '../js/core/config.ts';
 import { Director } from '../js/sim/director.ts';
 import { fakeGame } from './helpers.js';
 
@@ -24,19 +24,23 @@ const count = (q) =>
     return m;
   }, {});
 
-test('la oleada 1 solo trae normales, SWAT y velocistas', () => {
+test('la oleada 1 es chica y solo trae normales y velocistas; la 2 suma los SWAT', () => {
   const d = sinRondas();
   d.startWave(fakeGame());
   assert.equal(d.wave, 1);
   assert.equal(d.state, 'active');
   assert.equal(d.waveSize, d.queue.length);
   const c = count(d.queue);
-  assert.deepEqual(Object.keys(c).sort(), ['normal', 'sprinter', 'swat']);
-  // la fórmula de la oleada 1, escalada por WAVES.count (el balance vive en config.js)
-  const normalTotal = Math.round(WAVES.count * 5 * (32 + 18 + 1));
-  assert.equal(c.normal + c.swat, normalTotal);
-  assert.equal(c.swat, Math.round(normalTotal * 0.2));
-  assert.equal(c.sprinter, Math.round(WAVES.count * 5 * 3));
+  assert.deepEqual(Object.keys(c).sort(), ['normal', 'sprinter']);
+  // la fórmula de la oleada 1, escalada por WAVES.count y el arranque suave (el balance vive en config.ts)
+  const k = WAVES.count * START.size[0];
+  assert.equal(c.normal, Math.round(k * 5 * (32 + 18 + 1)));
+  assert.equal(c.sprinter, Math.round(k * 5 * 3));
+  d.startWave(fakeGame());
+  const c2 = count(d.queue);
+  const normalTotal = Math.round(WAVES.count * START.size[1] * 5 * (32 + 36 + 3));
+  assert.equal(c2.normal + c2.swat, normalTotal);
+  assert.equal(c2.swat, Math.round(normalTotal * 0.2));
 });
 
 test('el tamaño de la cola es determinista y crece con la oleada', () => {

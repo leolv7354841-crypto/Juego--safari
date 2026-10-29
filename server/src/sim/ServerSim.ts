@@ -591,7 +591,7 @@ export class ServerSim {
     const s = this.slotOf(p);
     if (!s || p.inRobot || p.boostT > 0) return;
     comboBreak(p.combo);
-    const loss = Rules.hitLoss(s.money);
+    const loss = Rules.hitLoss(s.money, this.director.wave);
     if (loss <= 0) return;
     s.money -= loss;
     s.lost += loss;
@@ -646,6 +646,13 @@ export class ServerSim {
 
   onWaveCleared() {
     this.structures.waveRepair();
+    // premio por superar la oleada, para cada uno
+    const bonus = Rules.waveBonus(this.director.wave);
+    for (const s of this.slots.values()) {
+      if (s.away) continue;
+      s.money += bonus;
+      s.toasts.push(`¡Oleada superada! +$${bonus}`);
+    }
     // al terminar la oleada revive quien haya caído, junto a un compañero vivo
     const alive = [...this.slots.values()].filter((s) => s.p.alive && !s.away);
     for (const s of this.slots.values()) {

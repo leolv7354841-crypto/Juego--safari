@@ -411,10 +411,23 @@ export const ZOMBIES = {
   },
 };
 
+// Arranque suave para engancharse rápido:
+//   size: fracción de normales y velocistas en las oleadas 1, 2 y 3 (desde la 4, la horda entera)
+//   swatFrom: oleada desde la que llegan policías SWAT · freeHits: hasta qué oleada los golpes no cuestan dinero
+//   xp: fracción de la experiencia que piden los niveles 1 y 2
+//   bonus: premio por superar la oleada w = base + perWave × w
+export const START = {
+  size: [0.45, 0.65, 0.85],
+  swatFrom: 2,
+  freeHits: 3,
+  xp: [0.47, 0.67],
+  bonus: { base: 15, perWave: 10 },
+};
+
 // Curva de experiencia: barata al principio (mejoras seguidas en los primeros minutos)
 // y cuadrática después, sin saltos bruscos entre niveles.
-//   nv1 51 · nv2 89 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
-export const xpForLevel = (lvl: number) => Math.round(25 + 20 * lvl + 6 * lvl * lvl);
+//   nv1 24 · nv2 60 · nv3 139 · nv5 275 · nv10 825 · nv20 2825
+export const xpForLevel = (lvl: number) => Math.round((25 + 20 * lvl + 6 * lvl * lvl) * (START.xp[lvl - 1] ?? 1));
 
 // Dinero por cada zombi eliminado: la cuarta parte de lo que era (se ganaba demasiado rápido).
 // Hay fracciones: lo que sobra de cada baja se junta en Player.cash hasta completar un dólar.

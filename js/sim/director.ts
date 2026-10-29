@@ -1,5 +1,5 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { EVENT_ORDER, EVENTS, MAX_ALIVE, WORLD_SIZE, WAVES } from '../core/config.ts';
+import { EVENT_ORDER, EVENTS, MAX_ALIVE, START, WORLD_SIZE, WAVES } from '../core/config.ts';
 import type { EventDef } from '../core/config.ts';
 import { rand, randInt } from '../core/util.ts';
 import type { GameHost, Vec } from '../core/types.d.ts';
@@ -28,11 +28,13 @@ export interface WaveCounts {
 // policía SWAT. WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno.
 export function waveCounts(w: number, m: number, ev: EventDef | null): WaveCounts {
   const few = (n: number) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
-  const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
+  // arranque suave: las primeras oleadas traen menos normales y velocistas, y la primera sin SWAT
+  const early = START.size[w - 1] ?? 1;
+  const normalTotal = Math.round(m * early * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
   // asedio blindado: más policías SWAT entre los normales
-  let swat = Math.round(normalTotal * (ev?.swat ?? 0.2));
+  let swat = w < START.swatFrom ? 0 : Math.round(normalTotal * (ev?.swat ?? 0.2));
   let normal = normalTotal - swat;
-  let sprinter = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
+  let sprinter = Math.round(m * early * 5 * (3 + Math.floor((w - 1) * 3.5)));
   let fat = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
   // después de la oleada 10 llegan los super blindados: el 7% de toda la horda (en lugar de normales)
   let heavy = w > 10 ? Math.round((normalTotal + sprinter + fat) * 0.07) : 0;
@@ -155,10 +157,12 @@ export class Director {
             : heavies
               ? 'Super blindados en la horda'
               : w === 1
-                ? 'Velocistas y policías SWAT'
-                : fats
-                  ? 'Cuidado con los gordos'
-                  : 'Sobrevive',
+                ? 'Calienta motores: llegan pocos'
+                : w === 2
+                  ? 'Llegan los policías SWAT y los gordos'
+                  : fats
+                    ? 'Cuidado con los gordos'
+                    : 'Sobrevive',
     );
     game.sfx.wave();
   }

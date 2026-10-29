@@ -52,6 +52,7 @@ export function updateMenu(game, dt) {
 // Un paso de la partida en solitario.
 export function updatePlay(game, dt) {
   game.time += dt;
+  game.hitstopCd -= dt;
   const p = game.player;
   if (game.input.consume('pause')) {
     game.pause();
@@ -132,7 +133,13 @@ export const STATES = {
   play: {
     music: true,
     update: (game, dt) => {
-      if (!game.mode.step(dt)) updatePlay(game, dt);
+      if (game.mode.step(dt)) return;
+      // micro-congelado tras una baja fuerte: el mundo se detiene un instante (ver events.js)
+      if (game.hitstop > 0) {
+        game.hitstop -= dt;
+        return;
+      }
+      updatePlay(game, dt);
     },
   },
   pause: {
