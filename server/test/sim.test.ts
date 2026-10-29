@@ -514,7 +514,7 @@ test('torreta pesada: mejoras junto a ella (también a mitad de oleada) y piloto
   assert.equal(b.money, 100000);
   // el blindaje sube la vida máxima y viaja con la foto (último campo de blk)
   assert.ok(sim.shop('a', 'tup', 'armor', 0));
-  assert.equal(t.max, HEAVY_UP.armor.hp[1]);
+  assert.equal(t.max, HEAVY_UP.armor.hp![1]);
   const blk = sim.snapshot('a', 0)!.blk;
   assert.ok(Array.isArray(blk) && blk[0][7] === t.up, 'los niveles van en la foto');
   // piloto automático: se aleja, llega un zombi y la torreta dispara sola con las balas de Ana
