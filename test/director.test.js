@@ -71,6 +71,22 @@ test('toros desde la oleada 3, gordos desde la 2, blindados tras la 10', () => {
   assert.ok(seen[10].heavy > 0);
 });
 
+test('composition describe exactamente la cola que arma startWave', () => {
+  for (const w of [1, 2, 5, 12]) {
+    const d = sinRondas();
+    for (let i = 0; i < w; i++) d.startWave(fakeGame());
+    const c = count(d.queue);
+    const k = d.composition(w);
+    assert.equal(k.total, d.queue.length, `total de la oleada ${w}`);
+    for (const t of ['normal', 'swat', 'sprinter', 'fat', 'heavy', 'bull'])
+      assert.equal(k[t], c[t] || 0, `${t} en la oleada ${w}`);
+  }
+  // sin arrancar nada: sirve para prever cualquier ronda
+  const d = sinRondas();
+  assert.ok(d.composition(20).total > d.composition(3).total);
+  assert.equal(d.wave, 0);
+});
+
 test('en grupo la cola se reduce a la mitad y online usa crowd', () => {
   const solo = sinRondas();
   solo.startWave(fakeGame());

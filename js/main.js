@@ -41,6 +41,7 @@ import { openTurret, bindTurret } from './ui/turret.js';
 import { toast, banner, updateHud, updateNetStat, moneyPop, bindHud } from './ui/hud.js';
 import { Input } from './ui/input.js';
 import { Sfx } from './ui/audio.js';
+import { bindDev, toggleDev, updateDev } from './ui/dev.js';
 import { cleanLook } from './render/sprites.js';
 
 class Game {
@@ -91,6 +92,8 @@ class Game {
     this.muzzle = 0;
     this.hurtFlash = 0;
     this.cache = {};
+    // modo desarrollador (?dev=1): lo llena bindDev (ui/dev.js)
+    this.dev = null;
     /** @type {(id: string) => any} */
     this.$ = (id) => document.getElementById(id);
     this.look = cleanLook(storage.get('dz-look', null));
@@ -214,6 +217,8 @@ class Game {
     this.taken = {};
     this.money = 0;
     this.moneyEarned = 0;
+    // se usó una trampa del modo desarrollador: la partida no cuenta para récords
+    this.devUsed = false;
     this.inv = Object.fromEntries([...BUILD_ORDER, ...THROWABLES].map((k) => [k, 0]));
     this.buildSel = 'wood';
     this.shopPending = false;
@@ -243,14 +248,20 @@ class Game {
     bindAccount(this);
     bindBoard(this);
     bindLobby(this);
+    bindDev(this);
   }
 
   /* ---------- bucle ---------- */
 
   loop(now) {
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const real = (now - this.last) / 1000;
+    const raw = Math.min(0.05, real);
     this.last = now;
+    // velocidad del juego del modo desarrollador (sólo cuando esta máquina simula)
+    const dt = this.mode.viaServer() ? raw : Math.min(0.05, raw * this.dev.speed);
     try {
+      if (this.input.consume('dev')) toggleDev(this);
+      updateDev(this, real);
       adaptQuality(this, dt);
       this.online.tick(dt);
       updateNetStat(this, dt);

@@ -48,6 +48,7 @@ export function saveProgress(game) {
     taken: game.taken,
     money: game.money,
     moneyEarned: game.moneyEarned,
+    dev: !!game.devUsed,
     inv: game.inv,
     buildSel: game.buildSel,
     player: {
@@ -99,6 +100,7 @@ export function loadProgress(game, kind = 'save') {
   game.taken = d.taken || {};
   game.money = d.money;
   game.moneyEarned = d.moneyEarned;
+  game.devUsed = !!d.dev;
   Object.assign(game.inv, d.inv);
   game.buildSel = d.buildSel || 'wood';
   const p = game.player;

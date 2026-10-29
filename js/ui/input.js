@@ -51,6 +51,8 @@ export class Input {
       if (e.code === 'KeyX') this.pressed.ability = true;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') this.pressed.nextRound = true;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pressed.pause = true;
+      // modo desarrollador: la tecla a la izquierda del 1 (º en teclado español, ` en el inglés)
+      if (e.code === 'Backquote') this.pressed.dev = true;
       const m = /^Digit([1-9])$/.exec(e.code);
       if (m) this.pressed.slot = Number(m[1]);
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) this.setMode('mouse');

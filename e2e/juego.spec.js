@@ -45,6 +45,30 @@ test('la tienda se abre entre rondas y se cierra', async ({ page }) => {
   expect(errores).toEqual([]);
 });
 
+test('modo desarrollador: ?dev=1 abre el panel, da dinero y salta de ronda', async ({ page }) => {
+  const errores = await abrir(page, '/index.html?dev=1');
+  await expect(page.locator('#dev')).toBeVisible();
+  await jugarSolo(page);
+  const dinero = () => page.evaluate(() => window.__deadzone.money);
+  const m0 = await dinero();
+  await page.locator('#dev [data-act="money"][data-n="1000"]').click();
+  expect(await dinero()).toBe(m0 + 1000);
+  // ir a la ronda 5: arranca sin pasar por las anteriores y el panel lo cuenta
+  await page.locator('#dev-wave').fill('5');
+  await page.locator('#dev [data-act="goto"]').click();
+  await expect.poll(() => page.evaluate(() => window.__deadzone.director.wave)).toBe(5);
+  await expect(page.locator('#dev-stats')).toContainText('Oleada 5 · en curso');
+  // la partida queda marcada (sin récord) y la tecla º / ` oculta el panel
+  expect(await page.evaluate(() => window.__deadzone.devUsed)).toBe(true);
+  await page.keyboard.press('Backquote');
+  await expect(page.locator('#dev')).toBeHidden();
+  // ?dev=0 lo apaga para las próximas cargas
+  await page.goto('/index.html?dev=0');
+  await expect.poll(() => page.evaluate(() => window.__deadzone?.state)).toBe('menu');
+  await expect(page.locator('#dev')).toBeHidden();
+  expect(errores).toEqual([]);
+});
+
 test('guardar, recargar y continuar', async ({ page }) => {
   const errores = await abrir(page);
   await jugarSolo(page);

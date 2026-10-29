@@ -12,6 +12,43 @@ export interface View {
   hh: number;
 }
 
+/** Zombis de cada tipo que trae una oleada (normal ya descuenta los super blindados que lo sustituyen). */
+export interface WaveCounts {
+  normal: number;
+  swat: number;
+  sprinter: number;
+  fat: number;
+  heavy: number;
+  bull: number;
+  total: number;
+}
+
+// Composición de la oleada w con escala m (WAVES.count por el factor de grupo) y ronda especial ev.
+// hordas masivas: 5 veces más normales y velocistas que antes; el 20% de los normales llega como
+// policía SWAT. WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno.
+export function waveCounts(w: number, m: number, ev: EventDef | null): WaveCounts {
+  const few = (n: number) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
+  const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
+  // asedio blindado: más policías SWAT entre los normales
+  let swat = Math.round(normalTotal * (ev?.swat ?? 0.2));
+  let normal = normalTotal - swat;
+  let sprinter = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
+  let fat = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
+  // después de la oleada 10 llegan los super blindados: el 7% de toda la horda (en lugar de normales)
+  let heavy = w > 10 ? Math.round((normalTotal + sprinter + fat) * 0.07) : 0;
+  // toros desde la oleada 3: pocos, pero embisten
+  let bull = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
+  if (ev?.size) {
+    // estampida: una horda más chica, toda de velocistas y toros
+    const total = Math.round((normalTotal + sprinter + fat + bull) * ev.size);
+    bull = Math.max(few(2), Math.round(total * (ev.bulls ?? 0)));
+    sprinter = total - bull;
+    normal = swat = fat = heavy = 0;
+  }
+  normal -= heavy;
+  return { normal, swat, sprinter, fat, heavy, bull, total: normal + swat + sprinter + fat + heavy + bull };
+}
+
 export class Director {
   declare wave: number;
   declare state: string;
@@ -73,37 +110,29 @@ export class Director {
     return WAVES.speed * (1 + Math.min(0.25, Math.max(0, this.wave - 3) * 0.02)) * (ev?.speed ?? 1);
   }
 
+  /** Cuántos zombis de cada tipo traería la oleada w con la escala de esta partida (sin ronda especial). */
+  composition(w: number): WaveCounts {
+    return waveCounts(w, (this.coop ? this.crowd || 0.5 : 1) * WAVES.count, null);
+  }
+
   startWave(game: GameHost) {
     this.wave++;
     const w = this.wave;
-    // hordas masivas: 5 veces más normales y velocistas que antes
-    // el 20% de los normales llega como policía SWAT
     // en grupo: la mitad de zombis que en solitario (eran demasiados)
     // en línea: crowd crece con el número de jugadores (ver NET.crowd)
-    // WAVES.count: rondas más cortas; los tipos especiales que tocan salen al menos de a uno
     const m = (this.coop ? this.crowd || 0.5 : 1) * WAVES.count;
-    const few = (n: number) => (n > 0 ? Math.max(1, Math.round(m * n)) : 0);
     this.event = this.rollEvent(w);
     const ev = this.eventDef;
-    const normalTotal = Math.round(m * 5 * (32 + w * 18 + Math.floor(Math.pow(w, 1.8))));
-    // asedio blindado: más policías SWAT entre los normales
-    let swats = Math.round(normalTotal * (ev?.swat ?? 0.2));
-    let normals = normalTotal - swats;
-    let sprinters = Math.round(m * 5 * (3 + Math.floor((w - 1) * 3.5)));
-    let fats = few(w >= 2 ? Math.floor((w - 1) * 2) : 0);
-    // después de la oleada 10 llegan los super blindados: el 7% de toda la horda
-    let heavies = w > 10 ? Math.round((normalTotal + sprinters + fats) * 0.07) : 0;
-    // toros desde la oleada 3: pocos, pero embisten
-    let bulls = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
-    if (ev?.size) {
-      // estampida: una horda más chica, toda de velocistas y toros
-      const total = Math.round((normalTotal + sprinters + fats + bulls) * ev.size);
-      bulls = Math.max(few(2), Math.round(total * (ev.bulls ?? 0)));
-      sprinters = total - bulls;
-      normals = swats = fats = heavies = 0;
-    }
+    const {
+      normal: normals,
+      swat: swats,
+      sprinter: sprinters,
+      fat: fats,
+      heavy: heavies,
+      bull: bulls,
+    } = waveCounts(w, m, ev);
     const q: string[] = [];
-    for (let i = 0; i < normals - heavies; i++) q.push('normal');
+    for (let i = 0; i < normals; i++) q.push('normal');
     for (let i = 0; i < heavies; i++) q.splice(randInt(0, q.length), 0, 'heavy');
     for (let i = 0; i < sprinters; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'sprinter');
     for (let i = 0; i < swats; i++) q.splice(randInt(0, q.length), 0, 'swat');

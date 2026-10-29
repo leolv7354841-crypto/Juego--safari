@@ -153,7 +153,8 @@ export function onWaveCleared(game) {
 
 // Mejor marca de la cuenta: oleada alcanzada y bajas.
 export function recordScore(game) {
-  if (game.state === 'menu') return;
+  // las partidas con trampas del modo desarrollador no cuentan
+  if (game.state === 'menu' || game.devUsed) return;
   if (
     game.accounts.recordScore({
       wave: game.director.wave,

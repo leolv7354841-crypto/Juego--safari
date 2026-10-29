@@ -172,6 +172,28 @@ animación. Hay gruñidos, pasos de la horda, impactos y caídas. La música cam
 | `Enter`: iniciar siguiente ronda | Botón del panel **Ronda completada** |
 | `Esc` / `P`: pausa | Botón de pausa |
 
+### Modo desarrollador
+
+Para probar el juego sin jugar cada ronda hay un panel de desarrollo (`js/ui/dev.js`). Se activa abriendo el
+juego con `?dev=1` en la dirección (por ejemplo `http://localhost:8080/?dev=1`); queda guardado en ese
+navegador hasta que lo abras con `?dev=0`. En el celular, sin teclado, se activa y desactiva tocando
+**cinco veces seguidas el número de versión** del menú principal. Con el modo activado, la tecla **º**
+(la que está a la izquierda del `1`; `` ` `` en teclado inglés) enseña u oculta el panel.
+
+El panel muestra, cuatro veces por segundo: la oleada y su estado, los zombis **vivos**, **en pantalla** y
+**cerca** (y cuántos de cada tipo), el tamaño de la ronda con lo que queda **en cola**, lo que traen las
+**dos rondas siguientes** (sin contar rondas especiales), el reloj del zombi dorado, la posición, vida,
+nivel y dinero del jugador, y balas, partículas, estructuras y FPS. Y tiene botones para: dar **dinero**
+(+$1 000 y +$10 000), **subir de nivel**, **matar a todos** (con botín), **terminar la ronda** (abre la
+tienda como siempre), **saltar a cualquier ronda** (la que esté en curso se descarta), **generar N zombis**
+de un tipo junto a la pantalla, sacar un **zombi dorado**, cambiar la **velocidad del juego** (×0,25 a
+×3), ser **invencible**, tener **munición infinita**, desbloquear **todas las armas** y desplegar el
+**robot**.
+
+Una partida en la que se usó cualquiera de esas trampas queda marcada (también en el guardado) y **no
+cuenta para los récords** de la cuenta ni para la clasificación. En línea el servidor manda, así que el
+panel sólo muestra cifras.
+
 ## Ejecutar en local
 
 Los módulos de JavaScript necesitan un servidor (no funciona abriendo el archivo con doble clic):
@@ -297,7 +319,29 @@ siguiente. Si alguien pierde la conexión, su personaje se queda quieto, los zom
 recibe daño durante 20 s; si vuelve (con el token de reconexión, también tras recargar la página)
 recupera el mismo personaje; si no, sale de la sala.
 
-### Ejecutar en local
+#### Modo desarrollador
+
+Para probar el juego sin jugar cada ronda hay un panel de desarrollo (`js/ui/dev.js`). Se activa abriendo el
+juego con `?dev=1` en la dirección (por ejemplo `http://localhost:8080/?dev=1`); queda guardado en ese
+navegador hasta que lo abras con `?dev=0`. En el celular, sin teclado, se activa y desactiva tocando
+**cinco veces seguidas el número de versión** del menú principal. Con el modo activado, la tecla **º**
+(la que está a la izquierda del `1`; `` ` `` en teclado inglés) enseña u oculta el panel.
+
+El panel muestra, cuatro veces por segundo: la oleada y su estado, los zombis **vivos**, **en pantalla** y
+**cerca** (y cuántos de cada tipo), el tamaño de la ronda con lo que queda **en cola**, lo que traen las
+**dos rondas siguientes** (sin contar rondas especiales), el reloj del zombi dorado, la posición, vida,
+nivel y dinero del jugador, y balas, partículas, estructuras y FPS. Y tiene botones para: dar **dinero**
+(+$1 000 y +$10 000), **subir de nivel**, **matar a todos** (con botín), **terminar la ronda** (abre la
+tienda como siempre), **saltar a cualquier ronda** (la que esté en curso se descarta), **generar N zombis**
+de un tipo junto a la pantalla, sacar un **zombi dorado**, cambiar la **velocidad del juego** (×0,25 a
+×3), ser **invencible**, tener **munición infinita**, desbloquear **todas las armas** y desplegar el
+**robot**.
+
+Una partida en la que se usó cualquiera de esas trampas queda marcada (también en el guardado) y **no
+cuenta para los récords** de la cuenta ni para la clasificación. En línea el servidor manda, así que el
+panel sólo muestra cifras.
+
+## Ejecutar en local
 
 ```bash
 npm run server:install   # una vez: dependencias del servidor

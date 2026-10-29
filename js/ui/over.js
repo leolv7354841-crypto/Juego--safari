@@ -49,6 +49,10 @@ export function gameOver(game) {
     dd.textContent = v;
     dl.append(dt, dd);
   }
+  if (game.devUsed) {
+    game.$('over-best').textContent = 'Partida con modo desarrollador: no cuenta para los récords';
+    return;
+  }
   const best = storage.get('dz-best', null);
   const record = !best || game.time > best.time;
   if (record) storage.set('dz-best', { time: game.time, kills: total, wave: game.director.wave });
