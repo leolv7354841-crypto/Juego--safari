@@ -1,4 +1,4 @@
-// Página de estadísticas (/stats/): pide los agregados a Supabase con la clave de acceso y los pinta.
+// Página de estadísticas (/stats, stats.html): pide los agregados a Supabase con la clave de acceso y los pinta.
 // La clave se valida en Postgres (`estadisticas(clave, desde)`); se recuerda en este navegador.
 import { SHOP, WEAPONS } from '../core/config.ts';
 import { storage } from '../core/util.ts';
