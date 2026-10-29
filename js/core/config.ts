@@ -716,6 +716,17 @@ export const SHOP = {
     h: 40,
     rotates: true,
   },
+  reinforced: {
+    name: 'Barrera de concreto reforzado',
+    desc: 'Concreto grueso con placas de acero y vigas. Lo más duro que puedes construir.',
+    price: 1300,
+    hp: 18000,
+    // fracción del daño que no le llega
+    armor: 0.1,
+    w: 80,
+    h: 40,
+    rotates: true,
+  },
   turret: {
     name: 'Torreta automática',
     desc: 'Dispara sola al zombi más cercano. Ponla detrás de tus muros.',
@@ -784,6 +795,7 @@ export const BUILD_ORDER = [
   'fence',
   'concrete',
   'hesco',
+  'reinforced',
   'turret',
   'heavy',
   'wire',

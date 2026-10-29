@@ -72,7 +72,8 @@ de elegir tu mejora de nivel) se abre la tienda:
 | Bloque de metal | $30 | 3× más que la madera (520) |
 | Valla de metal reforzado | $70 | Muro ancho muy resistente (1400) |
 | Muro de concreto | $150 | La defensa más dura (3200) |
-| Barrera HESCO | $600 | Gaviones de malla con arena, casi indestructibles (10000) |
+| Barrera HESCO | $800 | Gaviones de malla con arena, casi indestructibles (10000) |
+| Barrera de concreto reforzado | $1300 | Concreto con placas de acero y vigas; recibe 10 % menos daño (18000) |
 | Torreta automática | $500 | Dispara sola al zombi más cercano |
 | Alambre de púas | $20 | No bloquea: frena y hiere |
 | Trampa de pinchos | $60 | Frena y hiere mucho más |

@@ -13,6 +13,7 @@ interface ShopDef {
   rotates?: boolean;
   ground?: boolean;
   turret?: boolean;
+  armor?: number;
 }
 const shopDef = (kind: string): ShopDef => (SHOP as unknown as Record<string, ShopDef>)[kind];
 
@@ -298,7 +299,7 @@ export class Structures {
   damageBlock(game: GameHost, o: Block, dmg: number) {
     if (o.hp <= 0) return;
     o = this.topOf(o);
-    o.hp -= dmg;
+    o.hp -= dmg * (1 - (shopDef(o.kind).armor || 0));
     o.hitT = 0.12;
     game.particles.impact(
       o.x + o.w / 2 + rand(-o.w, o.w) * 0.3,

@@ -32,6 +32,8 @@ export const ITEM_ICONS = {
     '<svg viewBox="0 0 12 12"><rect x="0.5" y="3" width="11" height="6" fill="#8c8a84" stroke="#141612"/><rect x="0.5" y="3" width="11" height="2" fill="#a3a19a"/></svg>',
   hesco:
     '<svg viewBox="0 0 12 12"><rect x="0.5" y="2.5" width="11" height="7" fill="#c9b98c" stroke="#141612"/><rect x="1.8" y="3.8" width="3.6" height="4.4" fill="#a8966a"/><rect x="6.6" y="3.8" width="3.6" height="4.4" fill="#a8966a"/><path d="M6 2.5v7" stroke="#6e7070" stroke-width=".8"/></svg>',
+  reinforced:
+    '<svg viewBox="0 0 12 12"><rect x="0.5" y="2.5" width="11" height="7" fill="#7b7973" stroke="#141612"/><rect x="2.4" y="3.6" width="3.2" height="4.8" fill="#7a4c2c"/><rect x="6.4" y="3.6" width="3.2" height="4.8" fill="#7a4c2c"/><path d="M1.4 2v8M10.6 2v8M6 2v8" stroke="#3f4448" stroke-width="1.2"/></svg>',
   turret:
     '<svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="#3d4246" stroke="#141612"/><circle cx="6" cy="6" r="3" fill="#5c6268"/><rect x="6" y="5" width="5.5" height="2" fill="#1e2124"/></svg>',
   heavy:

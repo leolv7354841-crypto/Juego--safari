@@ -75,7 +75,7 @@ export function renderShop(game) {
     const poor = game.money < it.price;
     return `<div class="shop-item${THROWABLES.includes(k) ? ' hot' : ''}">
       <canvas class="shop-ic" data-ic="${k}" width="96" height="96"></canvas>
-      <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${game.inv[k]}${it.hp > 1 ? ` · Resistencia ${it.hp}` : ''}</small></div>
+      <div class="shop-txt"><b>${it.name}</b><span>${it.desc}</span><small>Tienes ${game.inv[k]}${it.hp > 1 ? ` · Resistencia ${it.hp}` : ''}${it.armor ? ` · Reduce ${it.armor * 100}% el daño` : ''}</small></div>
       <button class="btn buy${poor ? ' poor' : ''}" data-buy="${k}" ${poor ? 'disabled' : ''}>$${it.price}</button>
     </div>`;
   });

@@ -542,8 +542,154 @@ export function drawHeavyPrompt(ctx, game) {
   });
 }
 
+// Barrera de concreto reforzado: losa gruesa con vigas de acero en los extremos y placas oxidadas
+// remachadas. Se dibuja a lo largo (L) y a lo ancho (S) desde el centro; si está de pie, se gira.
+// Grietas finas a la mitad de la vida y, al cuarto, grietas grandes, esquinas rotas y varilla expuesta.
+function drawReinforced(ctx, b) {
+  const { x, y, w, h } = b;
+  const horiz = w >= h;
+  const L = horiz ? w : h;
+  const S = horiz ? h : w;
+  const hl = L / 2;
+  const hs = S / 2;
+  const life = b.hp / b.max;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(x + 5, y + 6, w, h);
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  if (!horiz) ctx.rotate(Math.PI / 2);
+  // losa de concreto
+  ctx.fillStyle = '#7b7973';
+  ctx.fillRect(-hl, -hs, L, S);
+  ctx.fillStyle = '#96948c';
+  ctx.fillRect(-hl, -hs, L, S * 0.28);
+  ctx.fillStyle = '#5e5c57';
+  ctx.fillRect(-hl, hs - S * 0.16, L, S * 0.16);
+  ctx.fillStyle = 'rgba(40,38,34,0.4)';
+  for (let i = 0; i < 9; i++) ctx.fillRect(-hl + 4 + ((i * 29) % (L - 8)), -hs + 3 + ((i * 17) % (S - 6)), 2, 2);
+  // placas de acero oxidado entre las vigas
+  const px = hl - 14;
+  for (const s of [-1, 1]) {
+    const x0 = s < 0 ? -px + 3 : 5;
+    const pw = px - 8;
+    const g = ctx.createLinearGradient(x0, -hs * 0.5, x0 + pw, hs * 0.5);
+    g.addColorStop(0, '#8d5b35');
+    g.addColorStop(1, '#5f3b22');
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, -hs * 0.5, pw, S * 0.62);
+    ctx.fillStyle = 'rgba(176,104,52,0.55)';
+    ctx.fillRect(x0 + pw * 0.15, -hs * 0.4, pw * 0.3, 3);
+    ctx.fillRect(x0 + pw * 0.5, hs * 0.5, pw * 0.35, 2);
+    ctx.fillStyle = 'rgba(30,20,12,0.35)';
+    ctx.fillRect(x0 + pw * 0.6, -hs * 0.3, 2.5, S * 0.3);
+    ctx.strokeStyle = '#2e2218';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0, -hs * 0.5, pw, S * 0.62);
+    ctx.fillStyle = '#c9b49a';
+    for (const [rx, ry] of [
+      [x0 + 3, -hs * 0.5 + 3],
+      [x0 + pw - 3, -hs * 0.5 + 3],
+      [x0 + 3, hs * 0.74 - 3],
+      [x0 + pw - 3, hs * 0.74 - 3],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.3, 0, TAU);
+      ctx.fill();
+    }
+  }
+  // vigas de acero (perfil en I) que atraviesan la losa en los extremos y al centro
+  for (const bx of [-hl + 7, hl - 7, 0]) {
+    const bw = bx ? 8 : 4;
+    ctx.fillStyle = '#3f4448';
+    ctx.fillRect(bx - bw / 2, -hs - 2, bw, S + 3);
+    ctx.fillStyle = '#6d7377';
+    ctx.fillRect(bx - bw / 2, -hs - 2, bw, 2);
+    ctx.fillRect(bx - bw / 2, hs - 1, bw, 2);
+    ctx.fillStyle = 'rgba(200,205,210,0.25)';
+    ctx.fillRect(bx - bw / 2, -hs, 1.2, S - 1);
+    if (bx) {
+      ctx.fillStyle = '#c7a24a';
+      ctx.fillRect(bx - bw / 2, -2, bw, 4);
+      ctx.fillStyle = '#1e1c18';
+      ctx.fillRect(bx - 1, -2, 2, 4);
+    }
+  }
+  // marca de pintura militar
+  ctx.fillStyle = 'rgba(220,214,196,0.5)';
+  ctx.fillRect(-px + 4, -hs + 3, 3, 3);
+  ctx.fillRect(-px + 9, -hs + 3, 9, 3);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = OUT;
+  ctx.strokeRect(-hl, -hs, L, S);
+  if (life <= 0.5) {
+    // grietas finas
+    ctx.strokeStyle = 'rgba(20,18,15,0.8)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(-hl * 0.55, -hs);
+    ctx.lineTo(-hl * 0.45, -hs * 0.4);
+    ctx.lineTo(-hl * 0.6, hs * 0.1);
+    ctx.moveTo(hl * 0.3, hs);
+    ctx.lineTo(hl * 0.38, hs * 0.45);
+    ctx.lineTo(hl * 0.3, hs * 0.1);
+    ctx.moveTo(hl * 0.38, hs * 0.45);
+    ctx.lineTo(hl * 0.5, hs * 0.3);
+    ctx.stroke();
+  }
+  if (life <= 0.25) {
+    // esquinas rotas con la varilla a la vista
+    ctx.fillStyle = '#2b2925';
+    for (const [cx, cy, sx, sy] of [
+      [-hl, -hs, 1, 1],
+      [hl, hs, -1, -1],
+    ]) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + sx * 13, cy);
+      ctx.lineTo(cx + sx * 9, cy + sy * 5);
+      ctx.lineTo(cx + sx * 4, cy + sy * 11);
+      ctx.lineTo(cx, cy + sy * 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#9a5a2e';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx + sx * 2, cy + sy * 4);
+      ctx.lineTo(cx + sx * 11, cy + sy * 2);
+      ctx.moveTo(cx + sx * 3, cy + sy * 2);
+      ctx.lineTo(cx + sx * 5, cy + sy * 9);
+      ctx.stroke();
+    }
+    // grietas grandes que cruzan la losa y abollan las placas
+    ctx.strokeStyle = 'rgba(12,10,8,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-hl * 0.2, -hs);
+    ctx.lineTo(-hl * 0.05, -hs * 0.3);
+    ctx.lineTo(-hl * 0.25, hs * 0.25);
+    ctx.lineTo(-hl * 0.1, hs);
+    ctx.moveTo(-hl * 0.05, -hs * 0.3);
+    ctx.lineTo(hl * 0.2, -hs * 0.1);
+    ctx.moveTo(hl * 0.65, -hs);
+    ctx.lineTo(hl * 0.55, -hs * 0.2);
+    ctx.lineTo(hl * 0.7, hs * 0.4);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(15,12,10,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(-hl * 0.45, hs * 0.1, 6, 4, 0.4, 0, TAU);
+    ctx.ellipse(hl * 0.42, -hs * 0.15, 5, 3.5, -0.3, 0, TAU);
+    ctx.fill();
+  }
+  if (b.hitT > 0) {
+    ctx.fillStyle = 'rgba(255,240,220,0.35)';
+    ctx.fillRect(-hl, -hs, L, S);
+  }
+  ctx.restore();
+}
+
 function drawBlock(ctx, b) {
   if (b.kind === 'heavy') return drawHeavy(ctx, b);
+  if (b.kind === 'reinforced') return drawReinforced(ctx, b);
   const { x, y, w, h } = b;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(x + 5, y + 6, w, h);
