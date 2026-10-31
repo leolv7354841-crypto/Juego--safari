@@ -479,6 +479,12 @@ export const BULL = {
 // Zombis normales heridos: se desangran (vida por segundo) y avanzan arrastrándose.
 export const WOUND = { bleed: 3, pace: 0.5 };
 
+// Zombis lanzados por explosiones y embestidas: gravedad (px/s²) y altura máxima (px). Se dibujan
+// más grandes cuanto más alto van; sin tope, varias explosiones seguidas los subían cientos de px
+// y parecían gigantes encima de los muros. vmax: velocidad con la que se llega justo al tope.
+const AIR_MAX = 70;
+export const AIR = { gravity: 900, max: AIR_MAX, vmax: Math.sqrt(2 * 900 * AIR_MAX) };
+
 // Molotov: charco de fuego y quemadura sobre los zombis que lo pisan.
 export const MOLOTOV = { radius: 82, life: 6.5, burn: 4, dps: 24 };
 

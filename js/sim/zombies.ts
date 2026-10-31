@@ -8,6 +8,7 @@ import {
   MOLOTOV,
   WAVES,
   ZOMBIE_VARIANTS,
+  AIR,
 } from '../core/config.ts';
 import { clamp, rand, angleTo, TAU } from '../core/util.ts';
 import type { Zombie, ZombieDef } from '../core/types.d.ts';
@@ -329,7 +330,12 @@ export class Horde {
       // lanzado por una explosión: vuela, gira y cae
       if (z.air > 0) {
         z.air += z.airV * dt;
-        z.airV -= 900 * dt;
+        z.airV -= AIR.gravity * dt;
+        // otra explosión en pleno vuelo no lo sube más del tope
+        if (z.air > AIR.max) {
+          z.air = AIR.max;
+          z.airV = Math.min(z.airV, 0);
+        }
         z.angle += z.spinV * dt;
         if (z.air <= 0) {
           z.air = 0;
@@ -697,7 +703,7 @@ export class Horde {
         const k = 1 / Math.sqrt(o.mass);
         o.kx += (-z.cdy * side * 320 + z.cdx * 220) * k;
         o.ky += (z.cdx * side * 320 + z.cdy * 220) * k;
-        o.airV = Math.max(o.airV || 0, 200 * k);
+        o.airV = Math.max(o.airV || 0, Math.min(AIR.vmax, 200 * k));
         o.air = o.air || 0.01;
         o.spinV = rand(-8, 8);
       }

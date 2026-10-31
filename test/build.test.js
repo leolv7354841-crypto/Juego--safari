@@ -28,3 +28,40 @@ test('la barrera de concreto reforzado recibe un 10 % menos de daño; las demás
   assert.ok(!st.blocks.includes(muro));
   assert.deepEqual(removed, [muro]);
 });
+
+test('las explosiones seguidas no suben a un zombi más allá del tope (antes parecían gigantes)', async () => {
+  const { AIR, ROCKET } = await import('../js/core/config.ts');
+  const { Horde } = await import('../js/sim/zombies.ts');
+  const { World } = await import('../js/sim/world.ts');
+  const world = new World(777);
+  const horde = new Horde();
+  const st = new Structures();
+  const player = { x: world.spawn.x, y: world.spawn.y, r: 14, alive: true, mass: 4, kx: 0, ky: 0, hurt() {} };
+  const game = fakeGame({
+    world,
+    horde,
+    structures: st,
+    player,
+    particles: silent,
+    camera: silent,
+    decals: silent,
+    time: 0,
+    state: 'play',
+    hitZombie: () => {},
+    killZombie: () => {},
+    onZombieHit: () => {},
+    onGiantStep: () => {},
+    onSuperPunch: () => {},
+  });
+  const z = horde.spawn('sprinter', world.spawn.x + 300, world.spawn.y, 1, 1);
+  z.spawnT = 0;
+  let top = 0;
+  for (let i = 0; i < 120; i++) {
+    // un cohete cada 6 fotogramas, justo al lado
+    if (i % 6 === 0) st.explode(game, { x: z.x - 10, y: z.y, owner: null }, ROCKET.radius, 1, 1.5);
+    horde.update(1 / 60, game);
+    top = Math.max(top, z.air);
+  }
+  assert.ok(top > AIR.max * 0.9, `vuela (${top})`);
+  assert.ok(top <= AIR.max, `sin pasar el tope (${top})`);
+});

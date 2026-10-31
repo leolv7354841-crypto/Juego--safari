@@ -1,5 +1,5 @@
 // Barricadas compradas en la tienda (madera, metal, vallas, alambre) y granadas.
-import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY } from '../core/config.ts';
+import { SHOP, MOLOTOV, ROCKET, ABILITY, HEAVY, AIR } from '../core/config.ts';
 import { TAU, rand, clamp } from '../core/util.ts';
 import type { Bullet, GameHost, Zombie } from '../core/types.d.ts';
 import type { Player } from './player.ts';
@@ -552,7 +552,7 @@ export class Structures {
         z.y,
       );
       if (fling && !z.dead) {
-        z.airV = Math.max(z.airV || 0, ((160 + 320 * f) * fling) / Math.sqrt(z.mass));
+        z.airV = Math.max(z.airV || 0, Math.min(AIR.vmax, ((160 + 320 * f) * fling) / Math.sqrt(z.mass)));
         z.air = z.air || 0.01;
         z.spinV = rand(-9, 9);
       }

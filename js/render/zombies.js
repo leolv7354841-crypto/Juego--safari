@@ -1,5 +1,5 @@
 // Dibujo de la horda. La lógica vive en sim/zombies.js.
-import { GOLDEN } from '../core/config.ts';
+import { AIR, GOLDEN } from '../core/config.ts';
 import { TAU } from '../core/util.ts';
 import { zombieSprites, flameSprite } from './sprites.js';
 
@@ -40,7 +40,7 @@ export function drawHorde(ctx, list, view, base, layer) {
       ctx.globalAlpha = blink;
     }
     const grow = z.spawnT > 0 ? 1 - z.spawnT * 0.5 : 1;
-    const lift = z.air > 0 ? z.air : 0;
+    const lift = z.air > 0 ? Math.min(z.air, AIR.max) : 0;
     // hinchado por el cohete clavado: crece y tiembla antes de reventar
     const swell = z.swell > 0 ? z.swell : 0;
     const k = s * pop * grow * (1 + lift / 140) * (1 + swell * 0.35 + (swell ? Math.sin(z.id + swell * 60) * 0.03 : 0));
