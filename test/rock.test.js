@@ -92,7 +92,7 @@ test('madera aplastada, metal abollado y lanzado, valla empujada hasta romperse'
   const metal = pieza(t.game, 'metal', x + 240, y - 20);
   const mx = metal.x;
   t.horde.rockImpact(z, true, metal, null, t.game);
-  assert.equal(metal.hp, SHOP.metal.hp * (1 - ROCK.dent));
+  assert.ok(Math.abs(metal.hp - SHOP.metal.hp * (1 - ROCK.dent)) < 1e-6, `abollado (${metal.hp})`);
   assert.equal(metal.x - mx, ROCK.throw);
   // valla: la empuja y la va quebrando
   t.structures.crush(t.game, metal);
