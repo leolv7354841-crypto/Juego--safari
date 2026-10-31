@@ -9,13 +9,14 @@ import {
   WAVES,
   ZOMBIE_VARIANTS,
   AIR,
+  ROCK,
 } from '../core/config.ts';
 import { clamp, rand, angleTo, TAU } from '../core/util.ts';
 import type { Zombie, ZombieDef } from '../core/types.d.ts';
 import type { GameHost } from '../core/types.d.ts';
 import type { Block } from './build.ts';
 import type { Player } from './player.ts';
-import type { World } from './world.ts';
+import type { Obstacle, World } from './world.ts';
 
 const CELL = 64;
 
@@ -149,6 +150,11 @@ function pairUp(z: Zombie, o: Zombie, dt: number) {
   z.y -= ny * ov * (o.mass / tm);
   o.x += nx * ov * (z.mass / tm);
   o.y += ny * ov * (z.mass / tm);
+}
+
+// ¿Puede un rocoso agarrar a este jugador? (no dentro del robot, ni con el impulso, ni en la torreta)
+function canGrab(p: Player) {
+  return p.alive && !p.inRobot && !(p.boostT > 0) && !p.manned && !(p.flungT && p.flungT > 0);
 }
 
 // ¿Hay vista directa entre dos puntos? (los muros y edificios tapan; coches y barricadas no)
@@ -310,6 +316,8 @@ export class Horde {
     const views = dir && game.state !== 'menu' ? dir.views(game) : null;
     let danger = 0;
     let nearCount = 0;
+    // quien va volando tras el lanzamiento de un rocoso arrolla a los zombis que toca
+    for (const pl of (targets || [p0]) as Player[]) if ((pl.flungT || 0) > 0) this.flungStep(pl, dt, game);
 
     for (let i = 0; i < list.length; i++) {
       const z = list[i];
@@ -386,6 +394,7 @@ export class Horde {
       z.tilt =
         (z.wounded ? Math.sin(time * 5 + z.wob) * 0.16 : 0) + (z.burn > 0 ? Math.sin(time * 23 + z.wob) * 0.28 : 0);
       if (z.type === 'bull' && this.bullThink(z, p, dx, dy, d, dt, game, world)) continue;
+      if (z.type === 'rock' && this.rockThink(z, p, d, dt, game)) continue;
       let mx;
       let my;
       if (z.type === 'golden') {
@@ -403,6 +412,10 @@ export class Horde {
           mx = (-dy / d) * z.side + (dx / d) * 0.25;
           my = (dx / d) * z.side + (dy / d) * 0.25;
         }
+      } else if (z.type === 'rock' && !(z.detourT > 0)) {
+        // el rocoso va recto por ti: lo que le estorbe lo destroza (ver rockImpact)
+        mx = dx / d;
+        my = dy / d;
       } else {
         // ruta: hacia su punto de flanqueo mientras esté lejos; después, directo por ti
         let field = world.main;
@@ -439,7 +452,7 @@ export class Horde {
       // avx/avy los suma la separación del fotograma anterior (pairUp), sin consultas aparte.
       z.hx = mx;
       z.hy = my;
-      if (d > 50) {
+      if (d > 50 && z.type !== 'rock') {
         mx += z.avx * 0.7 * calm;
         my += z.avy * 0.7 * calm;
         const l = Math.sqrt(mx * mx + my * my) || 1;
@@ -561,11 +574,14 @@ export class Horde {
         }
       }
       world.lastBlock = null;
+      world.lastObs = null;
       // desde donde terminó el fotograma anterior: ni la horda apretando ni una embestida lo hacen
       // atravesar muros (ox/oy los borra quien lo recoloca, como el director con los rezagados)
       const bumped = world.collide(z, z.r, false, z.ox ?? NaN, z.oy ?? NaN);
       if (bumped) z.touchT = 0.5;
       if (z.type === 'bull' && !z.dead) this.bullImpact(z, bumped, world.lastBlock as Block | null, game);
+      if (z.type === 'rock' && !z.dead)
+        this.rockImpact(z, bumped, world.lastBlock as Block | null, world.lastObs, game);
       // detector de atasco: si en 1,2 s casi no avanzó y no está pegado al jugador
       z.chkT = (z.chkT || 0) + dt;
       if (z.chkT > 1.2) {
@@ -584,7 +600,7 @@ export class Horde {
         z.chkY = z.y;
       }
       // golpea la barricada que le cierra el paso
-      if (world.lastBlock && !z.inRange && !z.dead && z.type !== 'bull') {
+      if (world.lastBlock && !z.inRange && !z.dead && z.type !== 'bull' && z.type !== 'rock') {
         z.chew -= dt;
         if (z.chew <= 0) {
           z.chew = 1 / z.def.attackRate;
@@ -792,6 +808,307 @@ export class Horde {
       z.bt = 1.3;
       z.cdx = 0;
       z.cdy = 0;
+    }
+  }
+
+  /* ---------- rocoso ---------- */
+
+  // Devuelve true si el rocoso controla su propio movimiento este fotograma.
+  //   walk → windup (wk: 'grab' te sostiene, 'smash' rompe un árbol o coche, 'aim' toma vuelo)
+  //   push: empuja una valla o sacos · ram: retrocede para embestir · ramIn: embiste
+  rockThink(z: Zombie, p: Player, d: number, dt: number, game: GameHost) {
+    z.bt -= dt;
+    z.grabCd = (z.grabCd || 0) - dt;
+    z.detourT = (z.detourT || 0) - dt;
+    if (z.bs === 'walk') {
+      if (z.grabCd <= 0 && canGrab(p) && d < z.r + p.r + z.def.reach + 4 && !(z.air > 0)) {
+        // te alcanzó: te agarra y te levanta
+        z.bs = 'windup';
+        z.wk = 'grab';
+        z.bt = ROCK.grab.hold;
+        z.grabbed = p;
+        game.sfx.bullRoar();
+        return true;
+      }
+      return false;
+    }
+    if (z.bs === 'windup') {
+      z.anim += dt * 4;
+      if (z.wk === 'grab') {
+        const g = z.grabbed as Player | null;
+        if (!g || !canGrab(g)) {
+          z.bs = 'walk';
+          z.grabbed = null;
+          z.grabCd = 1;
+          return true;
+        }
+        // lo sostiene delante, sin dejarlo moverse
+        z.angle = angleTo(z.angle, Math.atan2(g.y - z.y, g.x - z.x), 8 * dt);
+        const reach = z.r + g.r + 2;
+        g.x = z.x + Math.cos(z.angle) * reach;
+        g.y = z.y + Math.sin(z.angle) * reach;
+        g.kx = 0;
+        g.ky = 0;
+        if (z.bt <= 0) this.rockThrow(z, g, game);
+        return true;
+      }
+      if (z.wk === 'smash') {
+        const o = z.smashObs as Obstacle | null;
+        if (!o || o.gone) {
+          z.bs = 'walk';
+          return true;
+        }
+        if (Math.random() < dt * 10)
+          game.particles.dust(z.x + Math.cos(z.angle) * z.r, z.y + Math.sin(z.angle) * z.r, 6);
+        if (z.bt <= 0) {
+          const cx = o.k === 0 ? o.x + (o.w || 0) / 2 : o.x;
+          const cy = o.k === 0 ? o.y + (o.h || 0) / 2 : o.y;
+          if (game.world.smash(o)) {
+            game.particles.debris(cx, cy, o.smash === 'car' ? 40 : 24, o.smash);
+            game.camera.shake(0.4, cx, cy);
+            game.sfx.bullSlam(true);
+          }
+          z.smashObs = null;
+          z.bs = 'walk';
+          z.lunge = 1;
+        }
+        return true;
+      }
+      // aim: tomó vuelo y carga contra la barricada
+      const b = z.ramBlock as Block | null;
+      if (!b || b.hp <= 0) {
+        z.bs = 'walk';
+        return true;
+      }
+      if (Math.random() < dt * 14) game.particles.dust(z.x - Math.cos(z.angle) * z.r, z.y - Math.sin(z.angle) * z.r, 5);
+      if (z.bt <= 0) this.rockCharge(z, b);
+      return true;
+    }
+    if (z.bs === 'push') {
+      const b = z.ramBlock as Block | null;
+      if (!b || b.hp <= 0 || !game.structures.blocks.includes(b)) {
+        z.bs = 'walk';
+        return true;
+      }
+      // empuja la valla (o los sacos) a paso de tortuga y la va quebrando
+      const step = ROCK.push * dt;
+      if (game.structures.moveStack(game, b, z.cdx * step, z.cdy * step)) {
+        z.x += z.cdx * step;
+        z.y += z.cdy * step;
+      }
+      z.anim += (step + 30 * dt) / (z.r * 0.55);
+      z.pushT = (z.pushT || 0) - dt;
+      if (z.pushT <= 0) {
+        z.pushT = 0.25;
+        z.lunge = 1;
+        game.structures.damageBlock(game, b, ROCK.pushDps * 0.25);
+      }
+      if (b.hp <= 0) z.bs = 'walk';
+      return true;
+    }
+    if (z.bs === 'ram') {
+      const b = z.ramBlock as Block | null;
+      if (!b || b.hp <= 0) {
+        z.bs = 'walk';
+        return true;
+      }
+      // retrocede de frente a la barricada para tomar impulso
+      const bx = clamp(z.x, b.x, b.x + b.w) - z.x;
+      const by = clamp(z.y, b.y, b.y + b.h) - z.y;
+      const bl = Math.hypot(bx, by) || 1;
+      z.angle = angleTo(z.angle, Math.atan2(by, bx), 8 * dt);
+      const back = z.ramLong ? ROCK.long : ROCK.short;
+      if (bl < back + z.r && z.bt > -2.5) {
+        z.x -= (bx / bl) * 120 * dt;
+        z.y -= (by / bl) * 120 * dt;
+        z.anim -= dt * 5;
+      } else if (z.ramLong) {
+        z.bs = 'windup';
+        z.wk = 'aim';
+        z.bt = 0.45;
+        game.sfx.bullRoar();
+      } else {
+        this.rockCharge(z, b);
+      }
+      return true;
+    }
+    if (z.bs === 'ramIn') {
+      z.x += z.cdx * ROCK.ramSpeed * dt;
+      z.y += z.cdy * ROCK.ramSpeed * dt;
+      z.anim += (ROCK.ramSpeed * dt) / (z.r * 0.55);
+      if (Math.random() < dt * 20) game.particles.dust(z.x - z.cdx * z.r, z.y - z.cdy * z.r, 5);
+      if (z.bt <= 0) z.bs = 'walk';
+      return true;
+    }
+    if (z.bs === 'recover') {
+      if (z.bt <= 0) z.bs = 'walk';
+      return true;
+    }
+    z.bs = 'walk';
+    return false;
+  }
+
+  // Sale disparado contra la barricada.
+  rockCharge(z: Zombie, b: Block) {
+    const bx = clamp(z.x, b.x, b.x + b.w) - z.x;
+    const by = clamp(z.y, b.y, b.y + b.h) - z.y;
+    const bl = Math.hypot(bx, by) || 1;
+    z.bs = 'ramIn';
+    z.bt = 1.2;
+    z.cdx = bx / bl;
+    z.cdy = by / bl;
+    z.angle = Math.atan2(by, bx);
+  }
+
+  // Choque del rocoso: decide qué hacer con lo que le cerró el paso.
+  rockImpact(z: Zombie, bumped: boolean, block: Block | null, obs: Obstacle | null, game: GameHost) {
+    if (z.bs === 'ramIn') {
+      if (!block) {
+        if (bumped) z.bs = 'walk';
+        return;
+      }
+      // la embestida: corta contra el concreto, larga contra la HESCO
+      game.structures.damageBlock(game, block, z.ramLong ? ROCK.longHit : ROCK.shortHit);
+      game.particles.dust(z.x + z.cdx * z.r, z.y + z.cdy * z.r, z.ramLong ? 30 : 16);
+      game.camera.shake(z.ramLong ? 0.4 : 0.18, z.x, z.y);
+      game.sfx.bullSlam(z.ramLong);
+      z.lunge = 1;
+      z.ramBlock = block;
+      z.bs = block.hp > 0 ? 'ram' : 'recover';
+      z.bt = 0.5;
+      return;
+    }
+    if (z.bs !== 'walk' || z.inRange) return;
+    if (block) {
+      const k = block.kind;
+      const a = Math.atan2(clamp(z.y, block.y, block.y + block.h) - z.y, clamp(z.x, block.x, block.x + block.w) - z.x);
+      const dx = Math.cos(a);
+      const dy = Math.sin(a);
+      z.lunge = 1;
+      if (k === 'wood') {
+        // la madera la aplasta al pasar
+        game.structures.crush(game, block);
+      } else if (k === 'metal') {
+        // el metal lo abolla y lo avienta (si no hay sitio donde caer, se deshace)
+        game.structures.damageBlock(game, block, block.max * ROCK.dent);
+        if (block.hp > 0 && !game.structures.moveStack(game, block, dx * ROCK.throw, dy * ROCK.throw))
+          game.structures.crush(game, block);
+        game.camera.shake(0.2, z.x, z.y);
+        game.sfx.bullSlam(false);
+      } else if (k === 'fence' || k === 'sandbag') {
+        // la valla y los sacos los empuja hasta quebrarlos
+        z.bs = 'push';
+        z.ramBlock = block;
+        const horiz = Math.abs(dx) > Math.abs(dy);
+        z.cdx = horiz ? Math.sign(dx) : 0;
+        z.cdy = horiz ? 0 : Math.sign(dy);
+        z.pushT = 0;
+      } else {
+        // concreto y torretas: embestida corta · HESCO y concreto reforzado: se aleja y embiste
+        z.bs = 'ram';
+        z.ramBlock = block;
+        z.ramLong = k === 'hesco' || k === 'reinforced';
+        z.bt = 0;
+      }
+      return;
+    }
+    if (!bumped || !obs) return;
+    if (obs.smash && !obs.gone) {
+      // árbol o coche: se planta y lo hace pedazos
+      z.bs = 'windup';
+      z.wk = 'smash';
+      z.bt = ROCK.smash;
+      z.smashObs = obs;
+      game.sfx.bullRoar();
+    } else if (!(z.detourT > 0)) {
+      // un edificio no lo puede tirar: lo rodea por la ruta normal un rato
+      z.detourT = ROCK.detour;
+    }
+  }
+
+  // Te lanza hacia donde hay más zombis: te quita vida y vas arrollando a los que tocas.
+  rockThrow(z: Zombie, g: Player, game: GameHost) {
+    const a = this.crowdDir(g.x, g.y, Math.atan2(g.y - z.y, g.x - z.x));
+    g.lastHit = 'rock_throw';
+    g.hurt(ROCK.grab.hit, game);
+    game.onZombieHit(z, g);
+    g.kx = Math.cos(a) * ROCK.grab.throw;
+    g.ky = Math.sin(a) * ROCK.grab.throw;
+    g.flungT = ROCK.grab.fly;
+    game.camera.shake(0.7, g.x, g.y);
+    game.particles.dust(g.x, g.y, 16);
+    game.sfx.bullHit();
+    z.bs = 'recover';
+    z.bt = 0.6;
+    z.lunge = 1;
+    z.grabbed = null;
+    z.grabCd = ROCK.grab.cd;
+  }
+
+  // La dirección (de 16) con más zombis en un pasillo de 320 px; si no hay, hacia fuera (away).
+  crowdDir(x: number, y: number, away: number) {
+    const R = 320;
+    this.grid.query(x - R, y - R, x + R, y + R, near);
+    let best = away;
+    let bestN = 0;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * TAU;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      let n = 0;
+      for (const o of near) {
+        if (o.dead || o.type === 'rock') continue;
+        const t = (o.x - x) * c + (o.y - y) * s;
+        if (t < 20 || t > R) continue;
+        if (Math.abs((o.x - x) * -s + (o.y - y) * c) < 48) n++;
+      }
+      if (n > bestN) {
+        bestN = n;
+        best = a;
+      }
+    }
+    return best;
+  }
+
+  // Quien vuela tras el lanzamiento: los zombis que toca mueren (los grandes sólo se apartan).
+  flungStep(pl: Player, dt: number, game: GameHost) {
+    pl.flungT = (pl.flungT || 0) - dt;
+    if (!pl.alive) {
+      pl.flungT = 0;
+      return;
+    }
+    // el tramo que voló desde el fotograma anterior (va muy rápido: no se salta a nadie)
+    const fx = pl.flyX ?? pl.x;
+    const fy = pl.flyY ?? pl.y;
+    pl.flyX = pl.flungT > 0 ? pl.x : undefined;
+    pl.flyY = pl.flungT > 0 ? pl.y : undefined;
+    const q = pl.r + 30;
+    this.grid.query(
+      Math.min(fx, pl.x) - q,
+      Math.min(fy, pl.y) - q,
+      Math.max(fx, pl.x) + q,
+      Math.max(fy, pl.y) + q,
+      near,
+    );
+    const sx = pl.x - fx;
+    const sy = pl.y - fy;
+    const sl = sx * sx + sy * sy || 1;
+    for (const o of near) {
+      if (o.dead) continue;
+      const t = clamp(((o.x - fx) * sx + (o.y - fy) * sy) / sl, 0, 1);
+      const dx = o.x - (fx + sx * t);
+      const dy = o.y - (fy + sy * t);
+      if (dx * dx + dy * dy > (pl.r + o.r + 4) ** 2) continue;
+      if (ROCK.grab.big.includes(o.type)) {
+        const l = Math.hypot(dx, dy) || 1;
+        o.kx += (dx / l) * 260;
+        o.ky += (dy / l) * 260;
+        continue;
+      }
+      o.lastOwner = pl.sid ?? null;
+      o.lastDx = pl.kx / 400;
+      o.lastDy = pl.ky / 400;
+      game.killZombie(o);
     }
   }
 

@@ -518,6 +518,35 @@ export class Particles {
   }
 
   // botella rota: vidrio y llamarada
+  // Un rocoso hizo pedazos un árbol o un coche: astillas y hojas, o chatarra y vidrios, y polvo.
+  debris(x, y, r, kind) {
+    const car = kind === 'car';
+    const colors = car ? ['#5d6166', '#7d8186', '#3a3c3f', '#a8a294'] : ['#5a4030', '#7a5634', '#3a4a2c', '#4f6236'];
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      const s = rand(60, 280);
+      this.add(DOT, x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.5, 1.1), rand(2.5, 6), pick(colors), 3.5);
+    }
+    if (car) {
+      for (let i = 0; i < 12; i++) {
+        const a = rand(0, TAU);
+        const s = rand(90, 300);
+        this.add(
+          SPARK,
+          x,
+          y,
+          Math.cos(a) * s,
+          Math.sin(a) * s,
+          rand(0.15, 0.4),
+          1,
+          pick(['#cfe8e0', '#9fc4b8', '#ffd890']),
+          6,
+        );
+      }
+    }
+    for (let i = 0; i < 3; i++) this.dust(x + rand(-r, r) * 0.5, y + rand(-r, r) * 0.5, r);
+  }
+
   shatter(x, y) {
     for (let i = 0; i < 14; i++) {
       const a = rand(0, TAU);

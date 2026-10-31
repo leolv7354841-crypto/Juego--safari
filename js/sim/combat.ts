@@ -14,7 +14,8 @@ export function bulletHit(game: GameHost, z: Zombie, b: Bullet, hx: number, hy: 
   z.lastDy = b.dy;
   if (Math.random() < 0.12) game.decals.splat(hx + b.dx * 14, hy + b.dy * 14, rand(7, 12));
   // el super blindado no se frena ni retrocede con las balas: sólo las explosiones lo mueven
-  const armored = z.type === 'heavy' && !b.blast;
+  // ni el rocoso: es de piedra
+  const armored = (z.type === 'heavy' || z.type === 'rock') && !b.blast;
   // normales y velocistas: la bala no los avienta; se frenan, sangran y se arrastran
   const flesh = (z.type === 'normal' || z.type === 'sprinter') && !b.blast;
   if (flesh) {
@@ -27,7 +28,13 @@ export function bulletHit(game: GameHost, z: Zombie, b: Bullet, hx: number, hy: 
     z.kx += b.dx * kn;
     z.ky += b.dy * kn;
   }
-  const big = z.type === 'fat' || z.type === 'swat' || z.type === 'heavy' || z.type === 'bull' || z.type === 'giant';
+  const big =
+    z.type === 'fat' ||
+    z.type === 'swat' ||
+    z.type === 'heavy' ||
+    z.type === 'bull' ||
+    z.type === 'giant' ||
+    z.type === 'rock';
   game.particles.hit(hx, hy, b.dx, b.dy, big);
   game.sfx.hit(big);
 }

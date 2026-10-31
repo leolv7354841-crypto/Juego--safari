@@ -13,6 +13,7 @@ import {
   HEAVY,
   HEAVY_UP,
   PLAYER_BASE,
+  ROCK,
   START,
   WEAPONS,
 } from '../../js/core/config.ts';
@@ -721,4 +722,29 @@ test('ronda especial en línea: va en la foto de todos y sus bajas pagan más', 
   const m0 = a.money;
   sim.killZombie(z);
   assert.equal(a.money + a.p.cash - m0, BOUNTY.normal * EVENTS.types.blood.pay);
+});
+
+test('rocoso en línea: el árbol que destroza va en la foto y quien vuela tras su lanzamiento se lleva las bajas', () => {
+  const sim = new ServerSim(5, [{ id: 'a', idx: 1, name: 'Ana' }]);
+  const a = sim.slots.get('a')!;
+  const seq = { n: 0 };
+  idle(sim, 'a', seq, 2);
+  sim.director.queue.length = 0;
+  sim.horde.list.length = 0;
+  // un árbol destrozado sale en la parte fija de la foto (wd: ids de obstáculo)
+  const tree = sim.world.obstacles.find((o: any) => o.smash === 'tree')!;
+  sim.world.smash(tree);
+  const snap = sim.snapshot('a', 0)!;
+  assert.deepEqual(snap.wd, [tree.id]);
+  // Ana sale volando: el normal que toca muere y la baja es suya
+  const p = a.p;
+  const z = sim.horde.spawn('normal', p.x + 60, p.y, 1, 0.001)!;
+  z.spawnT = 0;
+  idle(sim, 'a', seq, 1);
+  p.flungT = ROCK.grab.fly;
+  p.kx = ROCK.grab.throw;
+  const k0 = a.kills;
+  idle(sim, 'a', seq, 4);
+  assert.ok(z.dead, 'lo arrolló');
+  assert.equal(a.kills, k0 + 1);
 });

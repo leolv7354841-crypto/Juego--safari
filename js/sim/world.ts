@@ -24,6 +24,11 @@ export interface Obstacle {
   id?: number;
   stamp?: number;
   cells?: number[];
+  /** se puede destrozar (el rocoso): 'tree' o 'car', con su op de dibujo y su árbol */
+  smash?: string;
+  op?: WorldOp;
+  tree?: number;
+  gone?: boolean;
 }
 
 export interface WorldOp {
@@ -35,6 +40,8 @@ export interface WorldOp {
   kind: string;
   p: Record<string, unknown>;
   i: number;
+  /** destrozado: se pinta como escombros */
+  gone?: boolean;
 }
 
 export interface WorldLight {
@@ -55,6 +62,7 @@ export interface WorldTree {
   seed: number;
   ang: number;
   size: number;
+  gone?: boolean;
 }
 
 export interface WorldFire {
@@ -145,6 +153,10 @@ export class World {
   declare obsGrid: Obstacle[][];
   declare stamp: number;
   declare lastBlock: Block | null;
+  /** el último obstáculo del mapa (no barricada) contra el que chocó collide */
+  declare lastObs: Obstacle | null;
+  /** ids de los obstáculos destrozados, en orden (la foto en línea los manda) */
+  declare smashed: number[];
   declare navN: number;
   declare blocked: Uint8Array;
   declare queue: Int32Array;
@@ -162,6 +174,8 @@ export class World {
     this.overhead = [];
     this.lights = [];
     this.fires = [];
+    this.smashed = [];
+    this.lastObs = null;
     this.spawn = { x: 1900, y: 1900 };
     this.generate();
     this.buildObstacleGrid();
@@ -176,7 +190,9 @@ export class World {
 
   // Una op es un dato: el tipo de pintor (render/world.js) y lo que necesita para pintarse.
   op(layer: number, x: number, y: number, w: number, h: number, kind: string, p: Record<string, unknown> = {}) {
-    this.ops.push({ layer, x, y, w, h, kind, p, i: this.ops.length });
+    const o: WorldOp = { layer, x, y, w, h, kind, p, i: this.ops.length };
+    this.ops.push(o);
+    return o;
   }
 
   addRect(x: number, y: number, w: number, h: number, low = false): Obstacle {
@@ -222,10 +238,12 @@ export class World {
 
   addTree(x: number, y: number, r: number, dead = false): boolean {
     if (!this.free(x - 12, y - 12, 24, 24, 6)) return false;
-    this.addCircle(x, y, 11);
+    const o = this.addCircle(x, y, 11);
     const seed = this.nextSeed();
+    o.smash = 'tree';
+    o.tree = this.trees.length;
     this.trees.push({ x, y, r, dead, seed, ang: this.rng() * TAU, size: r * 2.6 });
-    this.op(2, x - r, y - r, r * 2 + 14, r * 2 + 14, 'addTree', { x, y, r });
+    o.op = this.op(2, x - r, y - r, r * 2 + 14, r * 2 + 14, 'addTree', { x, y, r });
     return true;
   }
 
@@ -266,12 +284,13 @@ export class World {
     const ry = y - h / 2;
     if (!this.free(rx, ry, w, h, opts.pad ?? 10)) return false;
     // low: frena a jugador y zombis, pero las balas pasan por encima
-    this.addRect(rx + 2, ry + 2, w - 4, h - 4, true);
+    const o = this.addRect(rx + 2, ry + 2, w - 4, h - 4, true);
     const ang = (horizontal ? 0 : Math.PI / 2) + (rng() < 0.5 ? Math.PI : 0);
     const burnt = opts.burnt ?? rng() < 0.14;
     const color = rpick(rng, CAR_COLORS);
     const seed = this.nextSeed();
-    this.op(3, rx - 4, ry - 4, w + 16, h + 16, 'addCar', { x, y, ang, len, wid, kind, burnt, color, seed });
+    o.smash = 'car';
+    o.op = this.op(3, rx - 4, ry - 4, w + 16, h + 16, 'addCar', { x, y, ang, len, wid, kind, burnt, color, seed });
     if (burnt && (opts.burning ?? rng() < 0.3)) {
       this.addLight(x, y, 260, 0.9, 0.3);
       this.fires.push({ x, y, s: 1.6 });
@@ -674,6 +693,7 @@ export class World {
               e.y = face === 2 ? o.y - r : face === 3 ? o.y + o.h + r : ty;
               hit = true;
               if (o.block) this.lastBlock = o as Block;
+              else this.lastObs = o;
               continue;
             }
             const px = e.x < o.x ? o.x : e.x > o.x + o.w ? o.x + o.w : e.x;
@@ -684,6 +704,7 @@ export class World {
             if (d2 >= r * r) continue;
             hit = true;
             if (o.block) this.lastBlock = o as Block;
+            else this.lastObs = o;
             if (d2 > 1e-6) {
               const d = Math.sqrt(d2);
               e.x += (dx / d) * (r - d);
@@ -706,6 +727,7 @@ export class World {
             const d2 = dx * dx + dy * dy;
             if (d2 >= rr * rr) continue;
             hit = true;
+            this.lastObs = o;
             const d = Math.sqrt(d2) || 0.001;
             e.x = o.x + (dx / d) * rr;
             e.y = o.y + (dy / d) * rr;
@@ -714,6 +736,45 @@ export class World {
       }
     }
     return hit;
+  }
+
+  /* ---------- obstáculos destrozados ---------- */
+
+  // Quita del mapa un árbol o coche (lo destrozó un rocoso): deja de chocar, la ruta lo cruza y
+  // se pinta como escombros. Devuelve false si no se puede destrozar o ya no estaba.
+  smash(o: Obstacle) {
+    if (!o.smash || o.gone || o.id === undefined) return false;
+    o.gone = true;
+    const n = this.obsN;
+    const [x, y, w, h] = isRect(o)
+      ? [o.x, o.y, o.w, o.h]
+      : isCirc(o)
+        ? [o.x - o.r, o.y - o.r, o.r * 2, o.r * 2]
+        : [o.x, o.y, 0, 0];
+    const x0 = clamp(Math.floor(x / OBS_CELL), 0, n - 1);
+    const y0 = clamp(Math.floor(y / OBS_CELL), 0, n - 1);
+    const x1 = clamp(Math.floor((x + w) / OBS_CELL), 0, n - 1);
+    const y1 = clamp(Math.floor((y + h) / OBS_CELL), 0, n - 1);
+    for (let j = y0; j <= y1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        const arr = this.obsGrid[j * n + i];
+        const k = arr.indexOf(o);
+        if (k >= 0) arr.splice(k, 1);
+      }
+    }
+    if (o.op) o.op.gone = true;
+    if (o.tree !== undefined) this.trees[o.tree].gone = true;
+    this.smashed.push(o.id);
+    this.refreshNav(x, y, w, h);
+    return true;
+  }
+
+  // Los destrozos que manda el servidor (ids en orden): aplica los que falten.
+  applySmashed(ids: number[]) {
+    for (const id of ids) {
+      const o = this.obstacles[id];
+      if (o && !o.gone) this.smash(o);
+    }
   }
 
   /* ---------- barricadas del jugador ---------- */

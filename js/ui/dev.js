@@ -19,6 +19,7 @@ const NAMES = {
   fat: 'Gordo',
   heavy: 'Super blindado',
   bull: 'Toro',
+  rock: 'Rocoso',
   giant: 'Gigante',
   golden: 'Dorado',
 };

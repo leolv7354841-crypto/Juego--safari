@@ -32,7 +32,7 @@ function apagado() {
   return VERSION === 'dev' || local || !!navigator.webdriver || !!storage.get(OFF_KEY, 0) || !activo();
 }
 
-// Nombre de la causa de muerte como se guarda: tipo de zombi, 'bull_charge' (cornada) o 'acid'.
+// Nombre de la causa de muerte como se guarda: tipo de zombi, 'bull_charge' (cornada), 'rock_throw' (lanzamiento del rocoso) o 'acid'.
 export const causaDe = (p) => (p && p.lastHit) || 'desconocida';
 
 export class Analitica {

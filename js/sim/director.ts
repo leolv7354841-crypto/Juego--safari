@@ -1,5 +1,5 @@
 // Director de oleadas: decide cuántos zombis salen, de qué tipo y por dónde.
-import { EVENT_ORDER, EVENTS, MAX_ALIVE, START, WORLD_SIZE, WAVES } from '../core/config.ts';
+import { EVENT_ORDER, EVENTS, MAX_ALIVE, ROCK, START, WORLD_SIZE, WAVES } from '../core/config.ts';
 import type { EventDef } from '../core/config.ts';
 import { rand, randInt } from '../core/util.ts';
 import type { GameHost, Vec } from '../core/types.d.ts';
@@ -20,6 +20,7 @@ export interface WaveCounts {
   fat: number;
   heavy: number;
   bull: number;
+  rock: number;
   total: number;
 }
 
@@ -40,15 +41,26 @@ export function waveCounts(w: number, m: number, ev: EventDef | null): WaveCount
   let heavy = w > 10 ? Math.round((normalTotal + sprinter + fat) * 0.07) : 0;
   // toros desde la oleada 3: pocos, pero embisten
   let bull = few(w >= 3 ? 2 + Math.floor((w - 3) * 2) : 0);
+  // rocosos desde la oleada ROCK.from: pocos, lentos y muy duros
+  let rock = few(w >= ROCK.from ? ROCK.first + Math.floor((w - ROCK.from) * ROCK.per) : 0);
   if (ev?.size) {
     // estampida: una horda más chica, toda de velocistas y toros
     const total = Math.round((normalTotal + sprinter + fat + bull) * ev.size);
     bull = Math.max(few(2), Math.round(total * (ev.bulls ?? 0)));
     sprinter = total - bull;
-    normal = swat = fat = heavy = 0;
+    normal = swat = fat = heavy = rock = 0;
   }
   normal -= heavy;
-  return { normal, swat, sprinter, fat, heavy, bull, total: normal + swat + sprinter + fat + heavy + bull };
+  return {
+    normal,
+    swat,
+    sprinter,
+    fat,
+    heavy,
+    bull,
+    rock,
+    total: normal + swat + sprinter + fat + heavy + bull + rock,
+  };
 }
 
 export class Director {
@@ -132,6 +144,7 @@ export class Director {
       fat: fats,
       heavy: heavies,
       bull: bulls,
+      rock: rocks,
     } = waveCounts(w, m, ev);
     const q: string[] = [];
     for (let i = 0; i < normals; i++) q.push('normal');
@@ -140,6 +153,7 @@ export class Director {
     for (let i = 0; i < swats; i++) q.splice(randInt(0, q.length), 0, 'swat');
     for (let i = 0; i < fats; i++) q.splice(randInt(Math.floor(q.length * 0.2), q.length), 0, 'fat');
     for (let i = 0; i < bulls; i++) q.splice(randInt(Math.floor(q.length * 0.15), q.length), 0, 'bull');
+    for (let i = 0; i < rocks; i++) q.splice(randInt(Math.floor(q.length * 0.1), q.length), 0, 'rock');
     this.queue = q;
     this.waveSize = q.length;
     this.waveT = 0;
@@ -152,17 +166,19 @@ export class Director {
         ? ev.desc
         : w === 3
           ? 'Llegan los toros: esquiva sus embestidas'
-          : w === 11
-            ? 'Llegan los super blindados'
-            : heavies
-              ? 'Super blindados en la horda'
-              : w === 1
-                ? 'Calienta motores: llegan pocos'
-                : w === 2
-                  ? 'Llegan los policías SWAT y los gordos'
-                  : fats
-                    ? 'Cuidado con los gordos'
-                    : 'Sobrevive',
+          : w === ROCK.from
+            ? 'Llegan los rocosos: lo destrozan todo a su paso'
+            : w === 11
+              ? 'Llegan los super blindados'
+              : heavies
+                ? 'Super blindados en la horda'
+                : w === 1
+                  ? 'Calienta motores: llegan pocos'
+                  : w === 2
+                    ? 'Llegan los policías SWAT y los gordos'
+                    : fats
+                      ? 'Cuidado con los gordos'
+                      : 'Sobrevive',
     );
     game.sfx.wave();
   }
@@ -329,7 +345,14 @@ export class Director {
       const cluster = Math.min(left, randInt(2, 5));
       for (let i = 0; i < cluster && this.queue.length; i++) {
         const type = this.queue[0];
-        const r = type === 'fat' || type === 'heavy' || type === 'bull' ? 24 : type === 'sprinter' ? 12 : 15;
+        const r =
+          type === 'rock'
+            ? 28
+            : type === 'fat' || type === 'heavy' || type === 'bull'
+              ? 24
+              : type === 'sprinter'
+                ? 12
+                : 15;
         for (let t = 0; t < 6; t++) {
           const x = c.x + rand(-45, 45);
           const y = c.y + rand(-45, 45);

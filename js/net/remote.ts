@@ -46,7 +46,12 @@ export type RemoteZombie = Pick<
 };
 type Row = [string, number, number, number, number, number, number, number?];
 /** Parte de una foto que usa applyStructures: las listas de barricadas y trampas llevan el tipo delante. */
-type StructSnap = Partial<Omit<WorldSnap, 'blk' | 'wir' | 'sc'>> & { blk?: Row[]; wir?: Row[]; sc?: number[][] };
+type StructSnap = Partial<Omit<WorldSnap, 'blk' | 'wir' | 'sc' | 'wd'>> & {
+  blk?: Row[];
+  wir?: Row[];
+  sc?: number[][];
+  wd?: number[];
+};
 type ShopDef = { hp: number; ground?: boolean; consumable?: boolean };
 const shopDef = (k: string): ShopDef | undefined => (SHOP as unknown as Record<string, ShopDef>)[k];
 
@@ -417,6 +422,8 @@ export class Remote {
   applyStructures(s: StructSnap, collide = true) {
     const g = this.game;
     const st = g.structures;
+    // árboles y coches que destrozó un rocoso
+    if (Array.isArray(s.wd) && g.world) g.world.applySmashed(s.wd.filter(Number.isInteger));
     const gr = Array.isArray(s.gr) ? s.gr : [];
     st.grenades = [];
     for (let i = 0; i + 5 < gr.length; i += 6)

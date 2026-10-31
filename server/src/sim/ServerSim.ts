@@ -155,6 +155,7 @@ export class ServerSim {
       const p: any = new Player(s.x + Math.cos(a) * 44 * Math.min(1, i), s.y + Math.sin(a) * 44 * Math.min(1, i));
       this.world.collide(p, p.r, true);
       p.field = this.newField();
+      p.sid = pl.id;
       // clase elegida en el lobby (si no eligió, bomber)
       p.cls = isClass(pl.cls ?? '') ? pl.cls : CLASS_ORDER[0];
       const idle: Cmd = { s: 0, mx: 0, my: 0, f: 0, a: p.angle, w: -1 };
@@ -900,7 +901,9 @@ export class ServerSim {
       st.wires.map((w: any) => `${w.kind}${w.x},${w.y},${w.w},${w.h}`).join() +
       '|' +
       st.scorches.length +
-      (sc ? `,${Math.round(sc.x)},${Math.round(sc.y)}` : '');
+      (sc ? `,${Math.round(sc.x)},${Math.round(sc.y)}` : '') +
+      '|' +
+      this.world.smashed.length;
     const full =
       geo +
       '|' +
@@ -912,7 +915,7 @@ export class ServerSim {
     s.stGeo = geo;
     s.stSent = full;
     s.stN = 0;
-    Object.assign(snap, encodeStatic(st));
+    Object.assign(snap, encodeStatic(st, this.world.smashed));
   }
 
   // Después de mandar las fotos de esta ronda, los efectos ya enviados se olvidan.

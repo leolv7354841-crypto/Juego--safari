@@ -658,6 +658,89 @@ const PAINTERS = {
   },
 };
 
+// Lo que queda de un árbol o coche que destrozó un rocoso (se pinta en lugar de la op).
+const WRECKS = {
+  addTree(g, { x, y, r }) {
+    const rng = mulberry32(Math.round(x * 7 + y * 13));
+    // hojas y ramas regadas alrededor del tocón
+    for (let i = 0; i < 14; i++) {
+      const a = rng() * TAU;
+      const d = rrange(rng, 4, r * 0.9);
+      g.fillStyle = rpick(rng, ['#34432a', '#3e4f2e', '#2c3824', '#4a3c2e']);
+      g.beginPath();
+      g.ellipse(x + Math.cos(a) * d, y + Math.sin(a) * d, rrange(rng, 2, 4.5), rrange(rng, 1.2, 2.4), a, 0, TAU);
+      g.fill();
+    }
+    g.strokeStyle = '#4a3a2a';
+    g.lineCap = 'round';
+    g.lineWidth = 2.2;
+    g.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a = rng() * TAU;
+      const d = rrange(rng, 8, r * 0.8);
+      g.moveTo(x + Math.cos(a) * d, y + Math.sin(a) * d);
+      g.lineTo(x + Math.cos(a) * (d + 9), y + Math.sin(a) * (d + 9) + rrange(rng, -3, 3));
+    }
+    g.stroke();
+    // tocón astillado
+    g.fillStyle = '#5a4430';
+    g.beginPath();
+    g.arc(x, y, 8, 0, TAU);
+    g.fill();
+    g.lineWidth = 1.6;
+    g.strokeStyle = OUT;
+    g.stroke();
+    g.fillStyle = '#8a6e4a';
+    g.beginPath();
+    g.arc(x, y, 5, 0, TAU);
+    g.fill();
+  },
+  addCar(g, { x, y, ang, len, wid, color, seed }) {
+    const rng = mulberry32(seed);
+    g.save();
+    g.translate(x, y);
+    g.rotate(ang);
+    // mancha de aceite y la carrocería aplastada en pedazos
+    g.fillStyle = 'rgba(12,12,12,0.45)';
+    g.beginPath();
+    g.ellipse(0, 0, len * 0.45, wid * 0.55, 0, 0, TAU);
+    g.fill();
+    for (let i = 0; i < 9; i++) {
+      const px = rrange(rng, -len * 0.45, len * 0.45);
+      const py = rrange(rng, -wid * 0.45, wid * 0.45);
+      g.save();
+      g.translate(px, py);
+      g.rotate(rng() * TAU);
+      const w = rrange(rng, 6, 16);
+      const h = rrange(rng, 4, 9);
+      g.fillStyle = rng() < 0.6 ? shade(color, rrange(rng, 0.55, 0.9)) : '#3a3c3f';
+      g.fillRect(-w / 2, -h / 2, w, h);
+      g.lineWidth = 1.2;
+      g.strokeStyle = OUT;
+      g.strokeRect(-w / 2, -h / 2, w, h);
+      g.restore();
+    }
+    // llantas sueltas y vidrios
+    for (const [px, py] of [
+      [-len * 0.32, -wid * 0.55],
+      [len * 0.3, wid * 0.5],
+    ]) {
+      g.fillStyle = '#1c1c1c';
+      g.beginPath();
+      g.arc(px, py, 6, 0, TAU);
+      g.fill();
+      g.fillStyle = '#5a5a5a';
+      g.beginPath();
+      g.arc(px, py, 2.5, 0, TAU);
+      g.fill();
+    }
+    g.fillStyle = 'rgba(190,220,215,0.7)';
+    for (let i = 0; i < 16; i++)
+      g.fillRect(rrange(rng, -len * 0.5, len * 0.5), rrange(rng, -wid * 0.6, wid * 0.6), 1.6, 1.6);
+    g.restore();
+  },
+};
+
 // Estado de dibujo de un mundo: índice de ops por trozo y caché de trozos ya pintados.
 class WorldView {
   constructor(world) {
@@ -669,6 +752,8 @@ class WorldView {
     const n = Math.ceil(world.size / CHUNK);
     this.n = n;
     this.chunkOps = Array.from({ length: n * n }, () => []);
+    // cuántos destrozos del mundo ya se repintaron
+    this.smashSeen = 0;
     for (const op of world.ops) {
       const x0 = clamp(Math.floor(op.x / CHUNK), 0, n - 1);
       const y0 = clamp(Math.floor(op.y / CHUNK), 0, n - 1);
@@ -699,7 +784,8 @@ class WorldView {
     g.setTransform(s, 0, 0, s, -i * CHUNK * s, -j * CHUNK * s);
     for (const op of this.chunkOps[key]) {
       g.save();
-      PAINTERS[op.kind](g, op.p);
+      if (!op.gone) PAINTERS[op.kind](g, op.p);
+      else WRECKS[op.kind]?.(g, op.p);
       g.restore();
     }
     this.cache.set(key, c);
@@ -733,8 +819,32 @@ export function setChunkView(world, scale, maxChunks) {
   v.pool.length = 0;
 }
 
+// Repinta los trozos donde un rocoso destrozó algo desde la última vez.
+function refreshSmashed(v, world) {
+  const list = world.smashed;
+  for (; v.smashSeen < list.length; v.smashSeen++) {
+    const o = world.obstacles[list[v.smashSeen]];
+    const op = o?.op;
+    if (!op) continue;
+    const n = v.n;
+    const x0 = clamp(Math.floor(op.x / CHUNK), 0, n - 1);
+    const y0 = clamp(Math.floor(op.y / CHUNK), 0, n - 1);
+    const x1 = clamp(Math.floor((op.x + op.w) / CHUNK), 0, n - 1);
+    const y1 = clamp(Math.floor((op.y + op.h) / CHUNK), 0, n - 1);
+    for (let j = y0; j <= y1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        const c = v.cache.get(j * n + i);
+        if (!c) continue;
+        v.cache.delete(j * n + i);
+        v.pool.push(c);
+      }
+    }
+  }
+}
+
 export function drawGround(ctx, world, x0, y0, x1, y1) {
   const v = viewOf(world);
+  if (v.smashSeen < world.smashed.length) refreshSmashed(v, world);
   const n = v.n;
   const i0 = clamp(Math.floor(x0 / CHUNK), 0, n - 1);
   const j0 = clamp(Math.floor(y0 / CHUNK), 0, n - 1);
@@ -785,6 +895,7 @@ export function drawOverhead(ctx, world, x0, y0, x1, y1, player, time) {
     drawFlame(ctx, f, time);
   }
   for (const t of world.trees) {
+    if (t.gone) continue;
     if (t.x + t.size < x0 || t.x - t.size > x1 || t.y + t.size < y0 || t.y - t.size > y1) continue;
     const near = Math.hypot(player.x - t.x, player.y - t.y) < t.r + 10;
     ctx.globalAlpha = near ? 0.45 : 0.95;

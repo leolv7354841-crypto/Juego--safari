@@ -318,6 +318,27 @@ export class Structures {
     }
   }
 
+  // Destroza la pieza de una vez (el rocoso aplasta la madera o deshace el metal que no puede lanzar).
+  crush(game: GameHost, o: Block) {
+    this.damageBlock(game, o, Number.POSITIVE_INFINITY);
+    game.particles.dust(o.x + o.w / 2, o.y + o.h / 2, 22);
+  }
+
+  // Mueve la pila de piezas de o (dx, dy) si cabe donde cae; el rocoso las avienta o las empuja.
+  moveStack(game: GameHost, o: Block, dx: number, dy: number) {
+    const stack = this.blocks.filter((b) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+    for (const b of stack) game.world.removeDynamic(b);
+    const ok = game.world.rectFree(o.x + dx, o.y + dy, o.w, o.h);
+    for (const b of stack) {
+      if (ok) {
+        b.x += dx;
+        b.y += dy;
+      }
+      game.world.addDynamic(b);
+    }
+    return ok;
+  }
+
   // Llamado por cada zombi: devuelve el efecto de la trampa que pisa (o null).
   trapAt(z: Zombie, dt: number, game: GameHost) {
     for (let i = 0; i < this.wires.length; i++) {

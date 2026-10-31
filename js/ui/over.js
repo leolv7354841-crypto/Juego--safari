@@ -28,6 +28,7 @@ export function gameOver(game) {
     ['Dorados', game.kills.golden || 0],
     ['Super blindados', game.kills.heavy],
     ['Toros', game.kills.bull || 0],
+    ['Rocosos', game.kills.rock || 0],
     ['sep'],
     ['Mejor racha', comboTxt],
     ['Precisión', `${acc}%`],

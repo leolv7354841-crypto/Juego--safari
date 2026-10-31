@@ -216,7 +216,7 @@ class Game {
     this.mode = new Solo(this);
     this.robot.reset();
     this.setAcid(0);
-    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, giant: 0 };
+    this.kills = { normal: 0, swat: 0, sprinter: 0, fat: 0, heavy: 0, bull: 0, rock: 0, giant: 0 };
     this.level = 1;
     this.xp = 0;
     this.xpNeed = xpForLevel(1);

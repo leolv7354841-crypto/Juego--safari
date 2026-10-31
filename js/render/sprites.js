@@ -9,7 +9,7 @@ export const OUT = '#141612';
 /** @typedef {keyof typeof ZOMBIE_VARIANTS} ZType */
 /** @typedef {{ skin: string, pants: string, hair: string, seed: number }} PalBase */
 /** @typedef {PalBase & { shirt: string }} PalShirt */
-/** @typedef {{ normal: PalShirt, golden: PalShirt, sprinter: PalShirt, fat: PalShirt, swat: PalShirt & { vest: string, shield: string }, heavy: PalShirt & { plate: string, dark: string, camo: string }, bull: PalBase & { bone: string, vein: string }, giant: PalShirt & { metal: string } }} PalOf paleta de cada tipo de zombi */
+/** @typedef {{ normal: PalShirt, golden: PalShirt, sprinter: PalShirt, fat: PalShirt, swat: PalShirt & { vest: string, shield: string }, heavy: PalShirt & { plate: string, dark: string, camo: string }, bull: PalBase & { bone: string, vein: string }, rock: { stone: string, light: string, dark: string, moss: string, skin: string, eye: string, seed: number }, giant: PalShirt & { metal: string } }} PalOf paleta de cada tipo de zombi */
 /** @typedef {{ [K in ZType]: (g: Ctx, r: number, p: PalOf[K], ph: number) => void }} Drawers */
 /** @typedef {{ frames: HTMLCanvasElement[], flash: HTMLCanvasElement[], dead: HTMLCanvasElement, burnt: HTMLCanvasElement, size: number, half: number }} ZSet */
 /** @typedef {{ id: string, name: string, colors: string[] }} LookPart */
@@ -245,6 +245,11 @@ const BULL_PALETTES = [
   { skin: '#b07c4c', pants: '#2f3440', hair: '#1d1a17', bone: '#d8c8a4', vein: '#7a4a2c' },
   { skin: '#a8743f', pants: '#4a3d2e', hair: '#151311', bone: '#cdbb92', vein: '#6e3f22' },
   { skin: '#b98a58', pants: '#38404c', hair: '#2b241d', bone: '#e0d2ae', vein: '#7d5030' },
+];
+// Rocosos: piedra gris o parda, musgo o líquenes, carne gris en las grietas y ojos encendidos.
+const ROCK_PALETTES = [
+  { stone: '#7d776c', light: '#9b9487', dark: '#565046', moss: '#5d6a3a', skin: '#8a9178', eye: '#f0a848' },
+  { stone: '#76695a', light: '#948672', dark: '#4d4338', moss: '#8a7a4a', skin: '#939880', eye: '#e8d070' },
 ];
 const GIANT_PALETTES = [
   { skin: '#748262', shirt: '#3a3631', pants: '#28282a', hair: '#151311', metal: '#6d6f70' },
@@ -631,6 +636,115 @@ function drawGiant(g, r, p, ph) {
   g.fillRect(r * 0.62, r * 0.05, r * 0.06, r * 0.05);
 }
 
+// Rocoso: un zombi recubierto de roca. Visto desde arriba es un peñasco ancho y facetado, con
+// hombros de piedra, puños como rocas, carne gris asomando por las grietas, musgo y ojos que
+// brillan hundidos entre los hombros. Mira hacia +x.
+/** @param {Ctx} g @param {number} r @param {PalOf["rock"]} p @param {number} ph */
+function drawRock(g, r, p, ph) {
+  softShadow(g, r * 1.35, 0.5);
+  const s = Math.sin(ph);
+  const rng = mulberry32(p.seed);
+  /** Peñasco irregular de n caras alrededor de (x, y). @param {number} x @param {number} y @param {number} rx @param {number} ry @param {number} n @param {number} jit */
+  const boulder = (x, y, rx, ry, n, jit) => {
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + rrange(rng, -0.15, 0.15);
+      const k = 1 - rrange(rng, 0, jit);
+      const px = x + Math.cos(a) * rx * k;
+      const py = y + Math.sin(a) * ry * k;
+      if (i) g.lineTo(px, py);
+      else g.moveTo(px, py);
+    }
+    g.closePath();
+  };
+  /** Peñasco con luz arriba a la izquierda y sombra abajo a la derecha. @param {number} x @param {number} y @param {number} rx @param {number} ry @param {number} n @param {number} lw */
+  const stone = (x, y, rx, ry, n, lw) => {
+    boulder(x, y, rx, ry, n, 0.18);
+    g.fillStyle = p.stone;
+    g.fill();
+    g.save();
+    g.clip();
+    g.fillStyle = p.light;
+    g.beginPath();
+    g.ellipse(x - rx * 0.35, y - ry * 0.35, rx * 0.7, ry * 0.55, -0.6, 0, TAU);
+    g.fill();
+    g.fillStyle = p.dark;
+    g.beginPath();
+    g.ellipse(x + rx * 0.55, y + ry * 0.55, rx * 0.8, ry * 0.6, -0.6, 0, TAU);
+    g.fill();
+    g.restore();
+    boulder(x, y, rx, ry, n, 0.18);
+    g.lineWidth = lw;
+    g.strokeStyle = OUT;
+    g.stroke();
+  };
+  // piernas: dos bloques que se arrastran
+  const stride = r * 0.22;
+  stone(s * stride, -r * 0.45, r * 0.34, r * 0.26, 6, 1.6);
+  stone(-s * stride, r * 0.45, r * 0.34, r * 0.26, 6, 1.6);
+  g.save();
+  g.rotate(s * 0.04);
+  // cuerpo: el peñasco grande, con carne gris en las grietas
+  boulder(-r * 0.08, 0, r * 0.82, r * 0.98, 11, 0.12);
+  g.fillStyle = p.skin;
+  g.fill();
+  g.lineWidth = 2.4;
+  g.strokeStyle = OUT;
+  g.stroke();
+  // placas de roca encima de la carne (dejan grietas entre ellas)
+  /** @type {[number, number, number, number][]} */
+  const plates = [
+    [-0.42, -0.48, 0.36, 0.34],
+    [-0.42, 0.45, 0.36, 0.34],
+    [-0.5, 0, 0.3, 0.26],
+    [0.02, -0.22, 0.3, 0.3],
+    [0.02, 0.26, 0.3, 0.28],
+    [0.34, 0, 0.24, 0.3],
+  ];
+  for (const [px, py, rx, ry] of plates) stone(px * r, py * r, rx * r, ry * r, 7, 1.4);
+  // musgo y líquenes
+  g.fillStyle = p.moss;
+  for (let i = 0; i < 6; i++) {
+    g.beginPath();
+    g.ellipse(
+      rrange(rng, -0.6, 0.2) * r,
+      rrange(rng, -0.7, 0.7) * r,
+      rrange(rng, 0.06, 0.13) * r,
+      rrange(rng, 0.04, 0.09) * r,
+      rng() * TAU,
+      0,
+      TAU,
+    );
+    g.fill();
+  }
+  // grietas finas en la piedra
+  g.strokeStyle = 'rgba(20,18,15,0.55)';
+  g.lineWidth = 1;
+  g.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const x = rrange(rng, -0.6, 0.3) * r;
+    const y = rrange(rng, -0.6, 0.6) * r;
+    g.moveTo(x, y);
+    g.lineTo(x + rrange(rng, -0.18, 0.18) * r, y + rrange(rng, -0.18, 0.18) * r);
+  }
+  g.stroke();
+  g.restore();
+  // brazos de carne con hombros de piedra y puños como rocas
+  const sw = s * r * 0.1;
+  limb(g, 0, -r * 0.78, r * 0.86 + sw, -r * 0.7, r * 0.34, p.skin);
+  limb(g, 0, r * 0.78, r * 0.86 - sw, r * 0.7, r * 0.34, p.skin);
+  stone(-r * 0.04, -r * 0.8, r * 0.36, r * 0.3, 7, 1.8);
+  stone(-r * 0.04, r * 0.8, r * 0.36, r * 0.3, 7, 1.8);
+  stone(r * 0.92 + sw, -r * 0.7, r * 0.26, r * 0.24, 6, 1.8);
+  stone(r * 0.92 - sw, r * 0.7, r * 0.26, r * 0.24, 6, 1.8);
+  // cabeza hundida entre los hombros, con una costra de piedra y ojos encendidos
+  circ(g, r * 0.3, s * r * 0.02, r * 0.24, p.skin, OUT, 1.8);
+  stone(r * 0.22, s * r * 0.02, r * 0.2, r * 0.22, 6, 1.4);
+  g.fillStyle = p.eye;
+  g.fillRect(r * 0.44, -r * 0.1 + s * r * 0.02, r * 0.07, r * 0.06);
+  g.fillRect(r * 0.44, r * 0.04 + s * r * 0.02, r * 0.07, r * 0.06);
+}
+
 /** @type {Drawers} */
 const DRAWERS = {
   normal: drawNormal,
@@ -640,6 +754,7 @@ const DRAWERS = {
   sprinter: drawSprinter,
   fat: drawFat,
   bull: drawBull,
+  rock: drawRock,
   giant: drawGiant,
 };
 /** @type {{ [K in ZType]: Omit<PalOf[K], 'seed'>[] }} */
@@ -651,6 +766,7 @@ const PALETTES = {
   sprinter: SPRINTER_PALETTES,
   fat: FAT_PALETTES,
   bull: BULL_PALETTES,
+  rock: ROCK_PALETTES,
   giant: GIANT_PALETTES,
 };
 
@@ -734,7 +850,7 @@ let ZSPRITES = null;
 export function zombieSprites() {
   if (ZSPRITES) return ZSPRITES;
   /** @type {Record<ZType, ZSet[]>} */
-  const sets = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], bull: [], giant: [] };
+  const sets = { normal: [], golden: [], swat: [], heavy: [], sprinter: [], fat: [], bull: [], rock: [], giant: [] };
   /** @type {Record<ZType, { r: number, frames: number, scale: number, pad: number }>} */
   const conf = {
     normal: { r: 13, frames: 6, scale: 2.5, pad: 1.65 },
@@ -745,6 +861,7 @@ export function zombieSprites() {
     swat: { r: 14, frames: 6, scale: 2.5, pad: 1.7 },
     heavy: { r: 22, frames: 6, scale: 2.4, pad: 1.45 },
     bull: { r: 17, frames: 6, scale: 2.5, pad: 1.65 },
+    rock: { r: 26, frames: 6, scale: 2.4, pad: 1.5 },
   };
   for (const type of /** @type {ZType[]} */ (Object.keys(conf))) {
     const k = conf[type];

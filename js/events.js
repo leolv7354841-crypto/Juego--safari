@@ -12,7 +12,7 @@ export function hitZombie(game, z, b, hx, hy) {
 }
 
 // Bajas que congelan el mundo un instante por sí solas.
-const HEFTY = new Set(['bull', 'heavy', 'giant', 'golden']);
+const HEFTY = new Set(['bull', 'heavy', 'giant', 'golden', 'rock']);
 
 export function killZombie(game, z) {
   // la baja alarga la racha de quien la hizo y su multiplicador sube el dinero y la experiencia
@@ -199,7 +199,17 @@ export function recordScore(game) {
 
 export function totalKills(game) {
   const k = game.kills;
-  return k.normal + (k.swat || 0) + k.sprinter + k.fat + (k.heavy || 0) + (k.golden || 0) + k.giant;
+  return (
+    k.normal +
+    (k.swat || 0) +
+    k.sprinter +
+    k.fat +
+    (k.heavy || 0) +
+    (k.bull || 0) +
+    (k.rock || 0) +
+    (k.golden || 0) +
+    k.giant
+  );
 }
 
 export function onRobotHit(game, dmg) {

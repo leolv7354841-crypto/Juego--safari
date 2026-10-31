@@ -300,8 +300,9 @@ export const CLASS_ORDER = ['bomber', 'berserker', 'booster'];
 export const CRATE_WEAPONS = ['shotgun', 'rifle'];
 
 // Unidad de velocidad: la del zombi normal en px/s (al azar entre los dos; 1,5 veces la de antes,
-// [60, 88]). En ZOMBIES, speed es un múltiplo de esta unidad y nunca menos de 1: ningún tipo es
-// más lento que un normal. La animación de pasos avanza con la distancia, así que no patinan.
+// [60, 88]). En ZOMBIES, speed es un múltiplo de esta unidad y nunca menos de 1 (ningún tipo es
+// más lento que un normal), salvo el rocoso, que es lento a propósito. La animación de pasos
+// avanza con la distancia, así que no patinan.
 export const ZOMBIE_SPEED = [90, 132];
 
 export const ZOMBIES = {
@@ -383,6 +384,20 @@ export const ZOMBIES = {
     frames: 6,
     turn: 3,
   },
+  // Rocoso: cuerpo de roca más ancho que un gordo, lento y pesado (aparta a la horda al pasar).
+  // La mitad de la vida del super blindado. Camina recto y destroza lo que le estorba (ver ROCK).
+  rock: {
+    hp: 42 * 25,
+    speed: 0.6,
+    radius: 26,
+    damage: 18,
+    attackRate: 0.6,
+    xp: 40,
+    mass: 14,
+    reach: 9,
+    frames: 6,
+    turn: 2,
+  },
   // Zombi dorado: poco común, huye de ti y desaparece si no lo matas a tiempo.
   golden: {
     hp: 42 * 3,
@@ -438,6 +453,7 @@ export const BOUNTY = {
   fat: 2.5,
   heavy: 12.5,
   bull: 7.5,
+  rock: 10,
   giant: 2.5,
   golden: 0,
 };
@@ -464,6 +480,34 @@ export const WAVES = {
 
 // Embestida del toro: te ve, escarba y carga en línea recta.
 // hit: daño al jugador · long/short: daño de la embestida larga y corta contra estructuras.
+// Rocoso (ZOMBIES.rock): desde la oleada `from`, `first` por oleada y `per` más por cada oleada
+// siguiente (escalado como la horda). Camina recto hacia ti; si topa con un edificio rodea
+// detour s por la ruta normal. Contra lo que le estorba:
+//   árboles y coches: se planta smash s y los hace pedazos (desaparecen del mapa)
+//   madera: la aplasta al pasar · metal: la abolla (dent de su vida) y la lanza throw px
+//   valla y sacos: los empuja (push px/s) mientras les quita pushDps hasta quebrarlos
+//   concreto, torretas: embestida corta (short px de impulso) de shortHit
+//   HESCO y concreto reforzado: se aleja long px, carga y embiste con longHit
+// Si te alcanza te agarra (hold s), te quita grab.hit y te lanza (throw px/s) hacia donde hay más
+// zombis: los que tocas mientras vuelas (fly s) mueren, salvo los grandes (big), que sólo se apartan.
+export const ROCK = {
+  from: 5,
+  first: 1,
+  per: 0.6,
+  detour: 2.5,
+  smash: 0.7,
+  dent: 0.5,
+  throw: 70,
+  push: 70,
+  pushDps: 420,
+  short: 45,
+  shortHit: 200,
+  long: 120,
+  longHit: 400,
+  ramSpeed: 300,
+  grab: { cd: 6, hold: 0.35, hit: 50, throw: 1700, fly: 0.55, big: ['rock', 'heavy', 'giant', 'bull'] },
+};
+
 export const BULL = {
   sight: 430,
   windup: 0.75,
@@ -587,6 +631,7 @@ export const DROPS = {
   fat: { ammo: 0.3, med: 0.1 },
   heavy: { ammo: 0.6, med: 0.25 },
   bull: { ammo: 0.4, med: 0.15 },
+  rock: { ammo: 0.5, med: 0.2 },
   golden: { ammo: 0.5, med: 0.5 },
 };
 
@@ -905,6 +950,7 @@ export const ZOMBIE_VARIANTS = {
   sprinter: 3,
   fat: 4,
   bull: 3,
+  rock: 2,
   giant: 2,
 };
 

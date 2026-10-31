@@ -117,8 +117,14 @@ export class Player {
   declare shotsFired: number;
   declare shotsHit: number;
   declare damageTaken: number;
-  /** Qué fue lo último que le pegó (tipo de zombi, 'bull_charge' o 'acid'): la causa si muere. */
+  /** Qué fue lo último que le pegó (tipo de zombi, 'bull_charge', 'rock_throw' o 'acid'): la causa si muere. */
   declare lastHit?: string;
+  /** s que le quedan volando tras el lanzamiento de un rocoso (arrolla zombis) y dónde iba el fotograma anterior */
+  declare flungT?: number;
+  declare flyX?: number;
+  declare flyY?: number;
+  /** en línea: id de su ranura (para dar las bajas que hace volando) */
+  declare sid?: string;
   declare cls: string | null;
   declare abCd: number;
   declare boostT: number;

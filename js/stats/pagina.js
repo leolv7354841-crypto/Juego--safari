@@ -16,6 +16,8 @@ const ZOMBI = {
   heavy: 'Super blindado',
   bull: 'Toro (mordida)',
   bull_charge: 'Toro (cornada)',
+  rock: 'Rocoso (golpe)',
+  rock_throw: 'Rocoso (lanzamiento)',
   fat: 'Gordo',
   golden: 'Dorado',
   giant: 'Gigante',
